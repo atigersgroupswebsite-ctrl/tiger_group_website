@@ -167,7 +167,7 @@ export const JobDetail: React.FC = () => {
                   Submit your candidate details online. Our placement officers will coordinate your interview choice across partner companies.
                 </p>
                 <Button
-                  to={`/enquiry?job=${job.slug}`}
+                  to={`/enquiry/job-seeker?job=${job.slug}`}
                   variant="primary"
                   size="lg"
                   icon={<ArrowRight size={18} />}
@@ -219,7 +219,7 @@ export const JobDetail: React.FC = () => {
 
                 <div style={{ marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--color-border)' }}>
                   <Button
-                    to={`/enquiry?job=${job.slug}`}
+                    to={`/enquiry/job-seeker?job=${job.slug}`}
                     variant="primary"
                     size="lg"
                     style={{ width: '100%' }}

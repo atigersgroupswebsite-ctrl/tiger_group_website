@@ -48,7 +48,7 @@ export const EmployerCTA: React.FC = () => {
               </p>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
-                <Button to="/employers" variant="primary" size="lg" icon={<ArrowRight size={18} />}>
+                <Button to="/enquiry/employer" variant="primary" size="lg" icon={<ArrowRight size={18} />}>
                   SUBMIT MANPOWER REQUIREMENT
                 </Button>
                 <Button to="/contact" variant="outline-light" size="lg" icon={<PhoneCall size={18} />}>

@@ -499,34 +499,49 @@
    -------------------------------------------------------------------------- */
 .partner-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--space-6);
-  align-items: center;
+  align-items: stretch;
+}
+
+@media (min-width: 640px) {
+  .partner-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 .partner-card {
   background: var(--color-pearl-white);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6) var(--space-8);
+  border-radius: var(--radius-xl);
+  padding: 1.75rem 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  height: 120px;
+  min-height: 170px;
+  box-shadow: var(--shadow-sm);
   transition: all var(--transition-normal);
 }
 
 .partner-card:hover {
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
   border-color: var(--color-champagne-dark);
-  transform: translateY(-3px);
+  transform: translateY(-4px);
+}
+
+.partner-logo-box {
+  width: 100%;
+  height: 95px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .partner-logo-img {
-  max-height: 52px;
-  max-width: 180px;
+  max-height: 85px;
+  max-width: 220px;
   width: auto;
   height: auto;
   object-fit: contain;
@@ -534,7 +549,29 @@
 }
 
 .partner-card:hover .partner-logo-img {
-  transform: scale(1.04);
+  transform: scale(1.05);
+}
+
+.partner-meta {
+  margin-top: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.partner-name {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-midnight-navy);
+  letter-spacing: -0.01em;
+}
+
+.partner-sub {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
 }
 
 /* --------------------------------------------------------------------------

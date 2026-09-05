@@ -7,13 +7,21 @@
    -------------------------------------------------------------------------- */
 .hero-section {
   position: relative;
-  min-height: 90vh;
-  padding-top: calc(var(--header-height) + 3rem);
+  min-height: 88vh;
+  padding-top: calc(var(--header-height) + 4.5rem);
   padding-bottom: 5rem;
   display: flex;
   align-items: center;
   overflow: hidden;
   background: linear-gradient(180deg, #FCFBFB 0%, #F5F3EF 100%);
+}
+
+@media (max-width: 991px) {
+  .hero-section {
+    padding-top: calc(var(--header-height) + 2.5rem);
+    padding-bottom: 4rem;
+    min-height: auto;
+  }
 }
 
 .hero-geometry {
@@ -47,7 +55,7 @@
 .hero-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-12);
+  gap: var(--space-10);
   align-items: center;
   position: relative;
   z-index: 1;
@@ -56,6 +64,7 @@
 @media (min-width: 992px) {
   .hero-grid {
     grid-template-columns: 1.15fr 0.85fr;
+    gap: var(--space-12);
   }
 }
 
@@ -65,12 +74,20 @@
 }
 
 .hero-title {
-  font-size: clamp(2.5rem, 5vw, 4.25rem);
-  line-height: 1.08;
+  font-size: clamp(2.1rem, 4.5vw, 4.1rem);
+  line-height: 1.1;
   font-weight: 800;
   color: var(--color-midnight-navy);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-5);
   letter-spacing: -0.03em;
+  word-break: break-word;
+}
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 2.15rem;
+    line-height: 1.15;
+  }
 }
 
 .hero-title-highlight {
@@ -123,6 +140,7 @@
 
 .hero-visual {
   position: relative;
+  width: 100%;
 }
 
 .hero-image-wrapper {
@@ -131,35 +149,105 @@
   overflow: hidden;
   box-shadow: var(--shadow-xl);
   border: 1px solid rgba(247, 215, 148, 0.4);
+  background-color: var(--color-midnight-navy-dark);
 }
 
 .hero-image {
   width: 100%;
   height: 480px;
   object-fit: cover;
+  object-position: center 25%;
   display: block;
 }
 
+/* Responsive Image Breakpoints preserving all employees & faces */
+@media (max-width: 991px) {
+  .hero-image {
+    height: auto;
+    aspect-ratio: 16 / 10;
+    object-position: center 20%;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-image-wrapper {
+    border-radius: var(--radius-xl);
+  }
+
+  .hero-image {
+    aspect-ratio: 16 / 11;
+    object-position: center 15%;
+  }
+}
+
+@media (max-width: 400px) {
+  .hero-image {
+    aspect-ratio: 16 / 11.5;
+    object-position: center 12%;
+  }
+}
+
+/* Floating Regional Presence Card - intentionally anchored */
 .hero-floating-card {
   position: absolute;
-  bottom: -20px;
-  left: -20px;
-  background: rgba(25, 42, 86, 0.95);
-  backdrop-filter: blur(10px);
+  bottom: 1.25rem;
+  left: 1.25rem;
+  background: rgba(25, 42, 86, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: var(--color-pearl-white);
-  padding: var(--space-4) var(--space-6);
+  padding: 0.75rem 1.25rem;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(247, 215, 148, 0.35);
-  box-shadow: var(--shadow-navy);
+  border: 1px solid rgba(247, 215, 148, 0.4);
+  box-shadow: 0 12px 30px rgba(15, 27, 56, 0.4);
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  z-index: 2;
+  max-width: calc(100% - 2.5rem);
 }
 
 @media (max-width: 767px) {
   .hero-floating-card {
-    position: static;
-    margin-top: var(--space-4);
+    position: relative;
+    bottom: auto;
+    left: auto;
+    margin-top: -1.25rem;
+    margin-left: auto;
+    margin-right: auto;
+    width: fit-content;
+    max-width: 92%;
+    padding: 0.7rem 1rem;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+/* Distinct Responsive Classes for About and Service Detail Images */
+.about-preview-image,
+.service-detail-image {
+  width: 100%;
+  height: 460px;
+  object-fit: cover;
+  object-position: center 20%;
+  display: block;
+}
+
+@media (max-width: 991px) {
+  .about-preview-image,
+  .service-detail-image {
+    height: auto;
+    aspect-ratio: 16 / 10;
+    object-position: center 15%;
+  }
+}
+
+@media (max-width: 640px) {
+  .about-preview-image,
+  .service-detail-image {
+    aspect-ratio: 16 / 11;
+    object-position: center 12%;
+    border-radius: var(--radius-xl);
   }
 }
 

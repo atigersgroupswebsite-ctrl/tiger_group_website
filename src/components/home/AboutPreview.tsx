@@ -38,9 +38,9 @@ export const AboutPreview: React.FC = () => {
                   border: '1px solid var(--color-border)'
                 }}>
                   <img
-                    src="/assets/service_consultancy.jpg"
-                    alt="A Tiger Global professional career counseling and workforce placement session"
-                    style={{ width: '100%', height: '460px', objectFit: 'cover' }}
+                    src="/assets/about_operations.jpg"
+                    alt="A Tiger Global professional workforce operations and recruitment planning meeting"
+                    className="about-preview-image"
                     loading="lazy"
                   />
                 </div>

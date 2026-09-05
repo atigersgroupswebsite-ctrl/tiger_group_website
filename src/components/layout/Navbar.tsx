@@ -27,6 +27,7 @@ export const Navbar: React.FC = () => {
     { label: 'About', path: '/about' },
     { label: 'Services', path: '/services' },
     { label: 'Jobs', path: '/jobs' },
+    { label: 'Enquiry', path: '/enquiry' },
     { label: 'For Employers', path: '/employers' },
     { label: 'Contact', path: '/contact' }
   ];
@@ -68,7 +69,7 @@ export const Navbar: React.FC = () => {
             {/* Desktop Action & Mobile Toggle */}
             <div className="navbar-actions">
               <div style={{ display: 'none' }} className="d-lg-flex">
-                <Button to="/enquiry" variant="primary" size="sm" icon={<ArrowRight size={15} />}>
+                <Button to="/enquiry/job-seeker" variant="primary" size="sm" icon={<ArrowRight size={15} />}>
                   APPLY NOW
                 </Button>
               </div>
@@ -84,7 +85,7 @@ export const Navbar: React.FC = () => {
                   <PhoneCall size={14} />
                   <span>+91 8349353946</span>
                 </a>
-                <Button to="/enquiry" variant="primary" size="sm" icon={<ArrowRight size={15} />}>
+                <Button to="/enquiry/job-seeker" variant="primary" size="sm" icon={<ArrowRight size={15} />}>
                   APPLY NOW
                 </Button>
               </div>
@@ -149,7 +150,7 @@ export const Navbar: React.FC = () => {
             </nav>
 
             <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              <Button to="/enquiry" variant="primary" size="lg" icon={<ArrowRight size={18} />}>
+              <Button to="/enquiry/job-seeker" variant="primary" size="lg" icon={<ArrowRight size={18} />}>
                 APPLY NOW
               </Button>
               <a

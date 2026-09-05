@@ -47,7 +47,7 @@ export const TwoAudienceSection: React.FC = () => {
               </div>
 
               <div>
-                <Button to="/employers" variant="navy" size="lg" icon={<Building2 size={18} />}>
+                <Button to="/enquiry/employer" variant="navy" size="lg" icon={<Building2 size={18} />}>
                   HIRE MANPOWER
                 </Button>
               </div>

@@ -64,7 +64,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job }) => {
           Details
         </Button>
         <Button
-          to={`/enquiry?job=${job.slug}`}
+          to={`/enquiry/job-seeker?job=${job.slug}`}
           variant="primary"
           size="sm"
           icon={<ArrowRight size={14} />}

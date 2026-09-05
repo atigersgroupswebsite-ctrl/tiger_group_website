@@ -23,7 +23,7 @@ export const ServicesOverview: React.FC = () => {
       title: 'Labour & Manpower Supply',
       description: 'Provide end-to-end workforce solutions based on business requirements, factory operations, logistics loading, and specialized industrial shifts.',
       icon: <Users size={26} />,
-      image: '/assets/hero_workforce.jpg',
+      image: '/assets/service_manpower.jpg',
       ctaText: 'Explore Manpower',
       link: '/services#manpower'
     },

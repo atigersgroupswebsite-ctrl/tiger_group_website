@@ -14,22 +14,11 @@ export const Hero: React.FC = () => {
         <div className="hero-grid">
           {/* Left: Text Content & Staggered Reveal */}
           <div className="hero-content">
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="eyebrow">
-                <span style={{ color: 'var(--color-champagne-dark)' }}>✦</span>
-                <span>Nagpur • Maharashtra • Central India</span>
-              </div>
-            </motion.div>
-
             <motion.h1
               className="hero-title"
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             >
               BUILDING WORKFORCES.<br />
               <span className="hero-title-highlight">CREATING OPPORTUNITIES.</span>
@@ -53,7 +42,7 @@ export const Hero: React.FC = () => {
               <Button to="/jobs" variant="primary" size="lg" icon={<ArrowRight size={18} />}>
                 FIND A JOB
               </Button>
-              <Button to="/employers" variant="navy" size="lg" icon={<Users size={18} />}>
+              <Button to="/enquiry/employer" variant="navy" size="lg" icon={<Users size={18} />}>
                 HIRE MANPOWER
               </Button>
             </motion.div>

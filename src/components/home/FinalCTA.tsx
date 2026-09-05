@@ -56,10 +56,10 @@ export const FinalCTA: React.FC = () => {
             </p>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 'var(--space-4)' }}>
-              <Button to="/jobs" variant="primary" size="lg" icon={<UserPlus size={18} />}>
+              <Button to="/enquiry/job-seeker" variant="primary" size="lg" icon={<UserPlus size={18} />}>
                 I'M LOOKING FOR WORK
               </Button>
-              <Button to="/employers" variant="navy" size="lg" icon={<Building size={18} />}>
+              <Button to="/enquiry/employer" variant="navy" size="lg" icon={<Building size={18} />}>
                 I NEED MANPOWER
               </Button>
             </div>

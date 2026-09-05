@@ -93,7 +93,8 @@ export const Services: React.FC = () => {
                 <img
                   src="/assets/service_consultancy.jpg"
                   alt="Job placement consultancy interview session"
-                  style={{ width: '100%', height: '420px', objectFit: 'cover' }}
+                  className="service-detail-image"
+                  loading="lazy"
                 />
               </div>
             </ScrollReveal>
@@ -121,9 +122,10 @@ export const Services: React.FC = () => {
             <ScrollReveal direction="left">
               <div style={{ borderRadius: 'var(--radius-2xl)', overflow: 'hidden', boxShadow: 'var(--shadow-xl)', border: '1px solid var(--color-border)' }}>
                 <img
-                  src="/assets/hero_workforce.jpg"
+                  src="/assets/service_manpower.jpg"
                   alt="Industrial manufacturing and warehouse manpower supply"
-                  style={{ width: '100%', height: '420px', objectFit: 'cover' }}
+                  className="service-detail-image"
+                  loading="lazy"
                 />
               </div>
             </ScrollReveal>
@@ -167,7 +169,7 @@ export const Services: React.FC = () => {
                   </ul>
                 </div>
 
-                <Button to="/employers" variant="navy" icon={<ArrowRight size={16} />}>
+                <Button to="/enquiry/employer" variant="navy" icon={<ArrowRight size={16} />}>
                   REQUEST MANPOWER QUOTE
                 </Button>
               </div>
@@ -177,7 +179,7 @@ export const Services: React.FC = () => {
       </section>
 
       {/* Service 3: Security Guard Supply */}
-      <section className="section" id="security">
+      <section className="section section-surface" id="security">
         <Container size="xl">
           <div style={{
             display: 'grid',
@@ -192,17 +194,8 @@ export const Services: React.FC = () => {
                   Security Guard Supply
                 </h2>
                 <p style={{ fontSize: 'var(--text-base)', lineHeight: 1.7, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-6)' }}>
-                  Deploying disciplined, physically fit, and thoroughly background-vetted security personnel to safeguard corporate premises, production facilities, storage warehouses, and gated facilities.
+                  Deploying disciplined, physically fit, and thoroughly verified security personnel for industrial perimeters, commercial complexes, corporate offices, and logistics hubs.
                 </p>
-
-                <div style={{ marginBottom: 'var(--space-6)' }}>
-                  <h4 style={{ fontSize: '1rem', color: 'var(--color-midnight-navy)', marginBottom: '0.5rem', fontWeight: 700 }}>
-                    Ideal Use Case
-                  </h4>
-                  <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
-                    Industrial factory entry gates, corporate reception lobbies, warehouse perimeters, and institutional buildings requiring round-the-clock vigilance.
-                  </p>
-                </div>
 
                 <div style={{ marginBottom: 'var(--space-6)' }}>
                   <h4 style={{ fontSize: '1rem', color: 'var(--color-midnight-navy)', marginBottom: '0.5rem', fontWeight: 700 }}>
@@ -224,7 +217,7 @@ export const Services: React.FC = () => {
                   </ul>
                 </div>
 
-                <Button to="/employers" variant="primary" icon={<ArrowRight size={16} />}>
+                <Button to="/enquiry/employer" variant="primary" icon={<ArrowRight size={16} />}>
                   HIRE SECURITY GUARDS
                 </Button>
               </div>
@@ -235,7 +228,8 @@ export const Services: React.FC = () => {
                 <img
                   src="/assets/service_security.jpg"
                   alt="Professional facility security guard supply"
-                  style={{ width: '100%', height: '420px', objectFit: 'cover' }}
+                  className="service-detail-image"
+                  loading="lazy"
                 />
               </div>
             </ScrollReveal>

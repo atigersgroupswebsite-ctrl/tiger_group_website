@@ -18,15 +18,18 @@ export const TrustedEmployers: React.FC = () => {
           {PARTNER_ORGANIZATIONS.map((partner, index) => (
             <ScrollReveal key={partner.id} delay={index * 0.1} direction="up">
               <div className="partner-card">
-                <img
-                  src={partner.logo}
-                  alt={partner.name}
-                  className="partner-logo-img"
-                  loading="lazy"
-                />
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.6rem', fontWeight: 500 }}>
-                  {partner.name}
-                </span>
+                <div className="partner-logo-box">
+                  <img
+                    src={partner.logo}
+                    alt={partner.name}
+                    className="partner-logo-img"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="partner-meta">
+                  <span className="partner-name">{partner.name}</span>
+                  <span className="partner-sub">{partner.category}</span>
+                </div>
               </div>
             </ScrollReveal>
           ))}

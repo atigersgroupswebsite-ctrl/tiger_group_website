@@ -70,8 +70,9 @@ export const Footer: React.FC = () => {
               <li><Link to="/about" className="footer-link"><ArrowRight size={12} /> About Us</Link></li>
               <li><Link to="/services" className="footer-link"><ArrowRight size={12} /> Services</Link></li>
               <li><Link to="/jobs" className="footer-link"><ArrowRight size={12} /> Opportunities</Link></li>
-              <li><Link to="/employers" className="footer-link"><ArrowRight size={12} /> For Employers</Link></li>
-              <li><Link to="/enquiry" className="footer-link"><ArrowRight size={12} /> Candidate Enquiry</Link></li>
+              <li><Link to="/enquiry" className="footer-link"><ArrowRight size={12} /> Enquiry Hub</Link></li>
+              <li><Link to="/enquiry/job-seeker" className="footer-link"><ArrowRight size={12} /> Job Seeker Form</Link></li>
+              <li><Link to="/enquiry/employer" className="footer-link"><ArrowRight size={12} /> Manpower Request</Link></li>
               <li><Link to="/contact" className="footer-link"><ArrowRight size={12} /> Contact Us</Link></li>
             </ul>
           </div>

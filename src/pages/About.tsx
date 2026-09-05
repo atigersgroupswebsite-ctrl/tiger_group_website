@@ -104,9 +104,10 @@ export const About: React.FC = () => {
                 position: 'relative'
               }}>
                 <img
-                  src="/assets/service_consultancy.jpg"
+                  src="/assets/about_operations.jpg"
                   alt="A Tiger Global professional recruitment and consultation center"
-                  style={{ width: '100%', height: '480px', objectFit: 'cover' }}
+                  className="about-preview-image"
+                  loading="lazy"
                 />
               </div>
             </ScrollReveal>

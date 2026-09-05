@@ -10,6 +10,8 @@ import { Services } from './pages/Services';
 import { Jobs } from './pages/Jobs';
 import { JobDetail } from './pages/JobDetail';
 import { Enquiry } from './pages/Enquiry';
+import { JobSeekerEnquiryPage } from './pages/JobSeekerEnquiryPage';
+import { EmployerEnquiryPage } from './pages/EmployerEnquiryPage';
 import { Employers } from './pages/Employers';
 import { Contact } from './pages/Contact';
 import { Joining } from './pages/Joining';
@@ -29,6 +31,8 @@ export const App: React.FC = () => {
             <Route path="/jobs" element={<Jobs />} />
             <Route path="/jobs/:slug" element={<JobDetail />} />
             <Route path="/enquiry" element={<Enquiry />} />
+            <Route path="/enquiry/job-seeker" element={<JobSeekerEnquiryPage />} />
+            <Route path="/enquiry/employer" element={<EmployerEnquiryPage />} />
             <Route path="/employers" element={<Employers />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/joining" element={<Joining />} />
