@@ -2,6 +2,7 @@
 // File: src/pages/admin/AdminApplicationDetailPage.tsx
 // Description: Detailed Candidate Application Record Management,
 //              Joining Access Authorization, Company Assignment, and Audit Logs
+// Brand: A TIGER GROUPS — Operational Recruitment System
 // ==============================================================================
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -18,6 +19,7 @@ import type {
   EmployeeRow,
   ActivityLogRow
 } from '../../types/database';
+import { AdminStatusBadge } from '../../components/admin/AdminStatusBadge';
 import {
   ArrowLeft,
   Lock,
@@ -70,7 +72,7 @@ export const AdminApplicationDetailPage: React.FC = () => {
   const [isTogglingAccess, setIsTogglingAccess] = useState<boolean>(false);
   const [isSavingCompanyInfo, setIsSavingCompanyInfo] = useState<boolean>(false);
 
-  // Company / Employment Editable Form State (Belongs in joining_forms)
+  // Company / Employment Editable Form State
   const [companyForm, setCompanyForm] = useState({
     company_id: '',
     unit: '',
@@ -84,7 +86,7 @@ export const AdminApplicationDetailPage: React.FC = () => {
     gross_salary: ''
   });
 
-  // Helper to record an activity log (strictly sanitized, never logging sensitive data)
+  // Helper to record an activity log (strictly sanitized)
   const logActivity = useCallback(
     async (action: string, description: string, metadata?: Record<string, unknown>) => {
       if (!id) return;
@@ -159,7 +161,6 @@ export const AdminApplicationDetailPage: React.FC = () => {
           gross_salary: jf.gross_salary ? String(jf.gross_salary) : ''
         });
       } else {
-        // Pre-fill designation from application
         setCompanyForm((prev) => ({
           ...prev,
           designation: app.designation || ''
@@ -238,11 +239,8 @@ export const AdminApplicationDetailPage: React.FC = () => {
         })
         .eq('id', application.id);
 
-      if (updateErr) {
-        throw new Error(updateErr.message);
-      }
+      if (updateErr) throw new Error(updateErr.message);
 
-      // Record Activity Log
       await logActivity(
         'APPLICATION_STATUS_UPDATED',
         `Coordinator updated application status from ${application.status} to ${selectedStatus}.`,
@@ -280,19 +278,14 @@ export const AdminApplicationDetailPage: React.FC = () => {
         })
         .eq('id', application.id);
 
-      if (updateErr) {
-        throw new Error(updateErr.message);
-      }
+      if (updateErr) throw new Error(updateErr.message);
 
-      // Log the action to activity_logs
       const actionType = willEnable ? 'JOINING_ACCESS_ENABLED' : 'JOINING_ACCESS_DISABLED';
       const actionDesc = willEnable
         ? 'Coordinator enabled joining form access.'
         : 'Coordinator disabled joining form access.';
 
-      await logActivity(actionType, actionDesc, {
-        timestamp: nowTimestamp
-      });
+      await logActivity(actionType, actionDesc, { timestamp: nowTimestamp });
 
       setApplication({
         ...application,
@@ -326,7 +319,6 @@ export const AdminApplicationDetailPage: React.FC = () => {
       const grossSalaryNum = companyForm.gross_salary ? parseFloat(companyForm.gross_salary) : null;
 
       if (joiningForm) {
-        // Update existing joining_forms record
         const { error: updateErr } = await supabase
           .from('joining_forms')
           .update({
@@ -346,7 +338,6 @@ export const AdminApplicationDetailPage: React.FC = () => {
 
         if (updateErr) throw new Error(updateErr.message);
       } else {
-        // Create new joining_forms record linked to application_id
         const { error: insertErr } = await supabase.from('joining_forms').insert({
           application_id: application.id,
           company_id: companyForm.company_id || null,
@@ -366,7 +357,6 @@ export const AdminApplicationDetailPage: React.FC = () => {
         if (insertErr) throw new Error(insertErr.message);
       }
 
-      // Log in activity_logs (safe metadata, no sensitive candidate data)
       await logActivity(
         'COMPANY_INFO_UPDATED',
         'Coordinator updated company and employment assignment details.',
@@ -397,15 +387,14 @@ export const AdminApplicationDetailPage: React.FC = () => {
     return `${maskedPart} ${visiblePart}`;
   };
 
-  // Helper summary calculations
   const verifiedDocsCount = documents.filter((d) => d.verification_status === 'VERIFIED').length;
   const hasSuccessfulPayment = payments.some((p) => p.status === 'SUCCESS');
   const hasPendingPayment = payments.some((p) => p.status === 'PENDING');
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '5rem 1rem', color: '#94A3B8' }}>
-        <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: '#F59E0B', marginBottom: '1rem' }} />
+      <div style={{ textAlign: 'center', padding: '5rem 1rem', color: '#64748B' }}>
+        <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: '#192A56', marginBottom: '1rem' }} />
         <div style={{ fontSize: '1rem', fontWeight: 600 }}>Loading candidate application record...</div>
       </div>
     );
@@ -414,22 +403,12 @@ export const AdminApplicationDetailPage: React.FC = () => {
   if (!application) {
     return (
       <div style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-        <AlertCircle size={48} color="#F87171" style={{ marginBottom: '1rem' }} />
-        <h2 style={{ color: '#F8FAFC', marginBottom: '0.5rem' }}>Application Record Not Found</h2>
-        <p style={{ color: '#94A3B8', marginBottom: '1.5rem' }}>
+        <AlertCircle size={48} color="#C9726F" style={{ marginBottom: '1rem' }} />
+        <h2 style={{ color: '#192A56', marginBottom: '0.5rem' }}>Application Record Not Found</h2>
+        <p style={{ color: '#64748B', marginBottom: '1.5rem' }}>
           The requested application ID does not exist in the database.
         </p>
-        <Link
-          to="/admin/applications"
-          style={{
-            color: '#F59E0B',
-            textDecoration: 'none',
-            fontWeight: 600,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
+        <Link to="/admin/applications" className="btn-admin-primary">
           <ArrowLeft size={16} />
           <span>Back to Applications</span>
         </Link>
@@ -446,17 +425,15 @@ export const AdminApplicationDetailPage: React.FC = () => {
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            color: '#94A3B8',
-            fontSize: '0.85rem',
+            gap: '0.4rem',
+            color: '#192A56',
+            fontSize: '0.825rem',
+            fontWeight: 700,
             textDecoration: 'none',
-            marginBottom: '1rem',
-            transition: 'color 0.15s ease'
+            marginBottom: '0.75rem'
           }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = '#F59E0B')}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = '#94A3B8')}
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={14} />
           <span>Back to Applications Directory</span>
         </Link>
 
@@ -472,41 +449,49 @@ export const AdminApplicationDetailPage: React.FC = () => {
         >
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-              <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#F8FAFC', margin: 0 }}>
+              <h1
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: '1.75rem',
+                  fontWeight: 800,
+                  color: '#192A56',
+                  margin: 0
+                }}
+              >
                 {application.full_name}
               </h1>
               <span
                 style={{
                   fontFamily: 'monospace',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                  color: '#F59E0B',
-                  padding: '4px 10px',
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                  backgroundColor: '#FDF3DB',
+                  color: '#8C6400',
+                  padding: '3px 9px',
                   borderRadius: '6px',
-                  border: '1px solid rgba(245, 158, 11, 0.3)'
+                  border: '1px solid #F7D794'
                 }}
               >
                 {application.application_number}
               </span>
             </div>
-            <p style={{ fontSize: '0.85rem', color: '#94A3B8', margin: 0 }}>
+            <p style={{ fontSize: '0.825rem', color: '#64748B', margin: 0 }}>
               Applied on {new Date(application.created_at).toLocaleDateString('en-IN', { dateStyle: 'long' })}
             </p>
           </div>
 
           {/* Quick Status Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value as ApplicationStatus)}
               style={{
-                padding: '0.6rem 0.85rem',
-                backgroundColor: '#0F172A',
-                border: '1px solid #334155',
-                borderRadius: '8px',
-                color: '#F8FAFC',
-                fontSize: '0.875rem',
+                padding: '0.55rem 0.75rem',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #D2CECE',
+                borderRadius: '6px',
+                color: '#192A56',
+                fontSize: '0.825rem',
                 fontWeight: 600,
                 outline: 'none',
                 cursor: 'pointer'
@@ -522,25 +507,13 @@ export const AdminApplicationDetailPage: React.FC = () => {
             <button
               onClick={handleStatusUpdate}
               disabled={isUpdatingStatus || selectedStatus === application.status}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.6rem 1rem',
-                borderRadius: '8px',
-                backgroundColor: selectedStatus === application.status ? '#1E293B' : '#D97706',
-                color: selectedStatus === application.status ? '#64748B' : '#FFFFFF',
-                border: 'none',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                cursor: selectedStatus === application.status || isUpdatingStatus ? 'not-allowed' : 'pointer',
-                transition: 'all 0.15s ease'
-              }}
+              className="btn-admin-primary"
+              style={{ padding: '0.55rem 1rem' }}
             >
               {isUpdatingStatus ? (
-                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
               ) : (
-                <Save size={16} />
+                <Save size={15} />
               )}
               <span>Update Status</span>
             </button>
@@ -548,40 +521,40 @@ export const AdminApplicationDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Alert Notices */}
+      {/* Notices */}
       {error && (
         <div
           style={{
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
+            backgroundColor: '#FBF0EF',
+            border: '1px solid #EDA6A3',
             borderRadius: '8px',
-            padding: '1rem',
-            marginBottom: '1.5rem',
+            padding: '0.85rem 1rem',
+            marginBottom: '1.25rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.75rem'
+            gap: '0.65rem'
           }}
         >
-          <AlertCircle size={20} color="#F87171" />
-          <span style={{ fontSize: '0.875rem', color: '#FCA5A5' }}>{error}</span>
+          <AlertCircle size={18} color="#C9726F" />
+          <span style={{ fontSize: '0.85rem', color: '#C9726F', fontWeight: 600 }}>{error}</span>
         </div>
       )}
 
       {successMsg && (
         <div
           style={{
-            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
+            backgroundColor: '#E8F5E9',
+            border: '1px solid #A5D6A7',
             borderRadius: '8px',
-            padding: '1rem',
-            marginBottom: '1.5rem',
+            padding: '0.85rem 1rem',
+            marginBottom: '1.25rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.75rem'
+            gap: '0.65rem'
           }}
         >
-          <CheckCircle2 size={20} color="#10B981" />
-          <span style={{ fontSize: '0.875rem', color: '#A7F3D0' }}>{successMsg}</span>
+          <CheckCircle2 size={18} color="#2E7D32" />
+          <span style={{ fontSize: '0.85rem', color: '#2E7D32', fontWeight: 600 }}>{successMsg}</span>
         </div>
       )}
 
@@ -589,100 +562,85 @@ export const AdminApplicationDetailPage: React.FC = () => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           gap: '1rem',
-          marginBottom: '2rem'
+          marginBottom: '1.75rem'
         }}
       >
         {/* Enquiry Card */}
-        <div style={{ backgroundColor: '#0F172A', border: '1px solid #1E293B', borderRadius: '10px', padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+        <div className="admin-card" style={{ padding: '1rem' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
             ENQUIRY
           </div>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#10B981', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#2E7D32', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <span>✓</span>
             <span>Complete</span>
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
             {application.desired_company || 'A Tiger Global'}
           </div>
         </div>
 
         {/* Joining Form Card */}
-        <div style={{ backgroundColor: '#0F172A', border: '1px solid #1E293B', borderRadius: '10px', padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+        <div className="admin-card" style={{ padding: '1rem' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
             JOINING FORM
           </div>
-          <div
-            style={{
-              fontSize: '1rem',
-              fontWeight: 700,
-              color: joiningForm?.submission_status === 'SUBMITTED' ? '#10B981' : '#F59E0B',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem'
-            }}
-          >
-            <span>●</span>
-            <span>{joiningForm?.submission_status ? joiningForm.submission_status.replace(/_/g, ' ') : 'NOT STARTED'}</span>
+          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#192A56' }}>
+            {joiningForm?.submission_status ? joiningForm.submission_status.replace(/_/g, ' ') : 'NOT STARTED'}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '0.25rem' }}>
-            {joiningForm?.submitted_at
-              ? `Submitted ${new Date(joiningForm.submitted_at).toLocaleDateString()}`
-              : 'Digital packet status'}
+          <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
+            {joiningForm?.submitted_at ? `Submitted ${new Date(joiningForm.submitted_at).toLocaleDateString()}` : 'Digital packet'}
           </div>
         </div>
 
         {/* Documents Card */}
-        <div style={{ backgroundColor: '#0F172A', border: '1px solid #1E293B', borderRadius: '10px', padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+        <div className="admin-card" style={{ padding: '1rem' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
             DOCUMENTS
           </div>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#F8FAFC' }}>
+          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#192A56' }}>
             {documents.length > 0 ? `${verifiedDocsCount} / ${documents.length} Verified` : '0 Uploaded'}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '0.25rem' }}>
-            Identity & Education
+          <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
+            Identity & Academic
           </div>
         </div>
 
         {/* Payment Card */}
-        <div style={{ backgroundColor: '#0F172A', border: '1px solid #1E293B', borderRadius: '10px', padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+        <div className="admin-card" style={{ padding: '1rem' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
             PAYMENT
           </div>
           <div
             style={{
-              fontSize: '1rem',
-              fontWeight: 700,
-              color: hasSuccessfulPayment ? '#10B981' : hasPendingPayment ? '#F59E0B' : '#64748B',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem'
+              fontSize: '0.95rem',
+              fontWeight: 800,
+              color: hasSuccessfulPayment ? '#2E7D32' : hasPendingPayment ? '#8C6400' : '#64748B'
             }}
           >
             {hasSuccessfulPayment ? '✓ Paid' : hasPendingPayment ? '● Pending' : 'Not Initiated'}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '0.25rem' }}>
-            Registration fee
+          <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
+            Registration fees
           </div>
         </div>
 
         {/* Employee Card */}
-        <div style={{ backgroundColor: '#0F172A', border: '1px solid #1E293B', borderRadius: '10px', padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+        <div className="admin-card" style={{ padding: '1rem' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
             EMPLOYEE
           </div>
           <div
             style={{
-              fontSize: '1rem',
-              fontWeight: 700,
-              color: employee ? '#10B981' : '#64748B'
+              fontSize: '0.95rem',
+              fontWeight: 800,
+              color: employee ? '#2E7D32' : '#64748B'
             }}
           >
             {employee ? `Active (${employee.employee_code})` : 'Not Created'}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
             Stage 3 Onboarding
           </div>
         </div>
@@ -694,14 +652,15 @@ export const AdminApplicationDetailPage: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Joining Access Control Panel */}
           <div
+            className="admin-card"
             style={{
-              backgroundColor: '#0F172A',
-              border: application.joining_access_enabled
-                ? '1px solid rgba(16, 185, 129, 0.4)'
-                : '1px solid #1E293B',
-              borderRadius: '12px',
               padding: '1.5rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)'
+              border: application.joining_access_enabled
+                ? '1px solid #A5D6A7'
+                : '1px solid #E2DFD8',
+              backgroundColor: application.joining_access_enabled
+                ? '#F1F8F4'
+                : '#FFFFFF'
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -712,54 +671,53 @@ export const AdminApplicationDetailPage: React.FC = () => {
                       width: '32px',
                       height: '32px',
                       borderRadius: '6px',
-                      backgroundColor: application.joining_access_enabled
-                        ? 'rgba(16, 185, 129, 0.15)'
-                        : 'rgba(239, 68, 68, 0.15)',
+                      backgroundColor: application.joining_access_enabled ? '#E8F5E9' : '#FBF0EF',
+                      color: application.joining_access_enabled ? '#2E7D32' : '#C9726F',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}
                   >
-                    {application.joining_access_enabled ? (
-                      <Unlock size={18} color="#10B981" />
-                    ) : (
-                      <Lock size={18} color="#F87171" />
-                    )}
+                    {application.joining_access_enabled ? <Unlock size={17} /> : <Lock size={17} />}
                   </div>
-                  <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>
+                  <h2
+                    style={{
+                      fontFamily: 'Plus Jakarta Sans, sans-serif',
+                      fontSize: '1.1rem',
+                      fontWeight: 800,
+                      color: '#192A56',
+                      margin: 0
+                    }}
+                  >
                     JOINING FORM ACCESS
                   </h2>
                   <span
                     style={{
                       padding: '2px 8px',
                       borderRadius: '4px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      backgroundColor: application.joining_access_enabled
-                        ? 'rgba(16, 185, 129, 0.15)'
-                        : 'rgba(239, 68, 68, 0.15)',
-                      color: application.joining_access_enabled ? '#10B981' : '#F87171',
-                      border: application.joining_access_enabled
-                        ? '1px solid rgba(16, 185, 129, 0.3)'
-                        : '1px solid rgba(239, 68, 68, 0.3)'
+                      fontSize: '0.725rem',
+                      fontWeight: 800,
+                      backgroundColor: application.joining_access_enabled ? '#E8F5E9' : '#FBF0EF',
+                      color: application.joining_access_enabled ? '#2E7D32' : '#C9726F',
+                      border: application.joining_access_enabled ? '1px solid #A5D6A7' : '1px solid #EDA6A3'
                     }}
                   >
                     {application.joining_access_enabled ? 'ENABLED' : 'LOCKED'}
                   </span>
                 </div>
 
-                <div style={{ fontSize: '0.825rem', color: '#94A3B8' }}>
+                <div style={{ fontSize: '0.825rem', color: '#64748B' }}>
                   {application.joining_access_enabled ? (
                     <>
                       Enabled At:{' '}
-                      <span style={{ color: '#F8FAFC', fontWeight: 600 }}>
+                      <strong style={{ color: '#192A56' }}>
                         {application.joining_access_enabled_at
                           ? new Date(application.joining_access_enabled_at).toLocaleString('en-IN')
                           : 'Active'}
-                      </span>
+                      </strong>
                     </>
                   ) : (
-                    'Candidate is currently restricted from submitting or editing the digital joining packet.'
+                    'Candidate is currently locked from editing or completing the digital joining packet.'
                   )}
                 </div>
               </div>
@@ -769,28 +727,15 @@ export const AdminApplicationDetailPage: React.FC = () => {
                 type="button"
                 onClick={handleToggleJoiningAccess}
                 disabled={isTogglingAccess}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.65rem 1.25rem',
-                  borderRadius: '8px',
-                  backgroundColor: application.joining_access_enabled ? '#1E293B' : '#10B981',
-                  color: application.joining_access_enabled ? '#F87171' : '#FFFFFF',
-                  border: application.joining_access_enabled ? '1px solid #334155' : 'none',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: isTogglingAccess ? 'not-allowed' : 'pointer',
-                  boxShadow: application.joining_access_enabled ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.3)',
-                  transition: 'all 0.15s ease'
-                }}
+                className={application.joining_access_enabled ? 'btn-admin-danger' : 'btn-admin-primary'}
+                style={{ padding: '0.6rem 1.25rem' }}
               >
                 {isTogglingAccess ? (
-                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                  <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
                 ) : application.joining_access_enabled ? (
-                  <Lock size={16} />
+                  <Lock size={15} />
                 ) : (
-                  <Unlock size={16} />
+                  <Unlock size={15} />
                 )}
                 <span>{application.joining_access_enabled ? 'DISABLE ACCESS' : 'ENABLE JOINING FORM'}</span>
               </button>
@@ -798,18 +743,18 @@ export const AdminApplicationDetailPage: React.FC = () => {
           </div>
 
           {/* Candidate Information Card */}
-          <div
-            style={{
-              backgroundColor: '#0F172A',
-              border: '1px solid #1E293B',
-              borderRadius: '12px',
-              padding: '1.5rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)'
-            }}
-          >
+          <div className="admin-card" style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-              <User size={20} color="#F59E0B" />
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>
+              <User size={18} color="#192A56" />
+              <h2
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: '1.1rem',
+                  fontWeight: 800,
+                  color: '#192A56',
+                  margin: 0
+                }}
+              >
                 Candidate Information
               </h2>
             </div>
@@ -819,7 +764,7 @@ export const AdminApplicationDetailPage: React.FC = () => {
                 <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>
                   Full Name
                 </div>
-                <div style={{ fontSize: '0.9rem', color: '#F8FAFC', fontWeight: 600, marginTop: '2px' }}>
+                <div style={{ fontSize: '0.9rem', color: '#192A56', fontWeight: 700, marginTop: '2px' }}>
                   {application.full_name}
                 </div>
               </div>
@@ -828,7 +773,7 @@ export const AdminApplicationDetailPage: React.FC = () => {
                 <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>
                   Father's Name
                 </div>
-                <div style={{ fontSize: '0.9rem', color: '#F8FAFC', fontWeight: 600, marginTop: '2px' }}>
+                <div style={{ fontSize: '0.9rem', color: '#192A56', fontWeight: 700, marginTop: '2px' }}>
                   {application.father_name || '—'}
                 </div>
               </div>
@@ -837,7 +782,7 @@ export const AdminApplicationDetailPage: React.FC = () => {
                 <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>
                   Mobile Contact
                 </div>
-                <div style={{ fontSize: '0.9rem', color: '#F8FAFC', fontWeight: 600, marginTop: '2px' }}>
+                <div style={{ fontSize: '0.9rem', color: '#192A56', fontWeight: 700, marginTop: '2px' }}>
                   {application.mobile}
                 </div>
               </div>
@@ -846,7 +791,7 @@ export const AdminApplicationDetailPage: React.FC = () => {
                 <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>
                   Email Address
                 </div>
-                <div style={{ fontSize: '0.9rem', color: '#F8FAFC', fontWeight: 600, marginTop: '2px' }}>
+                <div style={{ fontSize: '0.9rem', color: '#192A56', fontWeight: 700, marginTop: '2px' }}>
                   {application.email}
                 </div>
               </div>
@@ -855,17 +800,17 @@ export const AdminApplicationDetailPage: React.FC = () => {
                 <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>
                   Permanent Address
                 </div>
-                <div style={{ fontSize: '0.9rem', color: '#CBD5E1', marginTop: '2px', lineHeight: 1.4 }}>
+                <div style={{ fontSize: '0.9rem', color: '#4A5568', marginTop: '2px', lineHeight: 1.4 }}>
                   {application.address || '—'}
                 </div>
               </div>
 
-              {/* Masked Sensitive Information if available in joining_forms */}
+              {/* Masked Sensitive Information */}
               <div>
                 <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>
                   Aadhaar Number (Masked)
                 </div>
-                <div style={{ fontSize: '0.9rem', color: '#F8FAFC', fontFamily: 'monospace', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.9rem', color: '#192A56', fontFamily: 'monospace', fontWeight: 600, marginTop: '2px' }}>
                   {maskSensitive(joiningForm?.aadhaar_number, 4)}
                 </div>
               </div>
@@ -874,7 +819,7 @@ export const AdminApplicationDetailPage: React.FC = () => {
                 <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>
                   PAN Card (Masked)
                 </div>
-                <div style={{ fontSize: '0.9rem', color: '#F8FAFC', fontFamily: 'monospace', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.9rem', color: '#192A56', fontFamily: 'monospace', fontWeight: 600, marginTop: '2px' }}>
                   {maskSensitive(joiningForm?.pan_number, 3)}
                 </div>
               </div>
@@ -883,7 +828,7 @@ export const AdminApplicationDetailPage: React.FC = () => {
                 <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>
                   Bank Account (Masked)
                 </div>
-                <div style={{ fontSize: '0.9rem', color: '#F8FAFC', fontFamily: 'monospace', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.9rem', color: '#192A56', fontFamily: 'monospace', fontWeight: 600, marginTop: '2px' }}>
                   {maskSensitive(joiningForm?.bank_account_number, 4)}
                 </div>
               </div>
@@ -892,32 +837,31 @@ export const AdminApplicationDetailPage: React.FC = () => {
                 <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>
                   Bank IFSC / Name
                 </div>
-                <div style={{ fontSize: '0.9rem', color: '#F8FAFC', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.9rem', color: '#192A56', fontWeight: 600, marginTop: '2px' }}>
                   {joiningForm?.ifsc_code ? `${joiningForm.bank_name || 'Bank'} (${joiningForm.ifsc_code})` : '—'}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Company / Employment Information Form (Saves to joining_forms) */}
-          <div
-            style={{
-              backgroundColor: '#0F172A',
-              border: '1px solid #1E293B',
-              borderRadius: '12px',
-              padding: '1.5rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <Building2 size={20} color="#F59E0B" />
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>
-                Company / Employment Assignment
+          {/* Company / Employment Assignment Form */}
+          <div className="admin-card" style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+              <Building2 size={18} color="#192A56" />
+              <h2
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: '1.1rem',
+                  fontWeight: 800,
+                  color: '#192A56',
+                  margin: 0
+                }}
+              >
+                Company & Employment Assignment
               </h2>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0 0 1.25rem 0' }}>
-              Corporate parameters assigned to the candidate. These values will populate the candidate's
-              Joining Form and generated PDF packet.
+              Assign employer partner and internal company parameters for the candidate's joining packet.
             </p>
 
             <form onSubmit={handleSaveCompanyInfo} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -928,9 +872,9 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       display: 'block',
                       fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: '#CBD5E1',
-                      marginBottom: '0.4rem',
+                      fontWeight: 700,
+                      color: '#192A56',
+                      marginBottom: '0.35rem',
                       textTransform: 'uppercase'
                     }}
                   >
@@ -949,12 +893,12 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       width: '100%',
                       boxSizing: 'border-box',
-                      padding: '0.65rem 0.75rem',
-                      backgroundColor: '#090D16',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#F8FAFC',
-                      fontSize: '0.875rem',
+                      padding: '0.6rem 0.75rem',
+                      backgroundColor: '#FCFBFB',
+                      border: '1px solid #D2CECE',
+                      borderRadius: '6px',
+                      color: '#192A56',
+                      fontSize: '0.85rem',
                       outline: 'none'
                     }}
                   >
@@ -973,9 +917,9 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       display: 'block',
                       fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: '#CBD5E1',
-                      marginBottom: '0.4rem',
+                      fontWeight: 700,
+                      color: '#192A56',
+                      marginBottom: '0.35rem',
                       textTransform: 'uppercase'
                     }}
                   >
@@ -989,12 +933,12 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       width: '100%',
                       boxSizing: 'border-box',
-                      padding: '0.65rem 0.75rem',
-                      backgroundColor: '#090D16',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#F8FAFC',
-                      fontSize: '0.875rem',
+                      padding: '0.6rem 0.75rem',
+                      backgroundColor: '#FCFBFB',
+                      border: '1px solid #D2CECE',
+                      borderRadius: '6px',
+                      color: '#192A56',
+                      fontSize: '0.85rem',
                       outline: 'none'
                     }}
                   />
@@ -1006,9 +950,9 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       display: 'block',
                       fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: '#CBD5E1',
-                      marginBottom: '0.4rem',
+                      fontWeight: 700,
+                      color: '#192A56',
+                      marginBottom: '0.35rem',
                       textTransform: 'uppercase'
                     }}
                   >
@@ -1022,12 +966,12 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       width: '100%',
                       boxSizing: 'border-box',
-                      padding: '0.65rem 0.75rem',
-                      backgroundColor: '#090D16',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#F8FAFC',
-                      fontSize: '0.875rem',
+                      padding: '0.6rem 0.75rem',
+                      backgroundColor: '#FCFBFB',
+                      border: '1px solid #D2CECE',
+                      borderRadius: '6px',
+                      color: '#192A56',
+                      fontSize: '0.85rem',
                       outline: 'none'
                     }}
                   />
@@ -1039,9 +983,9 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       display: 'block',
                       fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: '#CBD5E1',
-                      marginBottom: '0.4rem',
+                      fontWeight: 700,
+                      color: '#192A56',
+                      marginBottom: '0.35rem',
                       textTransform: 'uppercase'
                     }}
                   >
@@ -1055,12 +999,12 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       width: '100%',
                       boxSizing: 'border-box',
-                      padding: '0.65rem 0.75rem',
-                      backgroundColor: '#090D16',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#F8FAFC',
-                      fontSize: '0.875rem',
+                      padding: '0.6rem 0.75rem',
+                      backgroundColor: '#FCFBFB',
+                      border: '1px solid #D2CECE',
+                      borderRadius: '6px',
+                      color: '#192A56',
+                      fontSize: '0.85rem',
                       outline: 'none'
                     }}
                   />
@@ -1072,9 +1016,9 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       display: 'block',
                       fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: '#CBD5E1',
-                      marginBottom: '0.4rem',
+                      fontWeight: 700,
+                      color: '#192A56',
+                      marginBottom: '0.35rem',
                       textTransform: 'uppercase'
                     }}
                   >
@@ -1088,12 +1032,12 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       width: '100%',
                       boxSizing: 'border-box',
-                      padding: '0.65rem 0.75rem',
-                      backgroundColor: '#090D16',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#F8FAFC',
-                      fontSize: '0.875rem',
+                      padding: '0.6rem 0.75rem',
+                      backgroundColor: '#FCFBFB',
+                      border: '1px solid #D2CECE',
+                      borderRadius: '6px',
+                      color: '#192A56',
+                      fontSize: '0.85rem',
                       outline: 'none'
                     }}
                   />
@@ -1105,9 +1049,9 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       display: 'block',
                       fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: '#CBD5E1',
-                      marginBottom: '0.4rem',
+                      fontWeight: 700,
+                      color: '#192A56',
+                      marginBottom: '0.35rem',
                       textTransform: 'uppercase'
                     }}
                   >
@@ -1121,12 +1065,12 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       width: '100%',
                       boxSizing: 'border-box',
-                      padding: '0.65rem 0.75rem',
-                      backgroundColor: '#090D16',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#F8FAFC',
-                      fontSize: '0.875rem',
+                      padding: '0.6rem 0.75rem',
+                      backgroundColor: '#FCFBFB',
+                      border: '1px solid #D2CECE',
+                      borderRadius: '6px',
+                      color: '#192A56',
+                      fontSize: '0.85rem',
                       outline: 'none'
                     }}
                   />
@@ -1138,9 +1082,9 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       display: 'block',
                       fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: '#CBD5E1',
-                      marginBottom: '0.4rem',
+                      fontWeight: 700,
+                      color: '#192A56',
+                      marginBottom: '0.35rem',
                       textTransform: 'uppercase'
                     }}
                   >
@@ -1154,12 +1098,12 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       width: '100%',
                       boxSizing: 'border-box',
-                      padding: '0.65rem 0.75rem',
-                      backgroundColor: '#090D16',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#F8FAFC',
-                      fontSize: '0.875rem',
+                      padding: '0.6rem 0.75rem',
+                      backgroundColor: '#FCFBFB',
+                      border: '1px solid #D2CECE',
+                      borderRadius: '6px',
+                      color: '#192A56',
+                      fontSize: '0.85rem',
                       outline: 'none'
                     }}
                   />
@@ -1171,9 +1115,9 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       display: 'block',
                       fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: '#CBD5E1',
-                      marginBottom: '0.4rem',
+                      fontWeight: 700,
+                      color: '#192A56',
+                      marginBottom: '0.35rem',
                       textTransform: 'uppercase'
                     }}
                   >
@@ -1187,12 +1131,12 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       width: '100%',
                       boxSizing: 'border-box',
-                      padding: '0.65rem 0.75rem',
-                      backgroundColor: '#090D16',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#F8FAFC',
-                      fontSize: '0.875rem',
+                      padding: '0.6rem 0.75rem',
+                      backgroundColor: '#FCFBFB',
+                      border: '1px solid #D2CECE',
+                      borderRadius: '6px',
+                      color: '#192A56',
+                      fontSize: '0.85rem',
                       outline: 'none'
                     }}
                   />
@@ -1204,9 +1148,9 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       display: 'block',
                       fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: '#CBD5E1',
-                      marginBottom: '0.4rem',
+                      fontWeight: 700,
+                      color: '#192A56',
+                      marginBottom: '0.35rem',
                       textTransform: 'uppercase'
                     }}
                   >
@@ -1219,12 +1163,12 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       width: '100%',
                       boxSizing: 'border-box',
-                      padding: '0.65rem 0.75rem',
-                      backgroundColor: '#090D16',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#F8FAFC',
-                      fontSize: '0.875rem',
+                      padding: '0.6rem 0.75rem',
+                      backgroundColor: '#FCFBFB',
+                      border: '1px solid #D2CECE',
+                      borderRadius: '6px',
+                      color: '#192A56',
+                      fontSize: '0.85rem',
                       outline: 'none'
                     }}
                   />
@@ -1236,9 +1180,9 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       display: 'block',
                       fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: '#CBD5E1',
-                      marginBottom: '0.4rem',
+                      fontWeight: 700,
+                      color: '#192A56',
+                      marginBottom: '0.35rem',
                       textTransform: 'uppercase'
                     }}
                   >
@@ -1253,12 +1197,12 @@ export const AdminApplicationDetailPage: React.FC = () => {
                     style={{
                       width: '100%',
                       boxSizing: 'border-box',
-                      padding: '0.65rem 0.75rem',
-                      backgroundColor: '#090D16',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#F8FAFC',
-                      fontSize: '0.875rem',
+                      padding: '0.6rem 0.75rem',
+                      backgroundColor: '#FCFBFB',
+                      border: '1px solid #D2CECE',
+                      borderRadius: '6px',
+                      color: '#192A56',
+                      fontSize: '0.85rem',
                       outline: 'none'
                     }}
                   />
@@ -1269,20 +1213,8 @@ export const AdminApplicationDetailPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSavingCompanyInfo}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.65rem 1.25rem',
-                    borderRadius: '8px',
-                    backgroundColor: '#D97706',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: isSavingCompanyInfo ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 4px 12px rgba(217, 119, 6, 0.25)'
-                  }}
+                  className="btn-admin-primary"
+                  style={{ padding: '0.6rem 1.25rem' }}
                 >
                   {isSavingCompanyInfo ? (
                     <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
@@ -1299,18 +1231,10 @@ export const AdminApplicationDetailPage: React.FC = () => {
         {/* Right Column: Documents, Payments, Activity Logs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Documents Summary Card */}
-          <div
-            style={{
-              backgroundColor: '#0F172A',
-              border: '1px solid #1E293B',
-              borderRadius: '12px',
-              padding: '1.25rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)'
-            }}
-          >
+          <div className="admin-card" style={{ padding: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-              <FileText size={18} color="#F59E0B" />
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>
+              <FileText size={17} color="#192A56" />
+              <h3 style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: '1rem', fontWeight: 800, color: '#192A56', margin: 0 }}>
                 Candidate Documents ({documents.length})
               </h3>
             </div>
@@ -1329,42 +1253,21 @@ export const AdminApplicationDetailPage: React.FC = () => {
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '0.6rem 0.75rem',
-                      backgroundColor: '#090D16',
-                      border: '1px solid #1E293B',
+                      backgroundColor: '#F8F9FA',
+                      border: '1px solid #E2DFD8',
                       borderRadius: '6px',
                       fontSize: '0.8rem'
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 600, color: '#F8FAFC' }}>
+                      <div style={{ fontWeight: 700, color: '#192A56' }}>
                         {doc.document_type.replace(/_/g, ' ')} {doc.document_side ? `(${doc.document_side})` : ''}
                       </div>
                       <div style={{ fontSize: '0.7rem', color: '#64748B' }}>
                         {doc.original_file_name || 'Uploaded document'}
                       </div>
                     </div>
-                    <span
-                      style={{
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '0.675rem',
-                        fontWeight: 600,
-                        backgroundColor:
-                          doc.verification_status === 'VERIFIED'
-                            ? 'rgba(16, 185, 129, 0.15)'
-                            : doc.verification_status === 'REJECTED'
-                            ? 'rgba(239, 68, 68, 0.15)'
-                            : 'rgba(245, 158, 11, 0.15)',
-                        color:
-                          doc.verification_status === 'VERIFIED'
-                            ? '#10B981'
-                            : doc.verification_status === 'REJECTED'
-                            ? '#F87171'
-                            : '#F59E0B'
-                      }}
-                    >
-                      {doc.verification_status}
-                    </span>
+                    <AdminStatusBadge status={doc.verification_status} />
                   </div>
                 ))}
               </div>
@@ -1372,18 +1275,10 @@ export const AdminApplicationDetailPage: React.FC = () => {
           </div>
 
           {/* Payment Summary Card */}
-          <div
-            style={{
-              backgroundColor: '#0F172A',
-              border: '1px solid #1E293B',
-              borderRadius: '12px',
-              padding: '1.25rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)'
-            }}
-          >
+          <div className="admin-card" style={{ padding: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-              <CreditCard size={18} color="#F59E0B" />
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>
+              <CreditCard size={17} color="#192A56" />
+              <h3 style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: '1rem', fontWeight: 800, color: '#192A56', margin: 0 }}>
                 Payments & Receipts ({payments.length})
               </h3>
             </div>
@@ -1402,42 +1297,21 @@ export const AdminApplicationDetailPage: React.FC = () => {
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '0.6rem 0.75rem',
-                      backgroundColor: '#090D16',
-                      border: '1px solid #1E293B',
+                      backgroundColor: '#F8F9FA',
+                      border: '1px solid #E2DFD8',
                       borderRadius: '6px',
                       fontSize: '0.8rem'
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 600, color: '#F8FAFC' }}>
+                      <div style={{ fontWeight: 700, color: '#192A56' }}>
                         ₹{p.amount.toLocaleString()} — {p.purpose}
                       </div>
                       <div style={{ fontSize: '0.7rem', color: '#64748B', fontFamily: 'monospace' }}>
                         {p.payment_reference}
                       </div>
                     </div>
-                    <span
-                      style={{
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '0.675rem',
-                        fontWeight: 600,
-                        backgroundColor:
-                          p.status === 'SUCCESS'
-                            ? 'rgba(16, 185, 129, 0.15)'
-                            : p.status === 'PENDING'
-                            ? 'rgba(245, 158, 11, 0.15)'
-                            : 'rgba(239, 68, 68, 0.15)',
-                        color:
-                          p.status === 'SUCCESS'
-                            ? '#10B981'
-                            : p.status === 'PENDING'
-                            ? '#F59E0B'
-                            : '#F87171'
-                      }}
-                    >
-                      {p.status}
-                    </span>
+                    <AdminStatusBadge status={p.status} />
                   </div>
                 ))}
               </div>
@@ -1445,18 +1319,10 @@ export const AdminApplicationDetailPage: React.FC = () => {
           </div>
 
           {/* Activity Logs Audit Trail */}
-          <div
-            style={{
-              backgroundColor: '#0F172A',
-              border: '1px solid #1E293B',
-              borderRadius: '12px',
-              padding: '1.25rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)'
-            }}
-          >
+          <div className="admin-card" style={{ padding: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-              <History size={18} color="#F59E0B" />
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>
+              <History size={17} color="#192A56" />
+              <h3 style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: '1rem', fontWeight: 800, color: '#192A56', margin: 0 }}>
                 Audit Activity Log ({activityLogs.length})
               </h3>
             </div>
@@ -1466,22 +1332,22 @@ export const AdminApplicationDetailPage: React.FC = () => {
                 No activity recorded yet.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '400px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '380px', overflowY: 'auto' }}>
                 {activityLogs.map((log) => (
                   <div
                     key={log.id}
                     style={{
-                      borderLeft: '2px solid #F59E0B',
+                      borderLeft: '3px solid #F7D794',
                       paddingLeft: '0.75rem',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '0.15rem'
                     }}
                   >
-                    <div style={{ fontSize: '0.775rem', fontWeight: 700, color: '#F8FAFC' }}>
+                    <div style={{ fontSize: '0.775rem', fontWeight: 700, color: '#192A56' }}>
                       {log.action.replace(/_/g, ' ')}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#94A3B8', lineHeight: 1.3 }}>
+                    <div style={{ fontSize: '0.75rem', color: '#4A5568', lineHeight: 1.3 }}>
                       {log.description}
                     </div>
                     <div style={{ fontSize: '0.675rem', color: '#64748B' }}>

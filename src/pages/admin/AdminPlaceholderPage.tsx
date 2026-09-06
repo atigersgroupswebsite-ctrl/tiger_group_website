@@ -1,6 +1,6 @@
 // ==============================================================================
 // File: src/pages/admin/AdminPlaceholderPage.tsx
-// Description: Shell placeholder for upcoming Stage 3 admin modules
+// Description: Branded placeholder for upcoming Stage 3 operational modules
 // ==============================================================================
 
 import React from 'react';
@@ -9,7 +9,7 @@ import { Construction, ArrowLeft } from 'lucide-react';
 
 export const AdminPlaceholderPage: React.FC = () => {
   const location = useLocation();
-  const pathName = location.pathname.replace('/admin/', '').toUpperCase().replace('-', ' ');
+  const pathName = location.pathname.replace('/admin/', '').toUpperCase().replace(/-/g, ' ');
 
   return (
     <div
@@ -18,72 +18,63 @@ export const AdminPlaceholderPage: React.FC = () => {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '60vh',
+        minHeight: '55vh',
         textAlign: 'center',
         padding: '2rem'
       }}
     >
       <div
         style={{
-          width: '72px',
-          height: '72px',
+          width: '68px',
+          height: '68px',
           borderRadius: '16px',
-          backgroundColor: '#1E293B',
-          border: '1px solid #334155',
+          backgroundColor: '#FFFFFF',
+          border: '1px solid #E2DFD8',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: '1.5rem',
-          color: '#F59E0B'
+          marginBottom: '1.25rem',
+          color: '#192A56',
+          boxShadow: '0 4px 12px rgba(25, 42, 86, 0.08)'
         }}
       >
-        <Construction size={36} />
+        <Construction size={32} />
       </div>
 
       <h1
         style={{
+          fontFamily: 'Plus Jakarta Sans, sans-serif',
           fontSize: '1.5rem',
-          fontWeight: 700,
-          color: '#F8FAFC',
-          marginBottom: '0.5rem'
+          fontWeight: 800,
+          color: '#192A56',
+          marginBottom: '0.4rem'
         }}
       >
-        {pathName || 'MANAGEMENT MODULE'}
+        {pathName || 'OPERATIONS MODULE'}
       </h1>
 
       <p
         style={{
-          fontSize: '0.95rem',
-          color: '#94A3B8',
-          maxWidth: '500px',
+          fontSize: '0.9rem',
+          color: '#64748B',
+          maxWidth: '480px',
           lineHeight: 1.6,
-          marginBottom: '1.75rem'
+          marginBottom: '1.5rem'
         }}
       >
-        This module is scheduled for Stage 3 implementation (Candidate Access, Private Storage,
-        Razorpay Integration, and Automated Document Generation).
+        This operational module is scheduled for upcoming deployment in Stage 3. For immediate data
+        requirements, please utilize the Exports section or Applications directory.
       </p>
 
-      <Link
-        to="/admin"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          backgroundColor: '#1E293B',
-          color: '#F59E0B',
-          padding: '0.65rem 1.25rem',
-          borderRadius: '8px',
-          fontSize: '0.875rem',
-          fontWeight: 600,
-          textDecoration: 'none',
-          border: '1px solid #334155',
-          transition: 'all 0.15s ease'
-        }}
-      >
-        <ArrowLeft size={16} />
-        <span>Return to Dashboard</span>
-      </Link>
+      <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <Link to="/admin" className="btn-admin-secondary">
+          <ArrowLeft size={15} />
+          <span>Dashboard</span>
+        </Link>
+        <Link to="/admin/exports" className="btn-admin-primary">
+          <span>Go to Exports</span>
+        </Link>
+      </div>
     </div>
   );
 };

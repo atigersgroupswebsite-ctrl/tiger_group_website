@@ -1,22 +1,24 @@
 // ==============================================================================
 // File: src/pages/admin/AdminApplicationsPage.tsx
-// Description: Candidate Applications Management with Server-Side Search,
-//              Filtering, Pagination, and Route Navigation
+// Description: Applications Management with Server-Side Search, Filter, & Pagination
+// Brand: A TIGER GROUPS — Operational Table System
 // ==============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import type { ApplicationRow, ApplicationStatus, CompanyRow } from '../../types/database';
+import { AdminTableToolbar } from '../../components/admin/AdminTableToolbar';
+import { AdminStatusBadge } from '../../components/admin/AdminStatusBadge';
+import { AdminPagination } from '../../components/admin/AdminPagination';
+import { AdminEmptyState } from '../../components/admin/AdminEmptyState';
 import {
   Search,
   Filter,
-  ChevronLeft,
-  ChevronRight,
   RefreshCw,
   Eye,
   Building2,
-  Users,
+  Calendar,
   AlertCircle
 } from 'lucide-react';
 
@@ -50,18 +52,19 @@ export const AdminApplicationsPage: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [companyFilter, setCompanyFilter] = useState<string>('ALL');
+  const [dateFilter, setDateFilter] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Debounce search input
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchQuery.trim());
-      setCurrentPage(1); // Reset to page 1 on new search
+      setCurrentPage(1);
     }, 350);
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  // Fetch company list for filter dropdown
+  // Fetch active company list for filter dropdown
   useEffect(() => {
     const fetchCompanies = async () => {
       const { data, error: compErr } = await supabase
@@ -91,7 +94,6 @@ export const AdminApplicationsPage: React.FC = () => {
 
       // Apply Search (across application_number, full_name, mobile, email)
       if (debouncedSearch) {
-        // Supabase PostgREST ilike or filter
         query = query.or(
           `application_number.ilike.%${debouncedSearch}%,full_name.ilike.%${debouncedSearch}%,mobile.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%`
         );
@@ -105,6 +107,21 @@ export const AdminApplicationsPage: React.FC = () => {
       // Apply Company filter
       if (companyFilter !== 'ALL') {
         query = query.eq('desired_company', companyFilter);
+      }
+
+      // Apply Date filter (All, Today, Last 7 Days, Last 30 Days)
+      if (dateFilter !== 'ALL') {
+        const now = new Date();
+        if (dateFilter === 'TODAY') {
+          const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+          query = query.gte('created_at', startOfDay);
+        } else if (dateFilter === 'WEEK') {
+          const pastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+          query = query.gte('created_at', pastWeek);
+        } else if (dateFilter === 'MONTH') {
+          const pastMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+          query = query.gte('created_at', pastMonth);
+        }
       }
 
       // Order by created_at DESC
@@ -128,11 +145,11 @@ export const AdminApplicationsPage: React.FC = () => {
       }
     } catch (err: unknown) {
       console.error('[Applications] Unexpected query failure:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred while loading applications.');
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, statusFilter, companyFilter, currentPage]);
+  }, [debouncedSearch, statusFilter, companyFilter, dateFilter, currentPage]);
 
   useEffect(() => {
     fetchApplications();
@@ -144,23 +161,6 @@ export const AdminApplicationsPage: React.FC = () => {
     navigate(`/admin/applications/${id}`);
   };
 
-  const getStatusBadgeStyle = (status: string) => {
-    switch (status) {
-      case 'NEW_ENQUIRY':
-        return { bg: 'rgba(245, 158, 11, 0.15)', text: '#F59E0B', border: 'rgba(245, 158, 11, 0.3)' };
-      case 'JOINING_ACCESS_GRANTED':
-      case 'JOINING_SUBMITTED':
-      case 'VERIFIED_ACTIVE':
-        return { bg: 'rgba(16, 185, 129, 0.15)', text: '#10B981', border: 'rgba(16, 185, 129, 0.3)' };
-      case 'INTERVIEW_SELECTED':
-        return { bg: 'rgba(59, 130, 246, 0.15)', text: '#60A5FA', border: 'rgba(59, 130, 246, 0.3)' };
-      case 'REJECTED':
-        return { bg: 'rgba(239, 68, 68, 0.15)', text: '#F87171', border: 'rgba(239, 68, 68, 0.3)' };
-      default:
-        return { bg: 'rgba(148, 163, 184, 0.15)', text: '#CBD5E1', border: 'rgba(148, 163, 184, 0.3)' };
-    }
-  };
-
   return (
     <div>
       {/* Page Title Header */}
@@ -169,7 +169,7 @@ export const AdminApplicationsPage: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '2rem',
+          marginBottom: '1.75rem',
           flexWrap: 'wrap',
           gap: '1rem'
         }}
@@ -177,67 +177,43 @@ export const AdminApplicationsPage: React.FC = () => {
         <div>
           <h1
             style={{
+              fontFamily: 'Plus Jakarta Sans, sans-serif',
               fontSize: '1.75rem',
               fontWeight: 800,
-              color: '#F8FAFC',
+              color: '#192A56',
               letterSpacing: '-0.02em',
               margin: '0 0 0.25rem 0'
             }}
           >
-            Applications Directory
+            Candidate Applications
           </h1>
-          <p style={{ fontSize: '0.875rem', color: '#94A3B8', margin: 0 }}>
-            Manage candidate submissions, joining access authorizations, and status lifecycles
+          <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+            Operational recruitment directory for A TIGER GROUPS registered candidates
           </p>
         </div>
 
         <button
           onClick={() => fetchApplications()}
           disabled={loading}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.6rem 1rem',
-            borderRadius: '8px',
-            backgroundColor: '#1E293B',
-            border: '1px solid #334155',
-            color: '#F8FAFC',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            cursor: loading ? 'not-allowed' : 'pointer'
-          }}
+          className="btn-admin-secondary"
         >
           <RefreshCw
             size={15}
             style={{
               animation: loading ? 'spin 1s linear infinite' : 'none',
-              color: '#F59E0B'
+              color: '#192A56'
             }}
           />
-          <span>Refresh</span>
+          <span>Refresh List</span>
         </button>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div
-        style={{
-          backgroundColor: '#0F172A',
-          border: '1px solid #1E293B',
-          borderRadius: '12px',
-          padding: '1.25rem',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}
-      >
-        {/* Search Box */}
-        <div style={{ position: 'relative', flex: '1 1 300px', minWidth: '240px' }}>
+      {/* Filter Toolbar */}
+      <AdminTableToolbar>
+        {/* Search Input */}
+        <div style={{ position: 'relative', flex: '1 1 280px', minWidth: '220px' }}>
           <Search
-            size={18}
+            size={17}
             style={{
               position: 'absolute',
               left: '12px',
@@ -254,22 +230,22 @@ export const AdminApplicationsPage: React.FC = () => {
             style={{
               width: '100%',
               boxSizing: 'border-box',
-              padding: '0.65rem 0.75rem 0.65rem 2.4rem',
-              backgroundColor: '#090D16',
-              border: '1px solid #334155',
-              borderRadius: '8px',
-              color: '#F8FAFC',
-              fontSize: '0.875rem',
+              padding: '0.6rem 0.75rem 0.6rem 2.3rem',
+              backgroundColor: '#FCFBFB',
+              border: '1px solid #D2CECE',
+              borderRadius: '6px',
+              color: '#192A56',
+              fontSize: '0.85rem',
               outline: 'none'
             }}
           />
         </div>
 
-        {/* Filter Dropdowns */}
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        {/* Filters Group */}
+        <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
           {/* Status Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Filter size={16} color="#64748B" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <Filter size={15} color="#64748B" />
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -277,12 +253,13 @@ export const AdminApplicationsPage: React.FC = () => {
                 setCurrentPage(1);
               }}
               style={{
-                padding: '0.65rem 0.75rem',
-                backgroundColor: '#090D16',
-                border: '1px solid #334155',
-                borderRadius: '8px',
-                color: '#F8FAFC',
-                fontSize: '0.85rem',
+                padding: '0.6rem 0.75rem',
+                backgroundColor: '#FCFBFB',
+                border: '1px solid #D2CECE',
+                borderRadius: '6px',
+                color: '#192A56',
+                fontSize: '0.825rem',
+                fontWeight: 600,
                 outline: 'none',
                 cursor: 'pointer'
               }}
@@ -297,8 +274,8 @@ export const AdminApplicationsPage: React.FC = () => {
           </div>
 
           {/* Company Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Building2 size={16} color="#64748B" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <Building2 size={15} color="#64748B" />
             <select
               value={companyFilter}
               onChange={(e) => {
@@ -306,12 +283,13 @@ export const AdminApplicationsPage: React.FC = () => {
                 setCurrentPage(1);
               }}
               style={{
-                padding: '0.65rem 0.75rem',
-                backgroundColor: '#090D16',
-                border: '1px solid #334155',
-                borderRadius: '8px',
-                color: '#F8FAFC',
-                fontSize: '0.85rem',
+                padding: '0.6rem 0.75rem',
+                backgroundColor: '#FCFBFB',
+                border: '1px solid #D2CECE',
+                borderRadius: '6px',
+                color: '#192A56',
+                fontSize: '0.825rem',
+                fontWeight: 600,
                 outline: 'none',
                 cursor: 'pointer'
               }}
@@ -324,94 +302,91 @@ export const AdminApplicationsPage: React.FC = () => {
               ))}
             </select>
           </div>
+
+          {/* Date Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <Calendar size={15} color="#64748B" />
+            <select
+              value={dateFilter}
+              onChange={(e) => {
+                setDateFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              style={{
+                padding: '0.6rem 0.75rem',
+                backgroundColor: '#FCFBFB',
+                border: '1px solid #D2CECE',
+                borderRadius: '6px',
+                color: '#192A56',
+                fontSize: '0.825rem',
+                fontWeight: 600,
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="ALL">All Dates</option>
+              <option value="TODAY">Today</option>
+              <option value="WEEK">Last 7 Days</option>
+              <option value="MONTH">Last 30 Days</option>
+            </select>
+          </div>
         </div>
-      </div>
+      </AdminTableToolbar>
 
       {/* Error alert */}
       {error && (
         <div
           style={{
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
+            backgroundColor: '#FBF0EF',
+            border: '1px solid #EDA6A3',
             borderRadius: '8px',
             padding: '1rem',
-            marginBottom: '1.5rem',
+            marginBottom: '1.25rem',
             display: 'flex',
             alignItems: 'center',
             gap: '0.75rem'
           }}
         >
-          <AlertCircle size={20} color="#F87171" />
-          <span style={{ fontSize: '0.875rem', color: '#FCA5A5' }}>{error}</span>
+          <AlertCircle size={20} color="#C9726F" />
+          <span style={{ fontSize: '0.875rem', color: '#C9726F', fontWeight: 600 }}>{error}</span>
         </div>
       )}
 
       {/* Applications Data Table */}
-      <div
-        style={{
-          backgroundColor: '#0F172A',
-          border: '1px solid #1E293B',
-          borderRadius: '12px',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)',
-          overflow: 'hidden'
-        }}
-      >
+      <div className="admin-table-container">
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
+          <table className="admin-table">
             <thead>
-              <tr style={{ backgroundColor: '#131D31', borderBottom: '1px solid #1E293B' }}>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Application Number
-                </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Candidate
-                </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Email
-                </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Mobile
-                </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Desired Company
-                </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Designation
-                </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Status
-                </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Created Date
-                </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', textAlign: 'right' }}>
-                  Action
-                </th>
+              <tr>
+                <th>Application No.</th>
+                <th>Candidate</th>
+                <th>Email</th>
+                <th>Mobile</th>
+                <th>Company</th>
+                <th>Designation</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th style={{ textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={9} style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748B' }}>
-                    <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', color: '#F59E0B', marginBottom: '0.5rem' }} />
-                    <div style={{ fontSize: '0.875rem' }}>Loading applications from database...</div>
+                    Loading candidate applications...
                   </td>
                 </tr>
               ) : applications.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '4rem 1rem', color: '#64748B' }}>
-                    <Users size={36} style={{ marginBottom: '0.75rem', opacity: 0.4 }} />
-                    <div style={{ fontSize: '1rem', color: '#94A3B8', fontWeight: 600 }}>
-                      No applications match your criteria
-                    </div>
-                    <div style={{ fontSize: '0.8rem', marginTop: '0.35rem' }}>
-                      Try adjusting your search query, status filter, or company selection.
-                    </div>
+                  <td colSpan={9}>
+                    <AdminEmptyState
+                      title="No Matching Applications"
+                      message="No candidate registrations match your active search and filter criteria."
+                    />
                   </td>
                 </tr>
               ) : (
                 applications.map((app) => {
-                  const badge = getStatusBadgeStyle(app.status);
                   const formattedDate = new Date(app.created_at).toLocaleDateString('en-IN', {
                     day: '2-digit',
                     month: 'short',
@@ -422,73 +397,41 @@ export const AdminApplicationsPage: React.FC = () => {
                     <tr
                       key={app.id}
                       onClick={() => handleRowClick(app.id)}
-                      style={{
-                        borderBottom: '1px solid #1E293B',
-                        cursor: 'pointer',
-                        transition: 'background-color 0.12s ease'
-                      }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = '#131D31')}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = 'transparent')}
+                      style={{ cursor: 'pointer' }}
                     >
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', fontWeight: 700, color: '#F59E0B', fontFamily: 'monospace' }}>
+                      <td style={{ fontWeight: 800, color: '#192A56', fontFamily: 'monospace' }}>
                         {app.application_number}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>
+                      <td style={{ fontWeight: 700, color: '#192A56' }}>
                         {app.full_name}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#94A3B8' }}>
+                      <td style={{ color: '#4A5568', fontSize: '0.825rem' }}>
                         {app.email}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#94A3B8' }}>
+                      <td style={{ color: '#4A5568', fontSize: '0.825rem' }}>
                         {app.mobile}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#CBD5E1' }}>
+                      <td style={{ color: '#192A56', fontWeight: 600 }}>
                         {app.desired_company || '—'}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#94A3B8' }}>
+                      <td style={{ color: '#64748B' }}>
                         {app.designation || '—'}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem' }}>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.725rem',
-                            fontWeight: 600,
-                            backgroundColor: badge.bg,
-                            color: badge.text,
-                            border: `1px solid ${badge.border}`
-                          }}
-                        >
-                          {app.status.replace(/_/g, ' ')}
-                        </span>
+                      <td>
+                        <AdminStatusBadge status={app.status} />
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.8rem', color: '#64748B' }}>
+                      <td style={{ color: '#64748B', fontSize: '0.8rem' }}>
                         {formattedDate}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                      <td style={{ textAlign: 'right' }}>
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleRowClick(app.id);
                           }}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            padding: '5px 12px',
-                            borderRadius: '6px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            letterSpacing: '0.04em',
-                            backgroundColor: '#1E293B',
-                            color: '#F59E0B',
-                            border: '1px solid #334155',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                          }}
+                          className="btn-admin-secondary"
+                          style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                         >
                           <Eye size={13} />
                           <span>VIEW</span>
@@ -502,78 +445,15 @@ export const AdminApplicationsPage: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination Footer */}
-        <div
-          style={{
-            padding: '1rem 1.25rem',
-            borderTop: '1px solid #1E293B',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '1rem'
-          }}
-        >
-          <div style={{ fontSize: '0.825rem', color: '#64748B' }}>
-            Showing {applications.length > 0 ? (currentPage - 1) * PAGE_SIZE + 1 : 0} to{' '}
-            {Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount} applications
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1 || loading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                padding: '0.45rem 0.75rem',
-                borderRadius: '6px',
-                backgroundColor: '#1E293B',
-                border: '1px solid #334155',
-                color: currentPage === 1 ? '#475569' : '#F8FAFC',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-              }}
-            >
-              <ChevronLeft size={16} />
-              <span>Previous</span>
-            </button>
-
-            <div
-              style={{
-                padding: '0.45rem 0.85rem',
-                fontSize: '0.8rem',
-                color: '#94A3B8',
-                fontWeight: 600
-              }}
-            >
-              Page {currentPage} of {totalPages}
-            </div>
-
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages || loading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                padding: '0.45rem 0.75rem',
-                borderRadius: '6px',
-                backgroundColor: '#1E293B',
-                border: '1px solid #334155',
-                color: currentPage >= totalPages ? '#475569' : '#F8FAFC',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer'
-              }}
-            >
-              <span>Next</span>
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
+        {/* Pagination */}
+        <AdminPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={PAGE_SIZE}
+          onPageChange={(p) => setCurrentPage(p)}
+          loading={loading}
+        />
       </div>
     </div>
   );

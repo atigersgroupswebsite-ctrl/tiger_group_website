@@ -1,12 +1,12 @@
 // ==============================================================================
 // File: src/pages/admin/AdminLoginPage.tsx
-// Description: Administrator Secure Login Gateway
+// Description: Official Administrator Secure Login Gateway for A TIGER GROUPS
 // ==============================================================================
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
-import { Shield, Lock, Mail, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 
 export const AdminLoginPage: React.FC = () => {
   const { signIn, isAdmin, loading: authLoading, error: authError } = useAdminAuth();
@@ -58,7 +58,7 @@ export const AdminLoginPage: React.FC = () => {
     <div
       style={{
         minHeight: '100vh',
-        backgroundColor: '#070B14',
+        backgroundColor: '#F8F9FA',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -70,62 +70,83 @@ export const AdminLoginPage: React.FC = () => {
         style={{
           width: '100%',
           maxWidth: '440px',
-          backgroundColor: '#0F172A',
-          border: '1px solid #1E293B',
+          backgroundColor: '#FFFFFF',
+          border: '1px solid #E2DFD8',
           borderRadius: '16px',
-          padding: '2.5rem 2rem',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(245, 158, 11, 0.05)'
+          padding: '2.5rem 2.25rem',
+          boxShadow: '0 10px 25px -5px rgba(25, 42, 86, 0.08), 0 0 0 1px rgba(247, 215, 148, 0.25)',
+          position: 'relative'
         }}
       >
-        {/* Brand Icon & Heading */}
+        {/* Top brand accent stripe */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: 'linear-gradient(90deg, #192A56 0%, #F7D794 100%)',
+            borderTopLeftRadius: '16px',
+            borderTopRightRadius: '16px'
+          }}
+        />
+
+        {/* Brand Header with A TIGER GROUPS Client Logo */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div
+          <img
+            src="/assets/tiger-logo.jpeg"
+            alt="A TIGER GROUPS"
             style={{
-              width: '56px',
-              height: '56px',
+              width: '64px',
+              height: '64px',
               borderRadius: '12px',
-              background: 'linear-gradient(135deg, #D97706, #B45309)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              objectFit: 'contain',
+              backgroundColor: '#FFFFFF',
+              padding: '4px',
+              border: '1px solid #E2DFD8',
+              boxShadow: '0 4px 12px rgba(25, 42, 86, 0.1)',
               marginBottom: '1rem',
-              boxShadow: '0 4px 16px rgba(217, 119, 6, 0.3)'
+              display: 'inline-block'
             }}
-          >
-            <Shield size={30} color="#FFFFFF" />
-          </div>
+          />
 
           <h1
             style={{
-              fontSize: '1.35rem',
+              fontFamily: 'Plus Jakarta Sans, sans-serif',
+              fontSize: '1.4rem',
               fontWeight: 800,
-              color: '#F8FAFC',
+              color: '#192A56',
               letterSpacing: '0.04em',
               margin: '0 0 0.35rem 0'
             }}
           >
-            A TIGER GLOBAL
+            A TIGER GROUPS
           </h1>
           <p
             style={{
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              color: '#F59E0B',
+              fontSize: '0.775rem',
+              fontWeight: 700,
+              color: '#8C6400',
+              backgroundColor: '#FDF3DB',
+              display: 'inline-block',
+              padding: '3px 10px',
+              borderRadius: '4px',
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
               margin: 0
             }}
           >
-            Internal Admin Access Portal
+            Internal Administration Portal
           </p>
         </div>
 
-        {/* Error Alert Box */}
+        {/* Error Alert Box (using Dusty Rose) */}
         {(localError || authError) && (
           <div
             style={{
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
+              backgroundColor: '#FBF0EF',
+              border: '1px solid #EDA6A3',
               borderRadius: '8px',
               padding: '0.75rem 1rem',
               marginBottom: '1.5rem',
@@ -134,8 +155,8 @@ export const AdminLoginPage: React.FC = () => {
               gap: '0.75rem'
             }}
           >
-            <AlertCircle size={18} color="#F87171" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div style={{ fontSize: '0.825rem', color: '#FCA5A5', lineHeight: 1.4 }}>
+            <AlertCircle size={18} color="#C9726F" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ fontSize: '0.825rem', color: '#C9726F', lineHeight: 1.4, fontWeight: 500 }}>
               {localError || authError}
             </div>
           </div>
@@ -149,15 +170,15 @@ export const AdminLoginPage: React.FC = () => {
               htmlFor="admin-email"
               style={{
                 display: 'block',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                color: '#CBD5E1',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: '#192A56',
                 marginBottom: '0.5rem',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em'
               }}
             >
-              Admin Email
+              Administrator Email
             </label>
             <div style={{ position: 'relative' }}>
               <Mail
@@ -182,16 +203,16 @@ export const AdminLoginPage: React.FC = () => {
                   width: '100%',
                   boxSizing: 'border-box',
                   padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                  backgroundColor: '#090D16',
-                  border: '1px solid #334155',
+                  backgroundColor: '#FCFBFB',
+                  border: '1px solid #D2CECE',
                   borderRadius: '8px',
-                  color: '#F8FAFC',
+                  color: '#192A56',
                   fontSize: '0.9rem',
                   outline: 'none',
                   transition: 'border-color 0.15s ease'
                 }}
-                onFocus={(e) => (e.target.style.borderColor = '#F59E0B')}
-                onBlur={(e) => (e.target.style.borderColor = '#334155')}
+                onFocus={(e) => (e.target.style.borderColor = '#192A56')}
+                onBlur={(e) => (e.target.style.borderColor = '#D2CECE')}
               />
             </div>
           </div>
@@ -202,9 +223,9 @@ export const AdminLoginPage: React.FC = () => {
               htmlFor="admin-password"
               style={{
                 display: 'block',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                color: '#CBD5E1',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: '#192A56',
                 marginBottom: '0.5rem',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em'
@@ -235,16 +256,16 @@ export const AdminLoginPage: React.FC = () => {
                   width: '100%',
                   boxSizing: 'border-box',
                   padding: '0.75rem 2.75rem 0.75rem 2.5rem',
-                  backgroundColor: '#090D16',
-                  border: '1px solid #334155',
+                  backgroundColor: '#FCFBFB',
+                  border: '1px solid #D2CECE',
                   borderRadius: '8px',
-                  color: '#F8FAFC',
+                  color: '#192A56',
                   fontSize: '0.9rem',
                   outline: 'none',
                   transition: 'border-color 0.15s ease'
                 }}
-                onFocus={(e) => (e.target.style.borderColor = '#F59E0B')}
-                onBlur={(e) => (e.target.style.borderColor = '#334155')}
+                onFocus={(e) => (e.target.style.borderColor = '#192A56')}
+                onBlur={(e) => (e.target.style.borderColor = '#D2CECE')}
               />
               <button
                 type="button"
@@ -267,28 +288,16 @@ export const AdminLoginPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Submit Button */}
+          {/* Submit Button (Champagne highlight button) */}
           <button
             type="submit"
             disabled={isSubmitting}
+            className="btn-admin-primary"
             style={{
-              marginTop: '0.75rem',
+              marginTop: '0.5rem',
               padding: '0.85rem',
-              borderRadius: '8px',
-              backgroundColor: '#D97706',
-              color: '#FFFFFF',
-              border: 'none',
               fontSize: '0.9rem',
-              fontWeight: 700,
-              letterSpacing: '0.04em',
-              cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              opacity: isSubmitting ? 0.7 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              boxShadow: '0 4px 12px rgba(217, 119, 6, 0.3)',
-              transition: 'all 0.15s ease'
+              width: '100%'
             }}
           >
             {isSubmitting ? (
@@ -307,15 +316,15 @@ export const AdminLoginPage: React.FC = () => {
           style={{
             marginTop: '2rem',
             paddingTop: '1.25rem',
-            borderTop: '1px solid #1E293B',
+            borderTop: '1px solid #E2DFD8',
             textAlign: 'center',
             fontSize: '0.725rem',
             color: '#64748B',
             lineHeight: 1.5
           }}
         >
-          Protected System. Authorized personnel only. All access attempts and administrative
-          actions are monitored and recorded.
+          Confidential System. A TIGER GROUPS authorized personnel only. All access attempts and
+          administrative operations are monitored and recorded.
         </div>
       </div>
     </div>

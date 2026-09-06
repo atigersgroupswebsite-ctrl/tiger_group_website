@@ -1,35 +1,32 @@
 // ==============================================================================
 // File: src/pages/admin/AdminDashboardPage.tsx
-// Description: Live Aggregate Metric Dashboard and Recent Applications
+// Description: Live Aggregate Metric Dashboard and Recent Candidate Registrations
+// Brand: A TIGER GROUPS — Unified Pearl White Canvas & Midnight Navy System
 // ==============================================================================
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import type { ApplicationRow } from '../../types/database';
+import { AdminMetricCard } from '../../components/admin/AdminMetricCard';
+import { AdminStatusBadge } from '../../components/admin/AdminStatusBadge';
+import { AdminEmptyState } from '../../components/admin/AdminEmptyState';
 import {
   FileText,
   UserPlus,
   KeyRound,
   FileCheck,
-  Clock,
+  CreditCard,
   CheckCircle2,
   FileSearch,
   UserCheck2,
   Building,
   RefreshCw,
   ArrowRight,
-  AlertCircle
+  Download,
+  AlertCircle,
+  Eye
 } from 'lucide-react';
-
-interface MetricCount {
-  label: string;
-  count: number;
-  icon: React.ElementType;
-  color: string;
-  bgColor: string;
-  description: string;
-}
 
 export const AdminDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -53,7 +50,6 @@ export const AdminDashboardPage: React.FC = () => {
   const fetchDashboardData = useCallback(async () => {
     setError(null);
     try {
-      // 1. Parallel database queries for real counts
       const [
         totalAppsRes,
         newEnqRes,
@@ -66,33 +62,18 @@ export const AdminDashboardPage: React.FC = () => {
         activeEmployeesRes,
         recentAppsRes
       ] = await Promise.all([
-        // Total Applications
         supabase.from('applications').select('*', { count: 'exact', head: true }),
-        // New Enquiries
         supabase.from('applications').select('*', { count: 'exact', head: true }).eq('status', 'NEW_ENQUIRY'),
-        // Joining Access Enabled
         supabase.from('applications').select('*', { count: 'exact', head: true }).eq('joining_access_enabled', true),
-        // Joining Forms Submitted
         supabase.from('joining_forms').select('*', { count: 'exact', head: true }).eq('submission_status', 'SUBMITTED'),
-        // Payments Pending
         supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'PENDING'),
-        // Payments Successful
         supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'SUCCESS'),
-        // Documents Pending Verification
         supabase.from('documents').select('*', { count: 'exact', head: true }).in('verification_status', ['PENDING', 'UPLOADED']),
-        // Selected Candidates
         supabase.from('applications').select('*', { count: 'exact', head: true }).eq('status', 'INTERVIEW_SELECTED'),
-        // Active Employees
         supabase.from('employees').select('*', { count: 'exact', head: true }).eq('employment_status', 'ACTIVE'),
-        // Recent 5 Applications
-        supabase
-          .from('applications')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(5)
+        supabase.from('applications').select('*').order('created_at', { ascending: false }).limit(5)
       ]);
 
-      // Check for query errors
       const errors = [
         totalAppsRes.error,
         newEnqRes.error,
@@ -111,7 +92,6 @@ export const AdminDashboardPage: React.FC = () => {
         setError(`Database query error: ${errors[0]?.message || 'Failed to retrieve metrics'}`);
       }
 
-      // Assign counts (default to 0 if null)
       setTotalApplications(totalAppsRes.count ?? 0);
       setNewEnquiries(newEnqRes.count ?? 0);
       setJoiningAccessEnabled(joiningAccessRes.count ?? 0);
@@ -143,101 +123,9 @@ export const AdminDashboardPage: React.FC = () => {
     fetchDashboardData();
   };
 
-  const metricCards: MetricCount[] = [
-    {
-      label: 'Total Applications',
-      count: totalApplications,
-      icon: FileText,
-      color: '#3B82F6',
-      bgColor: 'rgba(59, 130, 246, 0.12)',
-      description: 'Cumulative candidate registrations'
-    },
-    {
-      label: 'New Enquiries',
-      count: newEnquiries,
-      icon: UserPlus,
-      color: '#F59E0B',
-      bgColor: 'rgba(245, 158, 11, 0.12)',
-      description: 'Pending initial coordinator review'
-    },
-    {
-      label: 'Joining Access Enabled',
-      count: joiningAccessEnabled,
-      icon: KeyRound,
-      color: '#10B981',
-      bgColor: 'rgba(16, 185, 129, 0.12)',
-      description: 'Candidates with unlocked joining forms'
-    },
-    {
-      label: 'Joining Forms Submitted',
-      count: joiningFormsSubmitted,
-      icon: FileCheck,
-      color: '#06B6D4',
-      bgColor: 'rgba(6, 182, 212, 0.12)',
-      description: 'Forms completed and submitted'
-    },
-    {
-      label: 'Payments Pending',
-      count: paymentsPending,
-      icon: Clock,
-      color: '#EC4899',
-      bgColor: 'rgba(236, 72, 153, 0.12)',
-      description: 'Processing or awaiting confirmation'
-    },
-    {
-      label: 'Payments Successful',
-      count: paymentsSuccessful,
-      icon: CheckCircle2,
-      color: '#10B981',
-      bgColor: 'rgba(16, 185, 129, 0.12)',
-      description: 'Verified candidate fee receipts'
-    },
-    {
-      label: 'Documents Pending Verification',
-      count: docsPendingVerification,
-      icon: FileSearch,
-      color: '#8B5CF6',
-      bgColor: 'rgba(139, 92, 246, 0.12)',
-      description: 'Uploaded docs awaiting admin audit'
-    },
-    {
-      label: 'Selected Candidates',
-      count: selectedCandidates,
-      icon: UserCheck2,
-      color: '#F59E0B',
-      bgColor: 'rgba(245, 158, 11, 0.12)',
-      description: 'Cleared interview stage'
-    },
-    {
-      label: 'Active Employees',
-      count: activeEmployees,
-      icon: Building,
-      color: '#10B981',
-      bgColor: 'rgba(16, 185, 129, 0.12)',
-      description: 'Onboarded corporate staff'
-    }
-  ];
-
-  const getStatusBadgeStyle = (status: string) => {
-    switch (status) {
-      case 'NEW_ENQUIRY':
-        return { bg: 'rgba(245, 158, 11, 0.15)', text: '#F59E0B', border: 'rgba(245, 158, 11, 0.3)' };
-      case 'JOINING_ACCESS_GRANTED':
-      case 'JOINING_SUBMITTED':
-      case 'VERIFIED_ACTIVE':
-        return { bg: 'rgba(16, 185, 129, 0.15)', text: '#10B981', border: 'rgba(16, 185, 129, 0.3)' };
-      case 'INTERVIEW_SELECTED':
-        return { bg: 'rgba(59, 130, 246, 0.15)', text: '#60A5FA', border: 'rgba(59, 130, 246, 0.3)' };
-      case 'REJECTED':
-        return { bg: 'rgba(239, 68, 68, 0.15)', text: '#F87171', border: 'rgba(239, 68, 68, 0.3)' };
-      default:
-        return { bg: 'rgba(148, 163, 184, 0.15)', text: '#CBD5E1', border: 'rgba(148, 163, 184, 0.3)' };
-    }
-  };
-
   return (
     <div>
-      {/* Top Header & Refresh */}
+      {/* Top Header & Fast Action Area */}
       <div
         style={{
           display: 'flex',
@@ -251,189 +139,161 @@ export const AdminDashboardPage: React.FC = () => {
         <div>
           <h1
             style={{
+              fontFamily: 'Plus Jakarta Sans, sans-serif',
               fontSize: '1.75rem',
               fontWeight: 800,
-              color: '#F8FAFC',
+              color: '#192A56',
               letterSpacing: '-0.02em',
               margin: '0 0 0.25rem 0'
             }}
           >
-            Operational Dashboard
+            Operational Overview
           </h1>
-          <p style={{ fontSize: '0.875rem', color: '#94A3B8', margin: 0 }}>
-            Live aggregate telemetry from A TIGER GLOBAL database
+          <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+            Real-time telemetry and candidate tracking across A TIGER GROUPS business units
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
             onClick={handleManualRefresh}
             disabled={refreshing || loading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.6rem 1rem',
-              borderRadius: '8px',
-              backgroundColor: '#1E293B',
-              border: '1px solid #334155',
-              color: '#F8FAFC',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: refreshing ? 'not-allowed' : 'pointer',
-              transition: 'background 0.15s ease'
-            }}
+            className="btn-admin-secondary"
           >
             <RefreshCw
               size={15}
               style={{
                 animation: refreshing ? 'spin 1s linear infinite' : 'none',
-                color: '#F59E0B'
+                color: '#192A56'
               }}
             />
-            <span>{refreshing ? 'Refreshing...' : 'Refresh Metrics'}</span>
+            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
 
-          <Link
-            to="/admin/applications"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.6rem 1.1rem',
-              borderRadius: '8px',
-              backgroundColor: '#D97706',
-              color: '#FFFFFF',
-              textDecoration: 'none',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              boxShadow: '0 4px 12px rgba(217, 119, 6, 0.25)'
-            }}
-          >
-            <span>View All Applications</span>
+          <Link to="/admin/exports" className="btn-admin-secondary">
+            <Download size={15} />
+            <span>Exports</span>
+          </Link>
+
+          <Link to="/admin/applications" className="btn-admin-primary">
+            <span>All Applications</span>
             <ArrowRight size={15} />
           </Link>
         </div>
       </div>
 
-      {/* Error Alert if any */}
+      {/* Error Alert if any (using Dusty Rose) */}
       {error && (
         <div
           style={{
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
+            backgroundColor: '#FBF0EF',
+            border: '1px solid #EDA6A3',
             borderRadius: '8px',
             padding: '1rem',
-            marginBottom: '2rem',
+            marginBottom: '1.5rem',
             display: 'flex',
             alignItems: 'center',
             gap: '0.75rem'
           }}
         >
-          <AlertCircle size={20} color="#F87171" />
-          <span style={{ fontSize: '0.875rem', color: '#FCA5A5' }}>{error}</span>
+          <AlertCircle size={20} color="#C9726F" />
+          <span style={{ fontSize: '0.875rem', color: '#C9726F', fontWeight: 600 }}>{error}</span>
         </div>
       )}
 
-      {/* 9 Aggregate Metrics Grid */}
+      {/* Unified Metric Cards Grid (Pearl White Cards with Midnight Navy and Champagne accents) */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
           gap: '1.25rem',
           marginBottom: '2.5rem'
         }}
       >
-        {metricCards.map((m) => {
-          const Icon = m.icon;
-          return (
-            <div
-              key={m.label}
-              style={{
-                backgroundColor: '#0F172A',
-                border: '1px solid #1E293B',
-                borderRadius: '12px',
-                padding: '1.25rem',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                <span
-                  style={{
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    color: '#94A3B8',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em'
-                  }}
-                >
-                  {m.label}
-                </span>
-                <div
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '8px',
-                    backgroundColor: m.bgColor,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Icon size={20} color={m.color} />
-                </div>
-              </div>
-
-              <div>
-                <div
-                  style={{
-                    fontSize: '2rem',
-                    fontWeight: 800,
-                    color: '#F8FAFC',
-                    lineHeight: 1,
-                    marginBottom: '0.5rem'
-                  }}
-                >
-                  {loading ? '—' : m.count.toLocaleString()}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
-                  {m.description}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        <AdminMetricCard
+          label="Total Applications"
+          count={totalApplications}
+          icon={FileText}
+          description="Cumulative candidate registrations"
+          loading={loading}
+        />
+        <AdminMetricCard
+          label="New Enquiries"
+          count={newEnquiries}
+          icon={UserPlus}
+          description="Pending initial review"
+          loading={loading}
+        />
+        <AdminMetricCard
+          label="Joining Forms Submitted"
+          count={joiningFormsSubmitted}
+          icon={FileCheck}
+          description="Completed digital packets"
+          loading={loading}
+        />
+        <AdminMetricCard
+          label="Joining Access Enabled"
+          count={joiningAccessEnabled}
+          icon={KeyRound}
+          description="Candidates unlocked for submission"
+          loading={loading}
+        />
+        <AdminMetricCard
+          label="Payments"
+          count={paymentsSuccessful}
+          icon={paymentsSuccessful > 0 ? CheckCircle2 : CreditCard}
+          description={paymentsPending > 0 ? `${paymentsPending} pending verification` : 'Verified candidate receipts'}
+          loading={loading}
+        />
+        <AdminMetricCard
+          label="Documents Pending"
+          count={docsPendingVerification}
+          icon={FileSearch}
+          description="Files awaiting administrative verification"
+          loading={loading}
+        />
+        <AdminMetricCard
+          label="Selected Candidates"
+          count={selectedCandidates}
+          icon={UserCheck2}
+          description="Cleared interview screening stage"
+          loading={loading}
+        />
+        <AdminMetricCard
+          label="Active Employees"
+          count={activeEmployees}
+          icon={Building}
+          description="Corporate on-boarded personnel"
+          loading={loading}
+        />
       </div>
 
       {/* Recent Applications Section */}
-      <div
-        style={{
-          backgroundColor: '#0F172A',
-          border: '1px solid #1E293B',
-          borderRadius: '12px',
-          padding: '1.5rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)'
-        }}
-      >
+      <div className="admin-table-container">
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginBottom: '1.25rem',
-            paddingBottom: '1rem',
-            borderBottom: '1px solid #1E293B'
+            padding: '1.25rem 1.5rem',
+            borderBottom: '1px solid #E2DFD8',
+            backgroundColor: '#FFFFFF'
           }}
         >
           <div>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#F8FAFC', margin: '0 0 0.25rem 0' }}>
-              Recent Candidate Applications
+            <h2
+              style={{
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                fontSize: '1.15rem',
+                fontWeight: 800,
+                color: '#192A56',
+                margin: '0 0 0.2rem 0'
+              }}
+            >
+              Recent Candidate Registrations
             </h2>
             <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>
-              Latest entries ordered by registration date (DESC)
+              Latest 5 candidate entries ordered by creation date (DESC)
             </p>
           </div>
 
@@ -441,69 +301,51 @@ export const AdminDashboardPage: React.FC = () => {
             to="/admin/applications"
             style={{
               fontSize: '0.825rem',
-              color: '#F59E0B',
-              fontWeight: 600,
+              color: '#192A56',
+              fontWeight: 700,
               textDecoration: 'none',
               display: 'flex',
               alignItems: 'center',
               gap: '0.35rem'
             }}
           >
-            <span>View All</span>
+            <span>View Full Directory</span>
             <ArrowRight size={14} />
           </Link>
         </div>
 
-        {/* Applications Table */}
+        {/* Table */}
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+          <table className="admin-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid #1E293B' }}>
-                <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  App Number
-                </th>
-                <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Candidate Name
-                </th>
-                <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Desired Company
-                </th>
-                <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Designation
-                </th>
-                <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Status
-                </th>
-                <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                  Applied Date
-                </th>
-                <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', textAlign: 'right' }}>
-                  Action
-                </th>
+              <tr>
+                <th>App No.</th>
+                <th>Candidate</th>
+                <th>Company</th>
+                <th>Designation</th>
+                <th>Status</th>
+                <th>Applied Date</th>
+                <th style={{ textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#64748B', fontSize: '0.875rem' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem', color: '#64748B' }}>
                     Loading recent applications...
                   </td>
                 </tr>
               ) : recentApplications.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748B' }}>
-                    <FileText size={32} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-                    <div style={{ fontSize: '0.9rem', color: '#94A3B8', fontWeight: 500 }}>
-                      No applications recorded yet.
-                    </div>
-                    <div style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                      When candidates submit through the enquiry or career portal, they will appear here.
-                    </div>
+                  <td colSpan={7}>
+                    <AdminEmptyState
+                      title="No Applications Recorded"
+                      message="When candidates submit an application through the website or career portal, they will appear here."
+                    />
                   </td>
                 </tr>
               ) : (
                 recentApplications.map((app) => {
-                  const badge = getStatusBadgeStyle(app.status);
                   const formattedDate = new Date(app.created_at).toLocaleDateString('en-IN', {
                     day: '2-digit',
                     month: 'short',
@@ -511,64 +353,33 @@ export const AdminDashboardPage: React.FC = () => {
                   });
 
                   return (
-                    <tr
-                      key={app.id}
-                      style={{
-                        borderBottom: '1px solid #1E293B',
-                        transition: 'background 0.1s ease'
-                      }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = '#131D31')}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = 'transparent')}
-                    >
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', fontWeight: 700, color: '#F59E0B', fontFamily: 'monospace' }}>
+                    <tr key={app.id}>
+                      <td style={{ fontWeight: 800, color: '#192A56', fontFamily: 'monospace' }}>
                         {app.application_number}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>
+                      <td style={{ fontWeight: 700, color: '#192A56' }}>
                         {app.full_name}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#CBD5E1' }}>
+                      <td style={{ color: '#4A5568' }}>
                         {app.desired_company || '—'}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#94A3B8' }}>
+                      <td style={{ color: '#64748B' }}>
                         {app.designation || '—'}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem' }}>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.725rem',
-                            fontWeight: 600,
-                            backgroundColor: badge.bg,
-                            color: badge.text,
-                            border: `1px solid ${badge.border}`
-                          }}
-                        >
-                          {app.status.replace(/_/g, ' ')}
-                        </span>
+                      <td>
+                        <AdminStatusBadge status={app.status} />
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.8rem', color: '#64748B' }}>
+                      <td style={{ color: '#64748B', fontSize: '0.8rem' }}>
                         {formattedDate}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                      <td style={{ textAlign: 'right' }}>
                         <Link
                           to={`/admin/applications/${app.id}`}
-                          style={{
-                            display: 'inline-block',
-                            padding: '4px 10px',
-                            borderRadius: '6px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            letterSpacing: '0.04em',
-                            backgroundColor: '#1E293B',
-                            color: '#F59E0B',
-                            border: '1px solid #334155',
-                            textDecoration: 'none',
-                            transition: 'all 0.15s ease'
-                          }}
+                          className="btn-admin-secondary"
+                          style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                         >
-                          VIEW
+                          <Eye size={13} />
+                          <span>VIEW</span>
                         </Link>
                       </td>
                     </tr>

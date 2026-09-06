@@ -13,6 +13,8 @@ import { AdminLoginPage } from './pages/admin/AdminLoginPage';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 import { AdminApplicationsPage } from './pages/admin/AdminApplicationsPage';
 import { AdminApplicationDetailPage } from './pages/admin/AdminApplicationDetailPage';
+import { AdminEmployerEnquiriesPage } from './pages/admin/AdminEmployerEnquiriesPage';
+import { AdminExportsPage } from './pages/admin/AdminExportsPage';
 import { AdminPlaceholderPage } from './pages/admin/AdminPlaceholderPage';
 
 // Public Pages
@@ -44,6 +46,8 @@ export const App: React.FC = () => {
               <Route index element={<AdminDashboardPage />} />
               <Route path="applications" element={<AdminApplicationsPage />} />
               <Route path="applications/:id" element={<AdminApplicationDetailPage />} />
+              <Route path="employer-enquiries" element={<AdminEmployerEnquiriesPage />} />
+              <Route path="exports" element={<AdminExportsPage />} />
               {/* Prepared Future Module Routes */}
               <Route path="jobs" element={<AdminPlaceholderPage />} />
               <Route path="companies" element={<AdminPlaceholderPage />} />
