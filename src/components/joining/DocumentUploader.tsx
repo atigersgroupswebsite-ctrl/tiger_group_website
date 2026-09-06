@@ -33,7 +33,8 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   };
 
   const handleFileUpload = async (category: DocumentCategory, e: React.ChangeEvent<HTMLInputElement>) => {
-    if (readOnly) return;
+    const isDocRejected = documents[category]?.verificationStatus === 'REJECTED';
+    if (readOnly && !isDocRejected) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -197,6 +198,8 @@ const DocumentCardItem: React.FC<DocumentCardItemProps> = ({
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const isImage = Boolean(doc.file?.dataUrl && (doc.file.type.startsWith('image/') || doc.file.dataUrl.startsWith('data:image/')));
+  const isRejected = doc.verificationStatus === 'REJECTED';
+  const isEditable = !readOnly || isRejected;
 
   return (
     <div className={`upload-card ${hasFile ? 'has-file' : ''}`}>
@@ -217,7 +220,31 @@ const DocumentCardItem: React.FC<DocumentCardItemProps> = ({
           )}
         </div>
 
-        {!readOnly && (
+        {/* Rejection Alert Banner */}
+        {isRejected && (
+          <div
+            style={{
+              padding: '0.5rem 0.65rem',
+              backgroundColor: '#FEF2F2',
+              border: '1px solid #FECACA',
+              borderRadius: '6px',
+              marginBottom: '0.75rem',
+              fontSize: '11px',
+              lineHeight: 1.35
+            }}
+          >
+            <div style={{ fontWeight: 800, color: '#DC2626', textTransform: 'uppercase' }}>
+              Status: ACTION REQUIRED
+            </div>
+            {doc.rejectionReason && (
+              <div style={{ color: '#991B1B', marginTop: '2px' }}>
+                Reason: {doc.rejectionReason}
+              </div>
+            )}
+          </div>
+        )}
+
+        {isEditable && (
           <input
             ref={inputRef}
             type="file"
@@ -259,7 +286,7 @@ const DocumentCardItem: React.FC<DocumentCardItemProps> = ({
 
             <div className="uploaded-file-preview">
               <div className="uploaded-file-info">
-                <CheckCircle2 size={18} style={{ color: 'var(--color-champagne-dark)', flexShrink: 0 }} />
+                <CheckCircle2 size={18} style={{ color: isRejected ? '#DC2626' : 'var(--color-champagne-dark)', flexShrink: 0 }} />
                 <div>
                   <div className="uploaded-file-name" title={doc.file.name}>
                     {doc.file.name}
@@ -270,26 +297,29 @@ const DocumentCardItem: React.FC<DocumentCardItemProps> = ({
                 </div>
               </div>
 
-              {!readOnly ? (
+              {isEditable ? (
                 <div style={{ display: 'flex', gap: '0.35rem' }}>
                   <button
                     type="button"
                     className="btn btn-outline btn-sm"
                     onClick={() => inputRef.current?.click()}
                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
-                    title="Replace file"
+                    title={isRejected ? 'Re-upload compliant document' : 'Replace file'}
                   >
                     <RefreshCw size={12} />
+                    {isRejected && <span style={{ marginLeft: '3px' }}>Replace</span>}
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={onRemove}
-                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', color: '#C62828', borderColor: '#C62828' }}
-                    title="Remove file"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={onRemove}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', color: '#C62828', borderColor: '#C62828' }}
+                      title="Remove file"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
                 </div>
               ) : (
                 <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>

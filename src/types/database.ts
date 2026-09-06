@@ -989,6 +989,19 @@ export interface Database {
         };
         Returns: Json;
       };
+      admin_verify_document: {
+        Args: {
+          p_doc_id: string;
+        };
+        Returns: Json;
+      };
+      admin_reject_document: {
+        Args: {
+          p_doc_id: string;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
       is_active_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
@@ -1037,3 +1050,8 @@ export type EmployerEnquiryRow = Database['public']['Tables']['employer_enquirie
 export type NotificationRow = Database['public']['Tables']['notifications']['Row'];
 export type NotificationInsert = Database['public']['Tables']['notifications']['Insert'];
 export type NotificationUpdate = Database['public']['Tables']['notifications']['Update'];
+
+export type EducationRecordRow = Database['public']['Tables']['education_records']['Row'];
+export type FamilyDetailRow = Database['public']['Tables']['family_details']['Row'];
+export type EmergencyContactRow = Database['public']['Tables']['emergency_contacts']['Row'];
+export type DeclarationRow = Database['public']['Tables']['declarations']['Row'];

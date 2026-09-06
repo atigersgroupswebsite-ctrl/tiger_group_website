@@ -230,6 +230,8 @@ export async function getJoiningForm(
 
           normalizedDocs[cat] = {
             ...normalizedDocs[cat],
+            verificationStatus: doc.verification_status,
+            rejectionReason: doc.rejection_reason || undefined,
             file: {
               name: doc.original_file_name || (doc as any).file_name || 'Document',
               size: doc.file_size || 0,

@@ -61,6 +61,8 @@ export const App: React.FC = () => {
               <Route index element={<AdminDashboardPage />} />
               <Route path="applications" element={<AdminApplicationsPage />} />
               <Route path="applications/:id" element={<AdminApplicationDetailPage />} />
+              <Route path="applications/:id/documents" element={<AdminApplicationDetailPage defaultTab="documents" />} />
+              <Route path="applications/:id/joining" element={<AdminApplicationDetailPage defaultTab="joining" />} />
               <Route path="employer-enquiries" element={<AdminEmployerEnquiriesPage />} />
               <Route path="employer-enquiries/:id" element={<AdminEmployerEnquiriesPage />} />
               <Route path="exports" element={<AdminExportsPage />} />

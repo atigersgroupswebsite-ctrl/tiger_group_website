@@ -8,6 +8,8 @@ export const ADMIN_ROUTES = {
   dashboard: '/admin',
   applications: '/admin/applications',
   applicationDetail: (id: string = ':id') => `/admin/applications/${id}`,
+  applicationDocuments: (id: string = ':id') => `/admin/applications/${id}/documents`,
+  applicationJoining: (id: string = ':id') => `/admin/applications/${id}/joining`,
   employerEnquiries: '/admin/employer-enquiries',
   employerEnquiryDetail: (id: string = ':id') => `/admin/employer-enquiries/${id}`,
   exports: '/admin/exports',

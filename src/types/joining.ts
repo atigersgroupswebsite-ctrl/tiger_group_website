@@ -102,6 +102,8 @@ export interface UploadedDocument {
     type: string;
     dataUrl?: string;
   };
+  verificationStatus?: 'UPLOADED' | 'VERIFIED' | 'REJECTED' | 'PENDING';
+  rejectionReason?: string;
 }
 
 export interface DeclarationsInfo {
