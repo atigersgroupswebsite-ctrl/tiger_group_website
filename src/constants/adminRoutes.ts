@@ -9,6 +9,7 @@ export const ADMIN_ROUTES = {
   applications: '/admin/applications',
   applicationDetail: (id: string = ':id') => `/admin/applications/${id}`,
   employerEnquiries: '/admin/employer-enquiries',
+  employerEnquiryDetail: (id: string = ':id') => `/admin/employer-enquiries/${id}`,
   exports: '/admin/exports',
   jobs: '/admin/jobs',
   jobDetail: (id: string = ':id') => `/admin/jobs/${id}`,

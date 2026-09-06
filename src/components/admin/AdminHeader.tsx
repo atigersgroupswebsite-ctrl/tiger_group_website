@@ -16,7 +16,9 @@ import {
   Building2,
   User,
   ExternalLink,
-  BellOff
+  BellOff,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { useAdminNotifications } from '../../contexts/AdminNotificationContext';
@@ -30,15 +32,25 @@ interface AdminHeaderProps {
 
 export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOpenMobile }) => {
   const { user, profile, signOut } = useAdminAuth();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useAdminNotifications();
+  const {
+    notifications,
+    unreadCount,
+    markNotificationAsRead,
+    markAllAsRead,
+    markApplicationNotificationsAsRead,
+    markEmployerEnquiryNotificationsAsRead,
+    soundEnabled,
+    setSoundEnabled
+  } = useAdminNotifications();
   const navigate = useNavigate();
 
   // Profile dropdown state
   const [profileOpen, setProfileOpen] = useState<boolean>(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  // Notification dropdown state
+  // Notification dropdown state & filter tab
   const [notifOpen, setNotifOpen] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'UNREAD' | 'ALL'>('UNREAD');
   const notifRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
@@ -71,14 +83,25 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
     }
   };
 
-  const handleNotificationClick = (notifId: string, appId?: string | null, empId?: string | null) => {
-    markAsRead(notifId);
+  const handleNotificationClick = async (notif: (typeof notifications)[0]) => {
+    try {
+      // Mark as read immediately before or atomically with navigation
+      await markNotificationAsRead(notif.id);
+      if (notif.application_id) {
+        await markApplicationNotificationsAsRead(notif.application_id);
+      } else if (notif.employer_enquiry_id) {
+        await markEmployerEnquiryNotificationsAsRead(notif.employer_enquiry_id);
+      }
+    } catch (err) {
+      console.error('[AdminHeader] Error marking notification read on click:', err);
+    }
+
     setNotifOpen(false);
 
-    if (appId) {
-      navigate(ADMIN_ROUTES.applicationDetail(appId));
-    } else if (empId) {
-      navigate(ADMIN_ROUTES.employerEnquiries);
+    if (notif.application_id) {
+      navigate(ADMIN_ROUTES.applicationDetail(notif.application_id));
+    } else if (notif.employer_enquiry_id) {
+      navigate(ADMIN_ROUTES.employerEnquiryDetail(notif.employer_enquiry_id));
     }
   };
 
@@ -206,75 +229,198 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
               {/* Panel Header */}
               <div
                 style={{
-                  padding: '0.85rem 1rem',
-                  backgroundColor: 'rgba(25, 42, 86, 0.85)',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
+                  padding: '0.85rem 1rem 0.5rem 1rem',
+                  backgroundColor: 'rgba(25, 42, 86, 0.95)',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#FCFBFB' }}>
-                    Notifications
-                  </span>
-                  {unreadCount > 0 && (
-                    <span
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#FCFBFB' }}>
+                      Notifications
+                    </span>
+                    {unreadCount > 0 && (
+                      <span
+                        style={{
+                          fontSize: '0.65rem',
+                          fontWeight: 800,
+                          backgroundColor: 'rgba(247, 215, 148, 0.2)',
+                          color: '#F7D794',
+                          padding: '1px 6px',
+                          borderRadius: '4px'
+                        }}
+                      >
+                        {unreadCount} unread
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {/* Sound Mute / Unmute Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setSoundEnabled(!soundEnabled)}
+                      title={soundEnabled ? 'Notification chime: ON (click to mute)' : 'Notification chime: MUTED (click to unmute)'}
+                      aria-label={soundEnabled ? 'Mute notification chime' : 'Unmute notification chime'}
                       style={{
+                        background: soundEnabled ? 'rgba(247, 215, 148, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid',
+                        borderColor: soundEnabled ? 'rgba(247, 215, 148, 0.35)' : 'rgba(255, 255, 255, 0.12)',
+                        color: soundEnabled ? '#F7D794' : 'rgba(252, 251, 251, 0.5)',
+                        borderRadius: '5px',
+                        padding: '3px 6px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
                         fontSize: '0.65rem',
-                        fontWeight: 800,
-                        backgroundColor: 'rgba(247, 215, 148, 0.2)',
-                        color: '#F7D794',
-                        padding: '1px 6px',
-                        borderRadius: '4px'
+                        fontWeight: 700,
+                        transition: 'all 0.15s ease'
                       }}
                     >
-                      {unreadCount} unread
-                    </span>
-                  )}
+                      {soundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
+                      <span>{soundEnabled ? 'Sound ON' : 'Muted'}</span>
+                    </button>
+
+                    {/* Mark All Read */}
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={markAllAsRead}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#F7D794',
+                          fontSize: '0.725rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          padding: '2px 4px'
+                        }}
+                        title="Mark all notifications as read"
+                      >
+                        <CheckCheck size={13} />
+                        <span>Mark all read</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {unreadCount > 0 && (
+                {/* Unread vs All Tabs */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    marginTop: '0.65rem',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
+                  }}
+                >
                   <button
                     type="button"
-                    onClick={markAllAsRead}
+                    onClick={() => setActiveTab('UNREAD')}
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      color: '#F7D794',
-                      fontSize: '0.725rem',
-                      fontWeight: 700,
+                      borderBottom: activeTab === 'UNREAD' ? '2px solid #F7D794' : '2px solid transparent',
+                      color: activeTab === 'UNREAD' ? '#F7D794' : 'rgba(252, 251, 251, 0.6)',
+                      fontSize: '0.75rem',
+                      fontWeight: activeTab === 'UNREAD' ? 800 : 600,
+                      padding: '4px 8px 6px 8px',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.3rem',
-                      padding: '2px 4px'
+                      gap: '0.35rem',
+                      transition: 'all 0.15s ease'
                     }}
                   >
-                    <CheckCheck size={13} />
-                    <span>Mark all read</span>
+                    <span>Unread</span>
+                    {unreadCount > 0 && (
+                      <span
+                        style={{
+                          fontSize: '0.625rem',
+                          fontWeight: 800,
+                          backgroundColor: '#F7D794',
+                          color: '#192A56',
+                          padding: '0 5px',
+                          borderRadius: '8px',
+                          lineHeight: '14px'
+                        }}
+                      >
+                        {unreadCount}
+                      </span>
+                    )}
                   </button>
-                )}
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('ALL')}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: activeTab === 'ALL' ? '2px solid #F7D794' : '2px solid transparent',
+                      color: activeTab === 'ALL' ? '#F7D794' : 'rgba(252, 251, 251, 0.6)',
+                      fontSize: '0.75rem',
+                      fontWeight: activeTab === 'ALL' ? 800 : 600,
+                      padding: '4px 8px 6px 8px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <span>All</span>
+                    <span
+                      style={{
+                        fontSize: '0.625rem',
+                        fontWeight: 700,
+                        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                        color: 'rgba(252, 251, 251, 0.75)',
+                        padding: '0 5px',
+                        borderRadius: '8px',
+                        lineHeight: '14px'
+                      }}
+                    >
+                      {notifications.length}
+                    </span>
+                  </button>
+                </div>
               </div>
 
               {/* Notification List */}
               <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
-                {notifications.length === 0 ? (
-                  <div
-                    style={{
-                      padding: '2.5rem 1.5rem',
-                      textAlign: 'center',
-                      color: 'rgba(252, 251, 251, 0.6)'
-                    }}
-                  >
-                    <BellOff size={28} style={{ margin: '0 auto 0.5rem auto', opacity: 0.5 }} />
-                    <div style={{ fontSize: '0.825rem', fontWeight: 600 }}>No notifications yet</div>
-                    <div style={{ fontSize: '0.75rem', marginTop: '2px', opacity: 0.7 }}>
-                      New candidate applications and employer enquiries will appear here in real-time.
-                    </div>
-                  </div>
-                ) : (
-                  notifications.map((notif) => {
+                {(() => {
+                  const displayed =
+                    activeTab === 'UNREAD'
+                      ? notifications.filter((n) => !n.read)
+                      : notifications;
+
+                  if (displayed.length === 0) {
+                    return (
+                      <div
+                        style={{
+                          padding: '2.5rem 1.5rem',
+                          textAlign: 'center',
+                          color: 'rgba(252, 251, 251, 0.6)'
+                        }}
+                      >
+                        <BellOff size={28} style={{ margin: '0 auto 0.5rem auto', opacity: 0.5 }} />
+                        <div style={{ fontSize: '0.825rem', fontWeight: 600 }}>
+                          {activeTab === 'UNREAD' ? 'No unread notifications' : 'No notifications yet'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', marginTop: '2px', opacity: 0.7 }}>
+                          {activeTab === 'UNREAD'
+                            ? 'You are all caught up! New enquiries and applications will arrive in real-time.'
+                            : 'Activity records and enquiry alerts will appear here.'}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return displayed.map((notif) => {
                     const isUnread = !notif.read;
                     const dateFormatted = new Date(notif.created_at).toLocaleString('en-IN', {
                       day: '2-digit',
@@ -286,7 +432,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
                     return (
                       <div
                         key={notif.id}
-                        onClick={() => handleNotificationClick(notif.id, notif.application_id, notif.employer_enquiry_id)}
+                        onClick={() => handleNotificationClick(notif)}
                         style={{
                           padding: '0.85rem 1rem',
                           borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
@@ -368,7 +514,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
                           <div
                             style={{
                               fontSize: '0.75rem',
-                              color: 'rgba(252, 251, 251, 0.7)',
+                              color: isUnread ? 'rgba(252, 251, 251, 0.8)' : 'rgba(252, 251, 251, 0.6)',
                               lineHeight: 1.35,
                               marginTop: '2px'
                             }}
@@ -394,8 +540,8 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
                         </div>
                       </div>
                     );
-                  })
-                )}
+                  });
+                })()}
               </div>
             </div>
           )}

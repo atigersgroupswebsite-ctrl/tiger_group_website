@@ -5,8 +5,11 @@
 // ==============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import { useAdminNotifications } from '../../contexts/AdminNotificationContext';
+import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 import type { EmployerEnquiryRow, EmployerEnquiryStatus } from '../../types/database';
 import { AdminTableToolbar } from '../../components/admin/AdminTableToolbar';
 import { AdminStatusBadge } from '../../components/admin/AdminStatusBadge';
@@ -36,7 +39,10 @@ const ALL_EMPLOYER_STATUSES: { value: EmployerEnquiryStatus; label: string }[] =
 ];
 
 export const AdminEmployerEnquiriesPage: React.FC = () => {
+  const { id } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
   const { user } = useAdminAuth();
+  const { markEmployerEnquiryNotificationsAsRead } = useAdminNotifications();
 
   // Data states
   const [enquiries, setEnquiries] = useState<EmployerEnquiryRow[]>([]);
@@ -118,9 +124,36 @@ export const AdminEmployerEnquiriesPage: React.FC = () => {
     fetchEnquiries();
   }, [fetchEnquiries]);
 
+  // When id param is present (e.g. opened directly or via notification link), auto-mark read and open modal
+  useEffect(() => {
+    if (!id) return;
+
+    markEmployerEnquiryNotificationsAsRead(id);
+
+    const found = enquiries.find((e) => e.id === id);
+    if (found) {
+      setSelectedEnquiry(found);
+      setEditingStatus(found.status);
+    } else {
+      supabase
+        .from('employer_enquiries')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            const row = data as EmployerEnquiryRow;
+            setSelectedEnquiry(row);
+            setEditingStatus(row.status);
+          }
+        });
+    }
+  }, [id, enquiries, markEmployerEnquiryNotificationsAsRead]);
+
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const handleOpenDetail = (enquiry: EmployerEnquiryRow) => {
+    markEmployerEnquiryNotificationsAsRead(enquiry.id);
     setSelectedEnquiry(enquiry);
     setEditingStatus(enquiry.status);
     setSuccessMsg(null);
@@ -129,6 +162,9 @@ export const AdminEmployerEnquiriesPage: React.FC = () => {
   const handleCloseDetail = () => {
     setSelectedEnquiry(null);
     setSuccessMsg(null);
+    if (id) {
+      navigate(ADMIN_ROUTES.employerEnquiries, { replace: true });
+    }
   };
 
   const handleStatusUpdate = async () => {

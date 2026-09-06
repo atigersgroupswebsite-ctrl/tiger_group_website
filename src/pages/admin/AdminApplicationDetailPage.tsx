@@ -9,6 +9,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import { useAdminNotifications } from '../../contexts/AdminNotificationContext';
 import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 import type {
   ApplicationRow,
@@ -55,6 +56,7 @@ export const AdminApplicationDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, profile } = useAdminAuth();
+  const { markApplicationNotificationsAsRead } = useAdminNotifications();
   const isSuperAdmin = profile?.role === 'SUPER_ADMIN';
 
   // Delete Modal & Action State
@@ -231,7 +233,10 @@ export const AdminApplicationDetailPage: React.FC = () => {
 
   useEffect(() => {
     loadApplicationData();
-  }, [loadApplicationData]);
+    if (id) {
+      markApplicationNotificationsAsRead(id);
+    }
+  }, [id, loadApplicationData, markApplicationNotificationsAsRead]);
 
   // Handle Application Status Update
   const handleStatusUpdate = async () => {

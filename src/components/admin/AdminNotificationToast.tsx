@@ -11,7 +11,13 @@ import { Bell, ArrowRight, X, Building2, User } from 'lucide-react';
 import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 
 export const AdminNotificationToast: React.FC = () => {
-  const { activeToast, dismissToast, markAsRead } = useAdminNotifications();
+  const {
+    activeToast,
+    dismissToast,
+    markNotificationAsRead,
+    markApplicationNotificationsAsRead,
+    markEmployerEnquiryNotificationsAsRead
+  } = useAdminNotifications();
   const navigate = useNavigate();
 
   if (!activeToast) return null;
@@ -19,12 +25,25 @@ export const AdminNotificationToast: React.FC = () => {
   const isJobEnquiry = activeToast.type === 'NEW_JOB_ENQUIRY';
   const isEmployerEnquiry = activeToast.type === 'NEW_EMPLOYER_ENQUIRY';
 
-  const handleAction = () => {
-    markAsRead(activeToast.id);
+  const handleAction = async () => {
+    const toast = activeToast;
     dismissToast();
 
-    if (isJobEnquiry && activeToast.applicationId) {
-      navigate(ADMIN_ROUTES.applicationDetail(activeToast.applicationId));
+    try {
+      await markNotificationAsRead(toast.id);
+      if (toast.applicationId) {
+        await markApplicationNotificationsAsRead(toast.applicationId);
+      } else if (toast.employerEnquiryId) {
+        await markEmployerEnquiryNotificationsAsRead(toast.employerEnquiryId);
+      }
+    } catch (err) {
+      console.error('[AdminNotificationToast] Error marking read:', err);
+    }
+
+    if (isJobEnquiry && toast.applicationId) {
+      navigate(ADMIN_ROUTES.applicationDetail(toast.applicationId));
+    } else if (isEmployerEnquiry && toast.employerEnquiryId) {
+      navigate(ADMIN_ROUTES.employerEnquiryDetail(toast.employerEnquiryId));
     } else if (isEmployerEnquiry) {
       navigate(ADMIN_ROUTES.employerEnquiries);
     }

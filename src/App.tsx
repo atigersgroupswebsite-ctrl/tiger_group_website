@@ -61,6 +61,7 @@ export const App: React.FC = () => {
               <Route path="applications" element={<AdminApplicationsPage />} />
               <Route path="applications/:id" element={<AdminApplicationDetailPage />} />
               <Route path="employer-enquiries" element={<AdminEmployerEnquiriesPage />} />
+              <Route path="employer-enquiries/:id" element={<AdminEmployerEnquiriesPage />} />
               <Route path="exports" element={<AdminExportsPage />} />
 
               {/* Management Suite Modules */}
