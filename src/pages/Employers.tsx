@@ -48,9 +48,9 @@ export const Employers: React.FC = () => {
             </p>
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-              <a href="#rate-quote" className="btn btn-primary btn-lg">
-                REQUEST RATE QUOTE
-              </a>
+              <Button to="/enquiry/employer" variant="primary" size="lg" icon={<ArrowRight size={18} />}>
+                SUBMIT MANPOWER REQUIREMENT
+              </Button>
               <a href="tel:+918349353946" className="btn btn-outline-light btn-lg">
                 <PhoneCall size={18} />
                 <span>TALK TO OUR TEAM</span>

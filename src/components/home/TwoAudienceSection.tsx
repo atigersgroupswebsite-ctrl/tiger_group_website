@@ -24,8 +24,8 @@ export const TwoAudienceSection: React.FC = () => {
               </div>
 
               <div>
-                <Button to="/jobs" variant="primary" size="lg" icon={<ArrowRight size={18} />}>
-                  EXPLORE JOBS
+                <Button to="/enquiry/job-seeker" variant="primary" size="lg" icon={<ArrowRight size={18} />}>
+                  FIND A JOB
                 </Button>
               </div>
             </div>

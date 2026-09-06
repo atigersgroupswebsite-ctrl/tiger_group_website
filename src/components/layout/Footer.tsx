@@ -68,10 +68,11 @@ export const Footer: React.FC = () => {
             <ul className="footer-links">
               <li><Link to="/" className="footer-link"><ArrowRight size={12} /> Home</Link></li>
               <li><Link to="/about" className="footer-link"><ArrowRight size={12} /> About Us</Link></li>
-              <li><Link to="/businesses" className="footer-link"><ArrowRight size={12} /> Businesses</Link></li>
-              <li><Link to="/careers" className="footer-link"><ArrowRight size={12} /> Careers Portal</Link></li>
-              <li><Link to="/enquiry" className="footer-link"><ArrowRight size={12} /> Enquiry Hub</Link></li>
-              <li><Link to="/contact" className="footer-link"><ArrowRight size={12} /> Contact Us</Link></li>
+              <li><Link to="/services" className="footer-link"><ArrowRight size={12} /> Services</Link></li>
+              <li><Link to="/jobs" className="footer-link"><ArrowRight size={12} /> Jobs</Link></li>
+              <li><Link to="/enquiry" className="footer-link"><ArrowRight size={12} /> Enquiry</Link></li>
+              <li><Link to="/employers" className="footer-link"><ArrowRight size={12} /> For Employers</Link></li>
+              <li><Link to="/contact" className="footer-link"><ArrowRight size={12} /> Contact</Link></li>
             </ul>
           </div>
 

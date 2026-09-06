@@ -103,6 +103,16 @@ export const Enquiry: React.FC = () => {
           >
             Find employment opportunities, connect with employers, and begin your application.
           </motion.p>
+
+          <motion.h2
+            className="enquiry-heading"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.22 }}
+            style={{ marginTop: 'var(--space-6)', marginBottom: '0' }}
+          >
+            WHAT CAN WE HELP YOU WITH?
+          </motion.h2>
         </div>
 
         {/* Two Large Interactive Path Selection Cards */}
