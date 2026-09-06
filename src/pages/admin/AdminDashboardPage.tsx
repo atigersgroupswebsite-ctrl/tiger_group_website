@@ -7,6 +7,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
+import { useAdminNotifications } from '../../contexts/AdminNotificationContext';
 import type { ApplicationRow } from '../../types/database';
 import { AdminMetricCard } from '../../components/admin/AdminMetricCard';
 import { AdminStatusBadge } from '../../components/admin/AdminStatusBadge';
@@ -117,6 +118,14 @@ export const AdminDashboardPage: React.FC = () => {
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  // Automatically refresh live metrics & recent records when a realtime notification event arrives
+  const { notifications } = useAdminNotifications();
+  useEffect(() => {
+    if (notifications.length > 0) {
+      fetchDashboardData();
+    }
+  }, [notifications.length, fetchDashboardData]);
 
   const handleManualRefresh = () => {
     setRefreshing(true);

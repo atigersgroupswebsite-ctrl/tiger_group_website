@@ -6,9 +6,10 @@
 // ==============================================================================
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 import type {
   ApplicationRow,
   ApplicationStatus,
@@ -32,7 +33,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Save,
-  Loader2
+  Loader2,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 const STATUS_OPTIONS: { value: ApplicationStatus; label: string }[] = [
@@ -50,7 +53,15 @@ const STATUS_OPTIONS: { value: ApplicationStatus; label: string }[] = [
 
 export const AdminApplicationDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAdminAuth();
+  const navigate = useNavigate();
+  const { user, profile } = useAdminAuth();
+  const isSuperAdmin = profile?.role === 'SUPER_ADMIN';
+
+  // Delete Modal & Action State
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [confirmNumberInput, setConfirmNumberInput] = useState<string>('');
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Primary Data
   const [application, setApplication] = useState<ApplicationRow | null>(null);
@@ -374,6 +385,60 @@ export const AdminApplicationDetailPage: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to save company information.');
     } finally {
       setIsSavingCompanyInfo(false);
+    }
+  };
+
+  // Handle Permanent Application Deletion (SUPER_ADMIN only)
+  const handleExecuteDelete = async () => {
+    if (!application || confirmNumberInput !== application.application_number) return;
+
+    if (!isSuperAdmin) {
+      setDeleteError('Access Denied: Only SUPER_ADMIN users are authorized to permanently delete applications.');
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      // 1. Gather any known storage paths to remove via Storage API
+      const candidatePaths: string[] = [];
+      const generatedPaths: string[] = [];
+
+      documents.forEach((d) => {
+        if (d.storage_path) candidatePaths.push(d.storage_path);
+      });
+
+      if (joiningForm?.photo_path) candidatePaths.push(joiningForm.photo_path);
+      if (joiningForm?.candidate_signature_path) candidatePaths.push(joiningForm.candidate_signature_path);
+
+      if (candidatePaths.length > 0) {
+        await supabase.storage.from('candidate-documents').remove(candidatePaths);
+      }
+      if (generatedPaths.length > 0) {
+        await supabase.storage.from('generated-documents').remove(generatedPaths);
+      }
+
+      // 2. Call the server-side SECURITY DEFINER atomic deletion function
+      const { error: rpcError } = await supabase.rpc('delete_application_permanently', {
+        target_app_id: application.id
+      });
+
+      if (rpcError) {
+        throw new Error(rpcError.message);
+      }
+
+      // 3. Navigate back to applications list with success confirmation state
+      navigate(ADMIN_ROUTES.applications, {
+        replace: true,
+        state: {
+          successMessage: `Application ${application.application_number} (${application.full_name}) and all associated records have been permanently deleted.`
+        }
+      });
+    } catch (err: unknown) {
+      console.error('[ApplicationDetail] Delete failure:', err);
+      setDeleteError(err instanceof Error ? err.message : 'An error occurred during application deletion.');
+      setIsDeleting(false);
     }
   };
 
@@ -1360,6 +1425,285 @@ export const AdminApplicationDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Danger Zone — Admin Destructive Actions */}
+      <div
+        style={{
+          marginTop: '2.5rem',
+          padding: '1.5rem',
+          backgroundColor: '#FFF8F8',
+          border: '1px solid #EDA6A3',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1.25rem'
+        }}
+      >
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+            <AlertTriangle size={18} color="#C9726F" />
+            <h3
+              style={{
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                fontSize: '1rem',
+                fontWeight: 800,
+                color: '#991B1B',
+                margin: 0
+              }}
+            >
+              Danger Zone — Application Deletion
+            </h3>
+          </div>
+          <p style={{ fontSize: '0.825rem', color: '#64748B', margin: 0, maxWidth: '600px' }}>
+            Permanently delete this candidate application and all associated records (joining forms, documents, payments, reference slips, and uploaded storage files). This action is non-reversible and restricted exclusively to Super Administrators.
+          </p>
+        </div>
+
+        <div>
+          {isSuperAdmin ? (
+            <button
+              type="button"
+              onClick={() => {
+                setShowDeleteModal(true);
+                setConfirmNumberInput('');
+                setDeleteError(null);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                backgroundColor: '#FFFFFF',
+                color: '#DC2626',
+                border: '1px solid #DC2626',
+                borderRadius: '8px',
+                padding: '0.65rem 1.15rem',
+                fontSize: '0.825rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                letterSpacing: '0.04em',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = '#DC2626';
+                (e.currentTarget as HTMLElement).style.color = '#FFFFFF';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = '#FFFFFF';
+                (e.currentTarget as HTMLElement).style.color = '#DC2626';
+              }}
+            >
+              <Trash2 size={15} />
+              <span>DELETE APPLICATION</span>
+            </button>
+          ) : (
+            <div
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: '#94A3B8',
+                backgroundColor: '#F1F5F9',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid #CBD5E1'
+              }}
+            >
+              SUPER_ADMIN ONLY
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(25, 42, 86, 0.7)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 160,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+          onClick={() => !isDeleting && setShowDeleteModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E2DFD8',
+              borderRadius: '12px',
+              maxWidth: '500px',
+              width: '100%',
+              padding: '2rem',
+              boxShadow: '0 20px 40px -10px rgba(25, 42, 86, 0.3)',
+              position: 'relative'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  backgroundColor: '#FEE2E2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#DC2626',
+                  flexShrink: 0
+                }}
+              >
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h2
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: '1.25rem',
+                    fontWeight: 800,
+                    color: '#192A56',
+                    margin: 0
+                  }}
+                >
+                  Delete Application
+                </h2>
+                <div style={{ fontSize: '0.75rem', color: '#DC2626', fontWeight: 600, marginTop: '2px' }}>
+                  Irreversible Destructive Action
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: '#4A5568', lineHeight: 1.5, marginBottom: '1rem' }}>
+              This will permanently delete the application and its associated records/files.
+            </p>
+
+            {/* Application info box */}
+            <div
+              style={{
+                backgroundColor: '#F8F9FA',
+                border: '1px solid #E2DFD8',
+                borderRadius: '8px',
+                padding: '0.85rem 1rem',
+                marginBottom: '1.25rem'
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Application:</div>
+              <div
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: '1.1rem',
+                  fontWeight: 800,
+                  color: '#192A56',
+                  marginTop: '2px'
+                }}
+              >
+                {application.application_number}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#4A5568', marginTop: '2px' }}>
+                Candidate: <strong>{application.full_name}</strong>
+              </div>
+            </div>
+
+            {/* Error Banner in modal if deletion failed */}
+            {deleteError && (
+              <div
+                style={{
+                  backgroundColor: '#FBF0EF',
+                  border: '1px solid #EDA6A3',
+                  borderRadius: '8px',
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem'
+                }}
+              >
+                <AlertCircle size={18} color="#C9726F" />
+                <span style={{ fontSize: '0.825rem', color: '#C9726F', fontWeight: 600 }}>
+                  {deleteError}
+                </span>
+              </div>
+            )}
+
+            <p style={{ fontSize: '0.825rem', color: '#192A56', fontWeight: 600, marginBottom: '0.5rem' }}>
+              Please type <code style={{ backgroundColor: '#F1F5F9', padding: '2px 5px', borderRadius: '4px', color: '#DC2626' }}>{application.application_number}</code> to confirm:
+            </p>
+
+            <input
+              type="text"
+              value={confirmNumberInput}
+              onChange={(e) => setConfirmNumberInput(e.target.value.trim())}
+              placeholder={application.application_number}
+              disabled={isDeleting}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '0.65rem 0.85rem',
+                backgroundColor: '#FCFBFB',
+                border: '1px solid',
+                borderColor: confirmNumberInput === application.application_number ? '#10B981' : '#D2CECE',
+                borderRadius: '6px',
+                fontFamily: 'monospace',
+                fontSize: '0.9rem',
+                color: '#192A56',
+                outline: 'none',
+                marginBottom: '1.5rem'
+              }}
+            />
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setConfirmNumberInput('');
+                  setDeleteError(null);
+                }}
+                disabled={isDeleting}
+                className="btn-admin-secondary"
+              >
+                CANCEL
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteDelete}
+                disabled={isDeleting || confirmNumberInput !== application.application_number}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: confirmNumberInput === application.application_number ? '#DC2626' : '#FCA5A5',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '0.6rem 1.25rem',
+                  fontSize: '0.825rem',
+                  fontWeight: 800,
+                  cursor: confirmNumberInput === application.application_number && !isDeleting ? 'pointer' : 'not-allowed',
+                  transition: 'background-color 0.15s ease'
+                }}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                    <span>DELETING...</span>
+                  </>
+                ) : (
+                  <span>DELETE PERMANENTLY</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

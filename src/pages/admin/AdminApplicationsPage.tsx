@@ -5,7 +5,7 @@
 // ==============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import type { ApplicationRow, ApplicationStatus, CompanyRow } from '../../types/database';
 import { AdminTableToolbar } from '../../components/admin/AdminTableToolbar';
@@ -19,7 +19,8 @@ import {
   Eye,
   Building2,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 
 const PAGE_SIZE = 15;
@@ -39,6 +40,10 @@ const ALL_STATUSES: { value: ApplicationStatus; label: string }[] = [
 
 export const AdminApplicationsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [flashSuccess, setFlashSuccess] = useState<string | null>(
+    (location.state as { successMessage?: string })?.successMessage || null
+  );
 
   // Data states
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
@@ -349,6 +354,42 @@ export const AdminApplicationsPage: React.FC = () => {
         >
           <AlertCircle size={20} color="#C9726F" />
           <span style={{ fontSize: '0.875rem', color: '#C9726F', fontWeight: 600 }}>{error}</span>
+        </div>
+      )}
+
+      {/* Flash Success Notice */}
+      {flashSuccess && (
+        <div
+          style={{
+            backgroundColor: '#E8F5E9',
+            border: '1px solid #A5D6A7',
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.75rem'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <CheckCircle2 size={20} color="#2E7D32" />
+            <span style={{ fontSize: '0.875rem', color: '#2E7D32', fontWeight: 600 }}>{flashSuccess}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFlashSuccess(null)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#2E7D32',
+              cursor: 'pointer',
+              fontWeight: 700,
+              padding: '2px 6px'
+            }}
+          >
+            ✕
+          </button>
         </div>
       )}
 

@@ -1,12 +1,16 @@
 // ==============================================================================
 // File: src/components/admin/AdminLayout.tsx
 // Description: Official internal application shell for A TIGER GROUPS
+// Features: Branded sidebar, header, breadcrumbs, realtime notifications provider,
+//           and in-app toast alerts.
 // ==============================================================================
 
 import React, { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
+import { AdminNotificationToast } from './AdminNotificationToast';
+import { AdminNotificationProvider } from '../../contexts/AdminNotificationContext';
 import type { BreadcrumbItem } from './AdminBreadcrumbs';
 import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 
@@ -75,40 +79,45 @@ export const AdminLayout: React.FC = () => {
   };
 
   return (
-    <div className="admin-shell">
-      {/* Mobile Backdrop */}
-      {mobileMenuOpen && (
-        <div
-          onClick={() => setMobileMenuOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(15, 27, 56, 0.7)',
-            backdropFilter: 'blur(2px)',
-            zIndex: 45
-          }}
-        />
-      )}
+    <AdminNotificationProvider>
+      <div className="admin-shell">
+        {/* Mobile Backdrop */}
+        {mobileMenuOpen && (
+          <div
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 27, 56, 0.7)',
+              backdropFilter: 'blur(2px)',
+              zIndex: 45
+            }}
+          />
+        )}
 
-      {/* Branded Sidebar */}
-      <AdminSidebar
-        mobileOpen={mobileMenuOpen}
-        onCloseMobile={() => setMobileMenuOpen(false)}
-      />
-
-      {/* Main Content Canvas (Pearl White canvas) */}
-      <div className="admin-content-canvas">
-        {/* Top Header */}
-        <AdminHeader
-          breadcrumbs={generateBreadcrumbs()}
-          onOpenMobile={() => setMobileMenuOpen(true)}
+        {/* Branded Sidebar */}
+        <AdminSidebar
+          mobileOpen={mobileMenuOpen}
+          onCloseMobile={() => setMobileMenuOpen(false)}
         />
 
-        {/* Page Body */}
-        <main className="admin-main-body">
-          <Outlet />
-        </main>
+        {/* Main Content Canvas (Pearl White canvas) */}
+        <div className="admin-content-canvas">
+          {/* Top Header with breadcrumbs and notification bell */}
+          <AdminHeader
+            breadcrumbs={generateBreadcrumbs()}
+            onOpenMobile={() => setMobileMenuOpen(true)}
+          />
+
+          {/* Page Body */}
+          <main className="admin-main-body">
+            <Outlet />
+          </main>
+        </div>
+
+        {/* In-App Floating Toast Notification for Realtime Events */}
+        <AdminNotificationToast />
       </div>
-    </div>
+    </AdminNotificationProvider>
   );
 };

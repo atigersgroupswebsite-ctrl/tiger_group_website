@@ -88,6 +88,13 @@ export type AdminRole =
   | 'DOCUMENT_VERIFIER'
   | 'ACCOUNTANT';
 
+export type NotificationType =
+  | 'NEW_JOB_ENQUIRY'
+  | 'NEW_EMPLOYER_ENQUIRY'
+  | 'PAYMENT_SUCCESS'
+  | 'DOCUMENT_UPLOADED'
+  | 'JOINING_FORM_SUBMITTED';
+
 export interface Database {
   public: {
     Tables: {
@@ -908,12 +915,61 @@ export interface Database {
         };
         Relationships: [];
       };
+      notifications: {
+        Row: {
+          id: string;
+          admin_user_id: string | null;
+          type: NotificationType;
+          title: string;
+          message: string;
+          application_id: string | null;
+          employer_enquiry_id: string | null;
+          read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          admin_user_id?: string | null;
+          type: NotificationType;
+          title: string;
+          message: string;
+          application_id?: string | null;
+          employer_enquiry_id?: string | null;
+          read?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          admin_user_id?: string | null;
+          type?: NotificationType;
+          title?: string;
+          message?: string;
+          application_id?: string | null;
+          employer_enquiry_id?: string | null;
+          read?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      delete_application_permanently: {
+        Args: {
+          target_app_id: string;
+        };
+        Returns: Json;
+      };
+      is_active_admin: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      is_super_admin: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
     };
     Enums: {
       [_ in never]: never;
@@ -950,3 +1006,7 @@ export type ActivityLogRow = Database['public']['Tables']['activity_logs']['Row'
 export type ActivityLogInsert = Database['public']['Tables']['activity_logs']['Insert'];
 export type ReferenceSlipRow = Database['public']['Tables']['reference_slips']['Row'];
 export type EmployerEnquiryRow = Database['public']['Tables']['employer_enquiries']['Row'];
+
+export type NotificationRow = Database['public']['Tables']['notifications']['Row'];
+export type NotificationInsert = Database['public']['Tables']['notifications']['Insert'];
+export type NotificationUpdate = Database['public']['Tables']['notifications']['Update'];
