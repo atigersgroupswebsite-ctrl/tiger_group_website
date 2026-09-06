@@ -81,7 +81,8 @@ export interface FamilyMemberRecord {
 export type DocumentCategory =
   | 'PHOTO'
   | 'SIGNATURE'
-  | 'AADHAAR'
+  | 'AADHAAR_FRONT'
+  | 'AADHAAR_BACK'
   | 'PAN'
   | 'BANK_PASSBOOK'
   | 'EDUCATION_CERTIFICATE'
@@ -92,6 +93,8 @@ export type DocumentCategory =
 export interface UploadedDocument {
   category: DocumentCategory;
   title: string;
+  type: 'AADHAAR' | 'PAN' | 'PHOTO' | 'SIGNATURE' | 'BANK_PASSBOOK' | 'EDUCATION_CERTIFICATE' | 'ADDRESS_PROOF' | 'EXPERIENCE_CERTIFICATE' | 'OTHER';
+  side?: 'FRONT' | 'BACK' | 'SINGLE';
   required: boolean;
   file?: {
     name: string;
@@ -124,5 +127,6 @@ export interface JoiningFormData {
   documents: Record<DocumentCategory, UploadedDocument>;
   declarations: DeclarationsInfo;
   status: 'DRAFT' | 'SUBMITTED';
+  submissionStatus?: 'DRAFT' | 'SUBMITTED';
   submittedAt?: string;
 }

@@ -13,7 +13,8 @@ import {
   FileCheck,
   FileSignature,
   ShieldCheck,
-  ArrowRight
+  ArrowRight,
+  Eye
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import type { JoiningFormData } from '../../types/joining';
@@ -27,6 +28,7 @@ interface ReviewSectionProps {
   onConfirmationToggle: (checked: boolean) => void;
   onSubmit: () => void;
   isSubmitting?: boolean;
+  onBackToSuccess?: () => void;
 }
 
 export const ReviewSection: React.FC<ReviewSectionProps> = ({
@@ -36,8 +38,11 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
   confirmationChecked,
   onConfirmationToggle,
   onSubmit,
-  isSubmitting = false
+  isSubmitting = false,
+  onBackToSuccess
 }) => {
+  const isSubmittedMode = formData.status === 'SUBMITTED';
+
   // Aggregate all missing fields across steps 1-8
   const missingItems: { step: number; stepName: string; fields: string[] }[] = [];
   const stepTitles: Record<number, string> = {
@@ -117,16 +122,75 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
 
   return (
     <div>
+      {/* Top Banner when form is SUBMITTED */}
+      {isSubmittedMode && (
+        <div
+          style={{
+            backgroundColor: 'rgba(25, 42, 86, 0.05)',
+            border: '2px solid var(--color-midnight-navy)',
+            borderRadius: 'var(--radius-xl)',
+            padding: 'var(--space-6)',
+            marginBottom: 'var(--space-8)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1.25rem' }}>
+            <div>
+              <span className="eyebrow" style={{ color: 'var(--color-champagne-dark)', fontWeight: 800 }}>
+                OFFICIAL RECORD LOCKED
+              </span>
+              <h2 style={{ fontSize: 'clamp(1.5rem, 2.5vw, 2rem)', color: 'var(--color-midnight-navy)', margin: '0.25rem 0' }}>
+                JOINING FORM SUBMITTED
+              </h2>
+              <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+                This joining dossier has been received and locked for administrative verification.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+              <div>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Submission Date
+                </span>
+                <div style={{ fontWeight: 700, color: 'var(--color-midnight-navy)' }}>
+                  {formData.submittedAt ? new Date(formData.submittedAt).toLocaleDateString() : 'Confirmed'}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Application Number
+                </span>
+                <div style={{ fontWeight: 700, color: 'var(--color-midnight-navy)', fontFamily: 'monospace' }}>
+                  {formData.applicationId}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Status
+                </span>
+                <div style={{ marginTop: '2px' }}>
+                  <span style={{ display: 'inline-flex', padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)', background: 'var(--color-midnight-navy)', color: '#fff', fontSize: '11px', fontWeight: 800 }}>
+                    SUBMITTED
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="joining-step-header">
         <span className="joining-step-tag">STEP 09</span>
-        <h2 className="joining-step-title">REVIEW & FINAL SUBMISSION</h2>
+        <h2 className="joining-step-title">
+          {isSubmittedMode ? 'SUBMISSION RECORD REVIEW' : 'REVIEW & FINAL SUBMISSION'}
+        </h2>
         <p className="joining-step-desc">
-          Verify all provided records, documents, and declarations before official generation into the 14-page Joining Packet.
+          {isSubmittedMode
+            ? 'Archived copy of submitted onboarding particulars and uploaded compliance credentials.'
+            : 'Verify all provided records, documents, and declarations before official generation into the 14-page Joining Packet.'}
         </p>
       </div>
 
-      {/* Global Incomplete Warning */}
-      {!isAllComplete && (
+      {/* Global Incomplete Warning (Only in edit/draft mode) */}
+      {!isSubmittedMode && !isAllComplete && (
         <div
           role="alert"
           style={{
@@ -177,8 +241,8 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             onClick={() => onEditStep(1)}
             style={{ fontSize: '0.75rem', gap: '0.3rem' }}
           >
-            <Edit3 size={13} />
-            <span>EDIT</span>
+            {isSubmittedMode ? <Eye size={13} /> : <Edit3 size={13} />}
+            <span>{isSubmittedMode ? 'VIEW' : 'EDIT'}</span>
           </button>
         </div>
 
@@ -234,8 +298,8 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             onClick={() => onEditStep(2)}
             style={{ fontSize: '0.75rem', gap: '0.3rem' }}
           >
-            <Edit3 size={13} />
-            <span>EDIT</span>
+            {isSubmittedMode ? <Eye size={13} /> : <Edit3 size={13} />}
+            <span>{isSubmittedMode ? 'VIEW' : 'EDIT'}</span>
           </button>
         </div>
 
@@ -310,8 +374,8 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             onClick={() => onEditStep(3)}
             style={{ fontSize: '0.75rem', gap: '0.3rem' }}
           >
-            <Edit3 size={13} />
-            <span>EDIT</span>
+            {isSubmittedMode ? <Eye size={13} /> : <Edit3 size={13} />}
+            <span>{isSubmittedMode ? 'VIEW' : 'EDIT'}</span>
           </button>
         </div>
 
@@ -358,8 +422,8 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             onClick={() => onEditStep(3)}
             style={{ fontSize: '0.75rem', gap: '0.3rem' }}
           >
-            <Edit3 size={13} />
-            <span>EDIT</span>
+            {isSubmittedMode ? <Eye size={13} /> : <Edit3 size={13} />}
+            <span>{isSubmittedMode ? 'VIEW' : 'EDIT'}</span>
           </button>
         </div>
 
@@ -394,8 +458,8 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             onClick={() => onEditStep(4)}
             style={{ fontSize: '0.75rem', gap: '0.3rem' }}
           >
-            <Edit3 size={13} />
-            <span>EDIT</span>
+            {isSubmittedMode ? <Eye size={13} /> : <Edit3 size={13} />}
+            <span>{isSubmittedMode ? 'VIEW' : 'EDIT'}</span>
           </button>
         </div>
 
@@ -451,8 +515,8 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             onClick={() => onEditStep(5)}
             style={{ fontSize: '0.75rem', gap: '0.3rem' }}
           >
-            <Edit3 size={13} />
-            <span>EDIT</span>
+            {isSubmittedMode ? <Eye size={13} /> : <Edit3 size={13} />}
+            <span>{isSubmittedMode ? 'VIEW' : 'EDIT'}</span>
           </button>
         </div>
 
@@ -496,8 +560,8 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             onClick={() => onEditStep(6)}
             style={{ fontSize: '0.75rem', gap: '0.3rem' }}
           >
-            <Edit3 size={13} />
-            <span>EDIT</span>
+            {isSubmittedMode ? <Eye size={13} /> : <Edit3 size={13} />}
+            <span>{isSubmittedMode ? 'VIEW' : 'EDIT'}</span>
           </button>
         </div>
 
@@ -539,8 +603,8 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             onClick={() => onEditStep(7)}
             style={{ fontSize: '0.75rem', gap: '0.3rem' }}
           >
-            <Edit3 size={13} />
-            <span>EDIT</span>
+            {isSubmittedMode ? <Eye size={13} /> : <Edit3 size={13} />}
+            <span>{isSubmittedMode ? 'VIEW' : 'EDIT'}</span>
           </button>
         </div>
 
@@ -561,7 +625,7 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             <div>
               <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-midnight-navy)' }}>Passport Photo</div>
               <div style={{ fontSize: '11px', color: formData.documents.PHOTO?.file ? 'var(--color-text-secondary)' : 'var(--color-dusty-rose-dark)' }}>
-                {formData.documents.PHOTO?.file ? formData.documents.PHOTO.file.name : 'Missing (Required)'}
+                {formData.documents.PHOTO?.file ? `✓ ${formData.documents.PHOTO.file.name}` : 'Missing (Required)'}
               </div>
             </div>
           </div>
@@ -582,14 +646,34 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             <div>
               <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-midnight-navy)' }}>Specimen Signature</div>
               <div style={{ fontSize: '11px', color: formData.documents.SIGNATURE?.file ? 'var(--color-text-secondary)' : 'var(--color-dusty-rose-dark)' }}>
-                {formData.documents.SIGNATURE?.file ? formData.documents.SIGNATURE.file.name : 'Missing (Required)'}
+                {formData.documents.SIGNATURE?.file ? `✓ ${formData.documents.SIGNATURE.file.name}` : 'Missing (Required)'}
               </div>
+            </div>
+          </div>
+
+          {/* Aadhaar Front */}
+          <div style={{ padding: '0.75rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-pearl-surface)' }}>
+            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-midnight-navy)' }}>
+              Aadhaar Card (Front Side)
+            </div>
+            <div style={{ fontSize: '11px', color: formData.documents.AADHAAR_FRONT?.file ? 'var(--color-text-secondary)' : 'var(--color-dusty-rose-dark)', marginTop: '2px' }}>
+              {formData.documents.AADHAAR_FRONT?.file ? `✓ ${formData.documents.AADHAAR_FRONT.file.name}` : 'Missing (Required)'}
+            </div>
+          </div>
+
+          {/* Aadhaar Back */}
+          <div style={{ padding: '0.75rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-pearl-surface)' }}>
+            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-midnight-navy)' }}>
+              Aadhaar Card (Back Side)
+            </div>
+            <div style={{ fontSize: '11px', color: formData.documents.AADHAAR_BACK?.file ? 'var(--color-text-secondary)' : 'var(--color-dusty-rose-dark)', marginTop: '2px' }}>
+              {formData.documents.AADHAAR_BACK?.file ? `✓ ${formData.documents.AADHAAR_BACK.file.name}` : 'Missing (Required)'}
             </div>
           </div>
 
           {/* Other Documents */}
           {Object.entries(formData.documents)
-            .filter(([cat]) => cat !== 'PHOTO' && cat !== 'SIGNATURE')
+            .filter(([cat]) => !['PHOTO', 'SIGNATURE', 'AADHAAR_FRONT', 'AADHAAR_BACK'].includes(cat))
             .map(([cat, doc]) => (
               <div key={cat} style={{ padding: '0.75rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-pearl-surface)' }}>
                 <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-midnight-navy)' }}>
@@ -619,8 +703,8 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
             onClick={() => onEditStep(8)}
             style={{ fontSize: '0.75rem', gap: '0.3rem' }}
           >
-            <Edit3 size={13} />
-            <span>EDIT</span>
+            {isSubmittedMode ? <Eye size={13} /> : <Edit3 size={13} />}
+            <span>{isSubmittedMode ? 'VIEW' : 'EDIT'}</span>
           </button>
         </div>
 
@@ -654,70 +738,112 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
         </div>
       </div>
 
-      {/* FINAL SUBMIT CONFIRMATION BOX */}
-      <div
-        style={{
-          backgroundColor: 'var(--color-pearl-surface)',
-          border: '2px solid var(--color-champagne-dark)',
-          borderRadius: 'var(--radius-xl)',
-          padding: 'clamp(1.5rem, 3vw, 2rem)',
-          boxShadow: 'var(--shadow-md)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--color-midnight-navy)', marginBottom: 'var(--space-3)' }}>
-          <ShieldCheck size={22} style={{ color: 'var(--color-midnight-navy)' }} />
-          <h3 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 700 }}>
-            FINAL VERIFICATION & SUBMISSION CONFIRMATION
-          </h3>
-        </div>
-
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 'var(--space-5)' }}>
-          Please review all information carefully before submitting your joining form. Once submitted, your onboarding packet will be processed for background verification, EPFO Form 11 creation, and reporting pass issuance.
-        </p>
-
-        <label
-          className="form-checkbox-label"
+      {/* SUBMISSION FOOTER: LOCKED BANNER vs EDITABLE SUBMIT */}
+      {isSubmittedMode ? (
+        <div
           style={{
-            alignItems: 'flex-start',
-            padding: '1rem',
-            backgroundColor: '#ffffff',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-md)',
-            marginBottom: 'var(--space-6)',
-            cursor: 'pointer'
+            backgroundColor: 'var(--color-pearl-surface)',
+            border: '2px solid var(--color-midnight-navy)',
+            borderRadius: 'var(--radius-xl)',
+            padding: 'clamp(1.5rem, 3vw, 2.25rem)',
+            textAlign: 'center'
           }}
         >
-          <input
-            type="checkbox"
-            className="form-checkbox-input"
-            checked={confirmationChecked}
-            onChange={(e) => onConfirmationToggle(e.target.checked)}
-            style={{ marginTop: '3px' }}
-          />
-          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-midnight-navy)', fontWeight: 600, lineHeight: 1.5 }}>
-            I confirm that the information provided by me is accurate to the best of my knowledge. I understand that any false declaration may result in cancellation of my appointment.
-          </span>
-        </label>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button
-            type="button"
-            variant="primary"
-            size="lg"
-            disabled={!confirmationChecked || !isAllComplete || isSubmitting}
-            onClick={onSubmit}
-            icon={<ArrowRight size={18} />}
-          >
-            {isSubmitting ? 'SUBMITTING JOINING DOSSIER...' : 'SUBMIT JOINING FORM →'}
-          </Button>
-        </div>
-
-        {!isAllComplete && (
-          <div style={{ marginTop: 'var(--space-3)', textAlign: 'right', fontSize: 'var(--text-xs)', color: 'var(--color-dusty-rose-dark)', fontWeight: 600 }}>
-            * Please resolve all incomplete sections before submitting.
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'var(--color-midnight-navy)', marginBottom: 'var(--space-2)' }}>
+            <CheckCircle2 size={22} style={{ color: 'var(--color-champagne-dark)' }} />
+            <h3 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 700 }}>
+              JOINING FORM SUBMITTED & ARCHIVED
+            </h3>
           </div>
-        )}
-      </div>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', maxWidth: '580px', margin: '0 auto var(--space-6)', lineHeight: 1.6 }}>
+            Your onboarding dossier was submitted on {formData.submittedAt ? new Date(formData.submittedAt).toLocaleDateString() : 'recently'}. All records are locked for administrative verification. No further modifications can be submitted online.
+          </p>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+            {onBackToSuccess && (
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={onBackToSuccess}
+              >
+                BACK TO CONFIRMATION
+              </Button>
+            )}
+            <Button
+              to="/"
+              variant="primary"
+              size="md"
+            >
+              RETURN TO HOMEPAGE
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div
+          style={{
+            backgroundColor: 'var(--color-pearl-surface)',
+            border: '2px solid var(--color-champagne-dark)',
+            borderRadius: 'var(--radius-xl)',
+            padding: 'clamp(1.5rem, 3vw, 2rem)',
+            boxShadow: 'var(--shadow-md)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--color-midnight-navy)', marginBottom: 'var(--space-3)' }}>
+            <ShieldCheck size={22} style={{ color: 'var(--color-midnight-navy)' }} />
+            <h3 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 700 }}>
+              FINAL VERIFICATION & SUBMISSION CONFIRMATION
+            </h3>
+          </div>
+
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 'var(--space-5)' }}>
+            Please review all information carefully before submitting your joining form. Once submitted, your onboarding packet will be processed for background verification, EPFO Form 11 creation, and reporting pass issuance.
+          </p>
+
+          <label
+            className="form-checkbox-label"
+            style={{
+              alignItems: 'flex-start',
+              padding: '1rem',
+              backgroundColor: '#ffffff',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: 'var(--space-6)',
+              cursor: 'pointer'
+            }}
+          >
+            <input
+              type="checkbox"
+              className="form-checkbox-input"
+              checked={confirmationChecked}
+              onChange={(e) => onConfirmationToggle(e.target.checked)}
+              style={{ marginTop: '3px' }}
+            />
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-midnight-navy)', fontWeight: 600, lineHeight: 1.5 }}>
+              I confirm that the information provided by me is accurate to the best of my knowledge. I understand that any false declaration may result in cancellation of my appointment.
+            </span>
+          </label>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              disabled={!confirmationChecked || !isAllComplete || isSubmitting}
+              onClick={onSubmit}
+              icon={<ArrowRight size={18} />}
+            >
+              {isSubmitting ? 'SUBMITTING JOINING DOSSIER...' : 'SUBMIT JOINING FORM →'}
+            </Button>
+          </div>
+
+          {!isAllComplete && (
+            <div style={{ marginTop: 'var(--space-3)', textAlign: 'right', fontSize: 'var(--text-xs)', color: 'var(--color-dusty-rose-dark)', fontWeight: 600 }}>
+              * Please resolve all incomplete sections before submitting.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

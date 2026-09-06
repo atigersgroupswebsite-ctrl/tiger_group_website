@@ -7,13 +7,15 @@ interface FamilyTableProps {
   onAdd: () => void;
   onRemove: (id: string) => void;
   onChange: (id: string, field: keyof FamilyMemberRecord, value: string) => void;
+  readOnly?: boolean;
 }
 
 export const FamilyTable: React.FC<FamilyTableProps> = ({
   records,
   onAdd,
   onRemove,
-  onChange
+  onChange,
+  readOnly = false
 }) => {
   return (
     <div>
@@ -31,7 +33,7 @@ export const FamilyTable: React.FC<FamilyTableProps> = ({
           <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>FAMILY MEMBERS (UP TO 5)</h3>
         </div>
 
-        {records.length < 5 && (
+        {!readOnly && records.length < 5 && (
           <button
             type="button"
             className="btn btn-outline btn-sm"
@@ -44,14 +46,14 @@ export const FamilyTable: React.FC<FamilyTableProps> = ({
         )}
       </div>
 
-      <div className="repeatable-table-wrapper">
+      <div className="repeatable-table-wrapper" style={{ overflowX: 'auto' }}>
         <table className="repeatable-table">
           <thead>
             <tr>
               <th style={{ width: '45%' }}>Family Member Name</th>
               <th style={{ width: '25%' }}>Date of Birth / Age</th>
               <th style={{ width: '20%' }}>Relationship</th>
-              <th style={{ width: '10%', textAlign: 'center' }}>Action</th>
+              {!readOnly && <th style={{ width: '10%', textAlign: 'center' }}>Action</th>}
             </tr>
           </thead>
           <tbody>
@@ -60,25 +62,30 @@ export const FamilyTable: React.FC<FamilyTableProps> = ({
                 <td>
                   <input
                     type="text"
-                    className="repeatable-input"
+                    className={`repeatable-input ${readOnly ? 'read-only-field' : ''}`}
                     placeholder="Full name as per Aadhaar"
                     value={fam.name}
+                    readOnly={readOnly}
+                    disabled={readOnly}
                     onChange={(e) => onChange(fam.id, 'name', e.target.value)}
                   />
                 </td>
                 <td>
                   <input
                     type="text"
-                    className="repeatable-input"
+                    className={`repeatable-input ${readOnly ? 'read-only-field' : ''}`}
                     placeholder="e.g. 52 Yrs / 12-05-1972"
                     value={fam.dateOfBirthOrAge}
+                    readOnly={readOnly}
+                    disabled={readOnly}
                     onChange={(e) => onChange(fam.id, 'dateOfBirthOrAge', e.target.value)}
                   />
                 </td>
                 <td>
                   <select
-                    className="repeatable-input"
+                    className={`repeatable-input ${readOnly ? 'read-only-field' : ''}`}
                     value={fam.relation}
+                    disabled={readOnly}
                     onChange={(e) => onChange(fam.id, 'relation', e.target.value)}
                   >
                     <option value="Father">Father</option>
@@ -90,25 +97,27 @@ export const FamilyTable: React.FC<FamilyTableProps> = ({
                     <option value="Sister">Sister</option>
                   </select>
                 </td>
-                <td style={{ textAlign: 'center' }}>
-                  {records.length > 1 && (
-                    <button
-                      type="button"
-                      className="table-remove-btn"
-                      onClick={() => onRemove(fam.id)}
-                      title="Remove row"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </td>
+                {!readOnly && (
+                  <td style={{ textAlign: 'center' }}>
+                    {records.length > 1 && (
+                      <button
+                        type="button"
+                        className="table-remove-btn"
+                        onClick={() => onRemove(fam.id)}
+                        title="Remove row"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
+      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 'var(--space-2) 0 0 0' }}>
         * These entries will be directly mapped into the statutory ESIC Form 1 family declaration and EPFO Form 2 nominee schedules in your final joining dossier.
       </p>
     </div>

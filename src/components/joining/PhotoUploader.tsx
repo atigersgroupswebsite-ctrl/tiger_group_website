@@ -5,12 +5,14 @@ interface PhotoUploaderProps {
   photoDataUrl?: string;
   onPhotoChange: (dataUrl: string | undefined, fileMeta?: { name: string; size: number; type: string }) => void;
   error?: string;
+  readOnly?: boolean;
 }
 
 export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   photoDataUrl,
   onPhotoChange,
-  error
+  error,
+  readOnly = false
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,7 +88,11 @@ export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       </div>
 
       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-        {photoDataUrl ? (
+        {readOnly ? (
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+            {photoDataUrl ? '✓ Photograph Attached (Locked)' : 'No Photograph Attached'}
+          </span>
+        ) : photoDataUrl ? (
           <>
             <button
               type="button"

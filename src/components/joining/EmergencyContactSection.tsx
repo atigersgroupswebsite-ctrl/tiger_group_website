@@ -8,6 +8,7 @@ interface EmergencyContactSectionProps {
   onAddContact: () => void;
   onRemoveContact: (id: string) => void;
   errors: Record<string, string>;
+  readOnly?: boolean;
 }
 
 export const EmergencyContactSection: React.FC<EmergencyContactSectionProps> = ({
@@ -15,7 +16,8 @@ export const EmergencyContactSection: React.FC<EmergencyContactSectionProps> = (
   onContactChange,
   onAddContact,
   onRemoveContact,
-  errors
+  errors,
+  readOnly = false
 }) => {
   return (
     <div style={{ marginTop: 'var(--space-8)' }}>
@@ -27,7 +29,7 @@ export const EmergencyContactSection: React.FC<EmergencyContactSectionProps> = (
           </h3>
         </div>
 
-        {contacts.length < 3 && (
+        {!readOnly && contacts.length < 3 && (
           <button
             type="button"
             className="btn btn-outline btn-sm"
@@ -60,7 +62,7 @@ export const EmergencyContactSection: React.FC<EmergencyContactSectionProps> = (
             <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-midnight-navy)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Emergency Relative #{index + 1}
             </span>
-            {contacts.length > 1 && (
+            {!readOnly && contacts.length > 1 && (
               <button
                 type="button"
                 onClick={() => onRemoveContact(contact.id)}
@@ -90,9 +92,11 @@ export const EmergencyContactSection: React.FC<EmergencyContactSectionProps> = (
               </label>
               <input
                 type="text"
-                className={`field-input ${errors[`emergency_${contact.id}_name`] ? 'has-error' : ''}`}
+                className={`field-input ${errors[`emergency_${contact.id}_name`] ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
                 placeholder="e.g. Ramesh Patil"
                 value={contact.name}
+                readOnly={readOnly}
+                disabled={readOnly}
                 onChange={(e) => onContactChange(contact.id, 'name', e.target.value)}
               />
               {errors[`emergency_${contact.id}_name`] && (
@@ -108,9 +112,11 @@ export const EmergencyContactSection: React.FC<EmergencyContactSectionProps> = (
               <input
                 type="tel"
                 maxLength={10}
-                className={`field-input ${errors[`emergency_${contact.id}_phone`] ? 'has-error' : ''}`}
+                className={`field-input ${errors[`emergency_${contact.id}_phone`] ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
                 placeholder="10-digit mobile"
                 value={contact.contactNumber}
+                readOnly={readOnly}
+                disabled={readOnly}
                 onChange={(e) => onContactChange(contact.id, 'contactNumber', e.target.value.replace(/\D/g, ''))}
               />
               {errors[`emergency_${contact.id}_phone`] && (
@@ -124,8 +130,9 @@ export const EmergencyContactSection: React.FC<EmergencyContactSectionProps> = (
                 <span className="field-required-star">*</span>
               </label>
               <select
-                className={`field-select ${errors[`emergency_${contact.id}_relation`] ? 'has-error' : ''}`}
+                className={`field-select ${errors[`emergency_${contact.id}_relation`] ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
                 value={contact.relation}
+                disabled={readOnly}
                 onChange={(e) => onContactChange(contact.id, 'relation', e.target.value)}
               >
                 <option value="">Select Relation</option>
@@ -151,9 +158,11 @@ export const EmergencyContactSection: React.FC<EmergencyContactSectionProps> = (
             </label>
             <input
               type="text"
-              className={`field-input ${errors[`emergency_${contact.id}_address`] ? 'has-error' : ''}`}
+              className={`field-input ${errors[`emergency_${contact.id}_address`] ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
               placeholder="House/Plot No., Area, City, District"
               value={contact.address}
+              readOnly={readOnly}
+              disabled={readOnly}
               onChange={(e) => onContactChange(contact.id, 'address', e.target.value)}
             />
             {errors[`emergency_${contact.id}_address`] && (

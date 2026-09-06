@@ -6,12 +6,14 @@ interface BankSectionProps {
   data: BankDetails;
   onChange: (field: keyof BankDetails, value: string) => void;
   errors: Record<string, string>;
+  readOnly?: boolean;
 }
 
 export const BankSection: React.FC<BankSectionProps> = ({
   data,
   onChange,
-  errors
+  errors,
+  readOnly = false
 }) => {
   const [showAccount, setShowAccount] = useState(false);
 
@@ -53,9 +55,11 @@ export const BankSection: React.FC<BankSectionProps> = ({
           <input
             id="accountHolderName"
             type="text"
-            className={`field-input ${errors.accountHolderName ? 'has-error' : ''}`}
+            className={`field-input ${errors.accountHolderName ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             placeholder="As recorded in bank passbook"
             value={data.accountHolderName}
+            readOnly={readOnly}
+            disabled={readOnly}
             onChange={(e) => onChange('accountHolderName', e.target.value)}
           />
           {errors.accountHolderName && <span className="field-error-msg">{errors.accountHolderName}</span>}
@@ -71,9 +75,11 @@ export const BankSection: React.FC<BankSectionProps> = ({
             type="text"
             maxLength={11}
             style={{ textTransform: 'uppercase' }}
-            className={`field-input ${errors.ifscCode ? 'has-error' : ''}`}
+            className={`field-input ${errors.ifscCode ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             placeholder="e.g. SBIN0001234"
             value={data.ifscCode}
+            readOnly={readOnly}
+            disabled={readOnly}
             onChange={(e) => onChange('ifscCode', e.target.value.toUpperCase())}
           />
           {errors.ifscCode && <span className="field-error-msg">{errors.ifscCode}</span>}
@@ -90,9 +96,11 @@ export const BankSection: React.FC<BankSectionProps> = ({
             <input
               id="bankAccountNumber"
               type={showAccount ? 'text' : 'password'}
-              className={`field-input ${errors.bankAccountNumber ? 'has-error' : ''}`}
+              className={`field-input ${errors.bankAccountNumber ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
               placeholder="Enter bank account number"
               value={data.bankAccountNumber}
+              readOnly={readOnly}
+              disabled={readOnly}
               onChange={(e) => onChange('bankAccountNumber', e.target.value)}
             />
             <button
@@ -124,9 +132,11 @@ export const BankSection: React.FC<BankSectionProps> = ({
           <input
             id="confirmBankAccountNumber"
             type="text"
-            className={`field-input ${errors.confirmBankAccountNumber ? 'has-error' : ''}`}
+            className={`field-input ${errors.confirmBankAccountNumber ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             placeholder="Re-enter bank account number"
             value={data.confirmBankAccountNumber}
+            readOnly={readOnly}
+            disabled={readOnly}
             onChange={(e) => onChange('confirmBankAccountNumber', e.target.value)}
           />
           {errors.confirmBankAccountNumber && <span className="field-error-msg">{errors.confirmBankAccountNumber}</span>}
@@ -142,9 +152,11 @@ export const BankSection: React.FC<BankSectionProps> = ({
           <input
             id="bankName"
             type="text"
-            className={`field-input ${errors.bankName ? 'has-error' : ''}`}
+            className={`field-input ${errors.bankName ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             placeholder="e.g. State Bank of India, Bank of Maharashtra, HDFC"
             value={data.bankName}
+            readOnly={readOnly}
+            disabled={readOnly}
             onChange={(e) => onChange('bankName', e.target.value)}
           />
           {errors.bankName && <span className="field-error-msg">{errors.bankName}</span>}
@@ -158,9 +170,11 @@ export const BankSection: React.FC<BankSectionProps> = ({
           <input
             id="branchName"
             type="text"
-            className={`field-input ${errors.branchName ? 'has-error' : ''}`}
+            className={`field-input ${errors.branchName ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             placeholder="e.g. Nagpur Main Branch, Hingna"
             value={data.branchName}
+            readOnly={readOnly}
+            disabled={readOnly}
             onChange={(e) => onChange('branchName', e.target.value)}
           />
           {errors.branchName && <span className="field-error-msg">{errors.branchName}</span>}
@@ -182,9 +196,11 @@ export const BankSection: React.FC<BankSectionProps> = ({
               id="uanNumber"
               type="text"
               maxLength={12}
-              className="field-input"
+              className={`field-input ${readOnly ? 'read-only-field' : ''}`}
               placeholder="12-digit UAN"
               value={data.uanNumber || ''}
+              readOnly={readOnly}
+              disabled={readOnly}
               onChange={(e) => onChange('uanNumber', e.target.value)}
             />
           </div>
@@ -197,9 +213,11 @@ export const BankSection: React.FC<BankSectionProps> = ({
             <input
               id="esicNumber"
               type="text"
-              className="field-input"
+              className={`field-input ${readOnly ? 'read-only-field' : ''}`}
               placeholder="17-digit IP Number"
               value={data.esicNumber || ''}
+              readOnly={readOnly}
+              disabled={readOnly}
               onChange={(e) => onChange('esicNumber', e.target.value)}
             />
           </div>
@@ -212,9 +230,11 @@ export const BankSection: React.FC<BankSectionProps> = ({
             <input
               id="ptNumber"
               type="text"
-              className="field-input"
+              className={`field-input ${readOnly ? 'read-only-field' : ''}`}
               placeholder="Profession Tax number"
               value={data.ptNumber || ''}
+              readOnly={readOnly}
+              disabled={readOnly}
               onChange={(e) => onChange('ptNumber', e.target.value)}
             />
           </div>

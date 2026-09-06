@@ -5,12 +5,14 @@ interface SignatureUploaderProps {
   signatureDataUrl?: string;
   onSignatureChange: (dataUrl: string | undefined, fileMeta?: { name: string; size: number; type: string }) => void;
   error?: string;
+  readOnly?: boolean;
 }
 
 export const SignatureUploader: React.FC<SignatureUploaderProps> = ({
   signatureDataUrl,
   onSignatureChange,
-  error
+  error,
+  readOnly = false
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,7 +88,11 @@ export const SignatureUploader: React.FC<SignatureUploaderProps> = ({
       </div>
 
       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-        {signatureDataUrl ? (
+        {readOnly ? (
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+            {signatureDataUrl ? '✓ Specimen Signature Attached (Locked)' : 'No Signature Attached'}
+          </span>
+        ) : signatureDataUrl ? (
           <>
             <button
               type="button"

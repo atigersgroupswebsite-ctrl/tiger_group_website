@@ -8,6 +8,7 @@ interface DeclarationSectionProps {
   candidateName: string;
   onChange: (field: keyof DeclarationsInfo, value: any) => void;
   errors: Record<string, string>;
+  readOnly?: boolean;
 }
 
 export const DeclarationSection: React.FC<DeclarationSectionProps> = ({
@@ -15,7 +16,8 @@ export const DeclarationSection: React.FC<DeclarationSectionProps> = ({
   signatureDataUrl,
   candidateName,
   onChange,
-  errors
+  errors,
+  readOnly = false
 }) => {
   return (
     <div>
@@ -35,11 +37,12 @@ export const DeclarationSection: React.FC<DeclarationSectionProps> = ({
         marginBottom: 'var(--space-6)'
       }}>
         {/* Declaration 1 */}
-        <label className="form-checkbox-label" style={{ marginBottom: 'var(--space-5)', alignItems: 'flex-start' }}>
+        <label className="form-checkbox-label" style={{ marginBottom: 'var(--space-5)', alignItems: 'flex-start', cursor: readOnly ? 'default' : 'pointer' }}>
           <input
             type="checkbox"
             className="form-checkbox-input"
             checked={declarations.candidateDeclarationAcknowledged}
+            disabled={readOnly}
             onChange={(e) => onChange('candidateDeclarationAcknowledged', e.target.checked)}
           />
           <div>
@@ -54,11 +57,12 @@ export const DeclarationSection: React.FC<DeclarationSectionProps> = ({
         </label>
 
         {/* Declaration 2 */}
-        <label className="form-checkbox-label" style={{ marginBottom: 'var(--space-5)', alignItems: 'flex-start' }}>
+        <label className="form-checkbox-label" style={{ marginBottom: 'var(--space-5)', alignItems: 'flex-start', cursor: readOnly ? 'default' : 'pointer' }}>
           <input
             type="checkbox"
             className="form-checkbox-input"
             checked={declarations.rulesAndConductAccepted}
+            disabled={readOnly}
             onChange={(e) => onChange('rulesAndConductAccepted', e.target.checked)}
           />
           <div>
@@ -73,11 +77,12 @@ export const DeclarationSection: React.FC<DeclarationSectionProps> = ({
         </label>
 
         {/* Declaration 3 */}
-        <label className="form-checkbox-label" style={{ marginBottom: 0, alignItems: 'flex-start' }}>
+        <label className="form-checkbox-label" style={{ marginBottom: 0, alignItems: 'flex-start', cursor: readOnly ? 'default' : 'pointer' }}>
           <input
             type="checkbox"
             className="form-checkbox-input"
             checked={declarations.backgroundVerificationConsent}
+            disabled={readOnly}
             onChange={(e) => onChange('backgroundVerificationConsent', e.target.checked)}
           />
           <div>
@@ -115,9 +120,11 @@ export const DeclarationSection: React.FC<DeclarationSectionProps> = ({
             </label>
             <input
               type="text"
-              className={`field-input ${errors.signatoryName ? 'has-error' : ''}`}
+              className={`field-input ${errors.signatoryName ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
               placeholder="Type your full legal name"
               value={declarations.signatoryName || candidateName}
+              readOnly={readOnly}
+              disabled={readOnly}
               onChange={(e) => onChange('signatoryName', e.target.value)}
             />
             {errors.signatoryName && <span className="field-error-msg">{errors.signatoryName}</span>}

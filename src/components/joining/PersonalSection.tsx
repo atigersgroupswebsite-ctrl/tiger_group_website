@@ -5,13 +5,23 @@ interface PersonalSectionProps {
   data: PersonalInfo;
   onChange: (field: keyof PersonalInfo, value: string) => void;
   errors: Record<string, string>;
+  readOnly?: boolean;
 }
 
 export const PersonalSection: React.FC<PersonalSectionProps> = ({
   data,
   onChange,
-  errors
+  errors,
+  readOnly = false
 }) => {
+  // Candidate must be at least 18 years old
+  const maxDobDate = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 18);
+    return d.toISOString().split('T')[0];
+  })();
+  const minDobDate = '1950-01-01';
+
   return (
     <div>
       <div className="joining-step-header">
@@ -31,10 +41,12 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
           <input
             id="employeeName"
             type="text"
-            className={`field-input ${errors.employeeName ? 'has-error' : ''}`}
+            className={`field-input ${errors.employeeName ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             placeholder="e.g. Rahul Manohar Patil"
             value={data.employeeName}
             onChange={(e) => onChange('employeeName', e.target.value)}
+            readOnly={readOnly}
+            disabled={readOnly}
           />
           {errors.employeeName && <span className="field-error-msg">{errors.employeeName}</span>}
         </div>
@@ -47,9 +59,13 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
           <input
             id="dateOfBirth"
             type="date"
-            className={`field-input ${errors.dateOfBirth ? 'has-error' : ''}`}
+            min={minDobDate}
+            max={maxDobDate}
+            className={`field-input ${errors.dateOfBirth ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             value={data.dateOfBirth}
             onChange={(e) => onChange('dateOfBirth', e.target.value)}
+            readOnly={readOnly}
+            disabled={readOnly}
           />
           {errors.dateOfBirth && <span className="field-error-msg">{errors.dateOfBirth}</span>}
         </div>
@@ -63,9 +79,10 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
           </label>
           <select
             id="gender"
-            className={`field-select ${errors.gender ? 'has-error' : ''}`}
+            className={`field-select ${errors.gender ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             value={data.gender}
             onChange={(e) => onChange('gender', e.target.value)}
+            disabled={readOnly}
           >
             <option value="">Select Gender</option>
             <option value="Male">Male</option>
@@ -82,9 +99,10 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
           </label>
           <select
             id="maritalStatus"
-            className={`field-select ${errors.maritalStatus ? 'has-error' : ''}`}
+            className={`field-select ${errors.maritalStatus ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             value={data.maritalStatus}
             onChange={(e) => onChange('maritalStatus', e.target.value)}
+            disabled={readOnly}
           >
             <option value="">Select Status</option>
             <option value="Single">Single / Unmarried</option>
@@ -102,9 +120,10 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
           </label>
           <select
             id="bloodGroup"
-            className="field-select"
+            className={`field-select ${readOnly ? 'read-only-field' : ''}`}
             value={data.bloodGroup}
             onChange={(e) => onChange('bloodGroup', e.target.value)}
+            disabled={readOnly}
           >
             <option value="">Select Blood Group</option>
             <option value="A+">A+</option>
@@ -128,10 +147,12 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
           <input
             id="fatherName"
             type="text"
-            className={`field-input ${errors.fatherName ? 'has-error' : ''}`}
+            className={`field-input ${errors.fatherName ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             placeholder="Father's full name"
             value={data.fatherName}
             onChange={(e) => onChange('fatherName', e.target.value)}
+            readOnly={readOnly}
+            disabled={readOnly}
           />
           {errors.fatherName && <span className="field-error-msg">{errors.fatherName}</span>}
         </div>
@@ -144,10 +165,12 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
           <input
             id="motherOrHusbandName"
             type="text"
-            className={`field-input ${errors.motherOrHusbandName ? 'has-error' : ''}`}
+            className={`field-input ${errors.motherOrHusbandName ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             placeholder="Mother's or husband's name"
             value={data.motherOrHusbandName}
             onChange={(e) => onChange('motherOrHusbandName', e.target.value)}
+            readOnly={readOnly}
+            disabled={readOnly}
           />
           {errors.motherOrHusbandName && <span className="field-error-msg">{errors.motherOrHusbandName}</span>}
         </div>
@@ -161,10 +184,12 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
           <input
             id="spouseName"
             type="text"
-            className="field-input"
+            className={`field-input ${readOnly ? 'read-only-field' : ''}`}
             placeholder="Full name of spouse"
             value={data.spouseName || ''}
             onChange={(e) => onChange('spouseName', e.target.value)}
+            readOnly={readOnly}
+            disabled={readOnly}
           />
         </div>
       )}
@@ -179,10 +204,12 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
             id="aadhaarNumber"
             type="text"
             maxLength={14}
-            className={`field-input ${errors.aadhaarNumber ? 'has-error' : ''}`}
+            className={`field-input ${errors.aadhaarNumber ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             placeholder="XXXX XXXX XXXX"
             value={data.aadhaarNumber}
             onChange={(e) => onChange('aadhaarNumber', e.target.value)}
+            readOnly={readOnly}
+            disabled={readOnly}
           />
           {errors.aadhaarNumber && <span className="field-error-msg">{errors.aadhaarNumber}</span>}
         </div>
@@ -197,10 +224,12 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
             type="text"
             maxLength={10}
             style={{ textTransform: 'uppercase' }}
-            className={`field-input ${errors.panNumber ? 'has-error' : ''}`}
+            className={`field-input ${errors.panNumber ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             placeholder="ABCDE1234F"
             value={data.panNumber}
             onChange={(e) => onChange('panNumber', e.target.value.toUpperCase())}
+            readOnly={readOnly}
+            disabled={readOnly}
           />
           {errors.panNumber && <span className="field-error-msg">{errors.panNumber}</span>}
         </div>
@@ -218,10 +247,12 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
               id="employeeContactNumber"
               type="tel"
               maxLength={10}
-              className={`field-phone-input ${errors.employeeContactNumber ? 'has-error' : ''}`}
+              className={`field-phone-input ${errors.employeeContactNumber ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
               placeholder="10-digit mobile"
               value={data.employeeContactNumber}
               onChange={(e) => onChange('employeeContactNumber', e.target.value)}
+              readOnly={readOnly}
+              disabled={readOnly}
             />
           </div>
           {errors.employeeContactNumber && <span className="field-error-msg">{errors.employeeContactNumber}</span>}
@@ -238,10 +269,12 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
               id="otherContactNumber"
               type="tel"
               maxLength={10}
-              className="field-phone-input"
+              className={`field-phone-input ${readOnly ? 'read-only-field' : ''}`}
               placeholder="Alternative phone"
               value={data.otherContactNumber || ''}
               onChange={(e) => onChange('otherContactNumber', e.target.value)}
+              readOnly={readOnly}
+              disabled={readOnly}
             />
           </div>
         </div>
@@ -254,10 +287,12 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
           <input
             id="emailId"
             type="email"
-            className={`field-input ${errors.emailId ? 'has-error' : ''}`}
+            className={`field-input ${errors.emailId ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
             placeholder="candidate@example.com"
             value={data.emailId}
             onChange={(e) => onChange('emailId', e.target.value)}
+            readOnly={readOnly}
+            disabled={readOnly}
           />
           {errors.emailId && <span className="field-error-msg">{errors.emailId}</span>}
         </div>

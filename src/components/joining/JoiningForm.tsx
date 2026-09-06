@@ -46,9 +46,16 @@ export const JoiningForm: React.FC = () => {
       const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
+        const resolvedStatus =
+          parsed.status === 'SUBMITTED' || parsed.submissionStatus === 'SUBMITTED'
+            ? 'SUBMITTED'
+            : 'DRAFT';
+
         return {
           ...INITIAL_JOINING_FORM_DATA,
           ...parsed,
+          status: resolvedStatus,
+          submissionStatus: resolvedStatus,
           documents: {
             ...INITIAL_JOINING_FORM_DATA.documents,
             ...(parsed.documents || {})
@@ -61,32 +68,63 @@ export const JoiningForm: React.FC = () => {
     return INITIAL_JOINING_FORM_DATA;
   });
 
-  const [currentStep, setCurrentStep] = useState<number>(formData.currentStep || 1);
-  const [completedSteps, setCompletedSteps] = useState<number[]>([1]);
+  // Single authoritative source of truth for submission state
+  const isSubmitted = formData.status === 'SUBMITTED' || formData.submissionStatus === 'SUBMITTED';
+  const isReadOnly = isSubmitted;
+
+  // Track whether the success acknowledgment screen is shown
+  const [showSuccessScreen, setShowSuccessScreen] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.status === 'SUBMITTED' || parsed.submissionStatus === 'SUBMITTED') {
+          // If viewMode was explicitly 'REVIEW', user was viewing the read-only submission
+          return parsed.viewMode !== 'REVIEW';
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    return false;
+  });
+
+  const [currentStep, setCurrentStep] = useState<number>(() => {
+    if (isSubmitted) {
+      return formData.currentStep || 9;
+    }
+    return formData.currentStep || 1;
+  });
+
+  const [completedSteps, setCompletedSteps] = useState<number[]>(
+    isSubmitted ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : [1]
+  );
   const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [confirmationChecked, setConfirmationChecked] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [isSubmitted, setIsSubmitted] = useState<boolean>(formData.status === 'SUBMITTED');
 
-  // Auto-sync draft to localStorage on significant changes
+  // Auto-sync draft to localStorage on changes with 600ms debounce (prevents input/picker lag)
   useEffect(() => {
-    if (formData.status !== 'SUBMITTED') {
+    if (isSubmitted) return;
+
+    const timer = setTimeout(() => {
       try {
         localStorage.setItem(
           DRAFT_STORAGE_KEY,
           JSON.stringify({ ...formData, currentStep })
         );
       } catch (err) {
-        // Handle potential quota errors with large base64 strings gracefully
         console.warn('Draft auto-save notice:', err);
       }
-    }
-  }, [formData, currentStep]);
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [formData, currentStep, isSubmitted]);
 
   // Sync signatory name with candidate name if empty
   useEffect(() => {
-    if (formData.personal.employeeName && !formData.declarations.signatoryName) {
+    if (formData.personal.employeeName && !formData.declarations.signatoryName && !isReadOnly) {
       setFormData((prev) => ({
         ...prev,
         declarations: {
@@ -95,10 +133,12 @@ export const JoiningForm: React.FC = () => {
         }
       }));
     }
-  }, [formData.personal.employeeName]);
+  }, [formData.personal.employeeName, isReadOnly]);
 
   // Handler: Manual save draft
   const handleSaveDraft = () => {
+    if (isReadOnly) return;
+
     try {
       localStorage.setItem(
         DRAFT_STORAGE_KEY,
@@ -115,6 +155,10 @@ export const JoiningForm: React.FC = () => {
 
   // Step Navigation Validation Check
   const validateCurrentStep = (step: number): boolean => {
+    if (isReadOnly) {
+      return true;
+    }
+
     let result = { isValid: true, errors: {} as Record<string, string> };
 
     switch (step) {
@@ -162,6 +206,15 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleNext = () => {
+    if (isReadOnly) {
+      if (currentStep < 9) {
+        const nextStep = currentStep + 1;
+        setCurrentStep(nextStep);
+        window.scrollTo({ top: 120, behavior: 'smooth' });
+      }
+      return;
+    }
+
     const isValid = validateCurrentStep(currentStep);
     if (!isValid) {
       window.scrollTo({ top: 120, behavior: 'smooth' });
@@ -188,7 +241,9 @@ export const JoiningForm: React.FC = () => {
       setStepErrors({});
       const prevStep = currentStep - 1;
       setCurrentStep(prevStep);
-      setFormData((prev) => ({ ...prev, currentStep: prevStep }));
+      if (!isReadOnly) {
+        setFormData((prev) => ({ ...prev, currentStep: prevStep }));
+      }
       window.scrollTo({ top: 120, behavior: 'smooth' });
     }
   };
@@ -196,12 +251,15 @@ export const JoiningForm: React.FC = () => {
   const handleSelectStep = (step: number) => {
     setStepErrors({});
     setCurrentStep(step);
-    setFormData((prev) => ({ ...prev, currentStep: step }));
+    if (!isReadOnly) {
+      setFormData((prev) => ({ ...prev, currentStep: step }));
+    }
     window.scrollTo({ top: 120, behavior: 'smooth' });
   };
 
-  // Field update handlers
+  // Field update handlers (guarded against updates if submitted/read-only)
   const handlePersonalChange = (field: keyof PersonalInfo, value: string) => {
+    if (isReadOnly) return;
     setFormData((prev) => ({
       ...prev,
       personal: { ...prev.personal, [field]: value }
@@ -216,6 +274,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handlePermanentAddressChange = (field: keyof AddressDetails, value: string) => {
+    if (isReadOnly) return;
     setFormData((prev) => {
       const updatedPerm = { ...prev.permanentAddress, [field]: value };
       return {
@@ -234,6 +293,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleCurrentAddressChange = (field: keyof AddressDetails, value: string) => {
+    if (isReadOnly) return;
     setFormData((prev) => ({
       ...prev,
       currentAddress: { ...prev.currentAddress, [field]: value }
@@ -248,6 +308,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleSameAsPermanentToggle = (checked: boolean) => {
+    if (isReadOnly) return;
     setFormData((prev) => ({
       ...prev,
       sameAsPermanentAddress: checked,
@@ -256,6 +317,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleEmergencyChange = (id: string, field: keyof EmergencyContact, value: string) => {
+    if (isReadOnly) return;
     setFormData((prev) => ({
       ...prev,
       emergencyContacts: prev.emergencyContacts.map((c) =>
@@ -265,7 +327,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleAddEmergencyContact = () => {
-    if (formData.emergencyContacts.length >= 3) return;
+    if (isReadOnly || formData.emergencyContacts.length >= 3) return;
     const newContact: EmergencyContact = {
       id: `ec-${Date.now()}`,
       name: '',
@@ -280,7 +342,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleRemoveEmergencyContact = (id: string) => {
-    if (formData.emergencyContacts.length <= 1) return;
+    if (isReadOnly || formData.emergencyContacts.length <= 1) return;
     setFormData((prev) => ({
       ...prev,
       emergencyContacts: prev.emergencyContacts.filter((c) => c.id !== id)
@@ -288,6 +350,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleBankChange = (field: keyof BankDetails, value: string) => {
+    if (isReadOnly) return;
     setFormData((prev) => ({
       ...prev,
       bank: { ...prev.bank, [field]: value }
@@ -302,7 +365,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleAddEducation = () => {
-    if (formData.education.length >= 5) return;
+    if (isReadOnly || formData.education.length >= 5) return;
     const newRecord: EducationRecord = {
       id: `edu-${Date.now()}`,
       qualification: '',
@@ -317,7 +380,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleRemoveEducation = (id: string) => {
-    if (formData.education.length <= 1) return;
+    if (isReadOnly || formData.education.length <= 1) return;
     setFormData((prev) => ({
       ...prev,
       education: prev.education.filter((r) => r.id !== id)
@@ -325,6 +388,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleEducationChange = (id: string, field: keyof EducationRecord, value: string) => {
+    if (isReadOnly) return;
     setFormData((prev) => ({
       ...prev,
       education: prev.education.map((r) => (r.id === id ? { ...r, [field]: value } : r))
@@ -332,7 +396,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleAddFamily = () => {
-    if (formData.family.length >= 5) return;
+    if (isReadOnly || formData.family.length >= 5) return;
     const newRecord: FamilyMemberRecord = {
       id: `fam-${Date.now()}`,
       name: '',
@@ -346,7 +410,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleRemoveFamily = (id: string) => {
-    if (formData.family.length <= 1) return;
+    if (isReadOnly || formData.family.length <= 1) return;
     setFormData((prev) => ({
       ...prev,
       family: prev.family.filter((r) => r.id !== id)
@@ -354,6 +418,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleFamilyChange = (id: string, field: keyof FamilyMemberRecord, value: string) => {
+    if (isReadOnly) return;
     setFormData((prev) => ({
       ...prev,
       family: prev.family.map((r) => (r.id === id ? { ...r, [field]: value } : r))
@@ -364,6 +429,7 @@ export const JoiningForm: React.FC = () => {
     category: DocumentCategory,
     fileMeta: { name: string; size: number; type: string; dataUrl?: string } | undefined
   ) => {
+    if (isReadOnly) return;
     setFormData((prev) => ({
       ...prev,
       documents: {
@@ -384,6 +450,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   const handleDeclarationChange = (field: keyof DeclarationsInfo, value: any) => {
+    if (isReadOnly) return;
     setFormData((prev) => ({
       ...prev,
       declarations: {
@@ -402,6 +469,8 @@ export const JoiningForm: React.FC = () => {
 
   // Final submit handler
   const handleSubmit = () => {
+    if (isReadOnly) return;
+
     const allStepValidation = validateAllSteps(formData);
     const hasAnyError = Object.values(allStepValidation).some((res) => !res.isValid);
 
@@ -419,15 +488,20 @@ export const JoiningForm: React.FC = () => {
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
-      setIsSubmitted(true);
       const submittedData: JoiningFormData = {
         ...formData,
         status: 'SUBMITTED',
-        submittedAt: new Date().toISOString()
+        submissionStatus: 'SUBMITTED',
+        submittedAt: new Date().toISOString(),
+        currentStep: 9
       };
       setFormData(submittedData);
+      setShowSuccessScreen(true);
       try {
-        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(submittedData));
+        localStorage.setItem(
+          DRAFT_STORAGE_KEY,
+          JSON.stringify({ ...submittedData, viewMode: 'SUCCESS' })
+        );
       } catch (err) {
         console.warn('Storage error on submit:', err);
       }
@@ -435,19 +509,57 @@ export const JoiningForm: React.FC = () => {
     }, 800);
   };
 
-  // In review mode or already submitted
-  if (isSubmitted) {
+  // Handler to open the read-only submitted dossier from FormSuccess
+  const handleViewSubmission = () => {
+    setShowSuccessScreen(false);
+    setCurrentStep(9);
+    try {
+      localStorage.setItem(
+        DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          ...formData,
+          status: 'SUBMITTED',
+          submissionStatus: 'SUBMITTED',
+          viewMode: 'REVIEW',
+          currentStep: 9
+        })
+      );
+    } catch (e) {
+      console.warn('Storage error on view submission:', e);
+    }
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+  };
+
+  // Handler to return to the success confirmation acknowledgment from the read-only review
+  const handleBackToSuccess = () => {
+    setShowSuccessScreen(true);
+    try {
+      localStorage.setItem(
+        DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          ...formData,
+          status: 'SUBMITTED',
+          submissionStatus: 'SUBMITTED',
+          viewMode: 'SUCCESS',
+          currentStep: 9
+        })
+      );
+    } catch (e) {
+      console.warn('Storage error on back to success:', e);
+    }
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+  };
+
+  // In post-submission acknowledgment view
+  if (isSubmitted && showSuccessScreen) {
     return (
       <FormSuccess
         formData={formData}
-        onViewSubmission={() => {
-          setIsSubmitted(false);
-          setCurrentStep(9);
-        }}
+        onViewSubmission={handleViewSubmission}
         onReset={() => {
           localStorage.removeItem(DRAFT_STORAGE_KEY);
           setFormData(INITIAL_JOINING_FORM_DATA);
-          setIsSubmitted(false);
+          setShowSuccessScreen(false);
           setCurrentStep(1);
           setCompletedSteps([1]);
         }}
@@ -489,6 +601,7 @@ export const JoiningForm: React.FC = () => {
               data={formData.personal}
               onChange={handlePersonalChange}
               errors={stepErrors}
+              readOnly={isReadOnly}
             />
           )}
 
@@ -506,6 +619,7 @@ export const JoiningForm: React.FC = () => {
               onAddEmergencyContact={handleAddEmergencyContact}
               onRemoveEmergencyContact={handleRemoveEmergencyContact}
               errors={stepErrors}
+              readOnly={isReadOnly}
             />
           )}
 
@@ -515,6 +629,7 @@ export const JoiningForm: React.FC = () => {
               data={formData.bank}
               onChange={handleBankChange}
               errors={stepErrors}
+              readOnly={isReadOnly}
             />
           )}
 
@@ -525,6 +640,7 @@ export const JoiningForm: React.FC = () => {
               onAdd={handleAddEducation}
               onRemove={handleRemoveEducation}
               onChange={handleEducationChange}
+              readOnly={isReadOnly}
             />
           )}
 
@@ -535,6 +651,7 @@ export const JoiningForm: React.FC = () => {
               onAdd={handleAddFamily}
               onRemove={handleRemoveFamily}
               onChange={handleFamilyChange}
+              readOnly={isReadOnly}
             />
           )}
 
@@ -544,6 +661,7 @@ export const JoiningForm: React.FC = () => {
               documents={formData.documents}
               onDocumentChange={handleDocumentChange}
               errors={stepErrors}
+              readOnly={isReadOnly}
             />
           )}
 
@@ -555,6 +673,7 @@ export const JoiningForm: React.FC = () => {
               candidateName={formData.personal.employeeName}
               onChange={handleDeclarationChange}
               errors={stepErrors}
+              readOnly={isReadOnly}
             />
           )}
 
@@ -568,6 +687,7 @@ export const JoiningForm: React.FC = () => {
               onConfirmationToggle={setConfirmationChecked}
               onSubmit={handleSubmit}
               isSubmitting={isSubmitting}
+              onBackToSuccess={handleBackToSuccess}
             />
           )}
 
@@ -580,6 +700,7 @@ export const JoiningForm: React.FC = () => {
               onNext={handleNext}
               onSaveDraft={handleSaveDraft}
               saveNotice={saveNotice}
+              isReadOnly={isReadOnly}
             />
           )}
         </div>

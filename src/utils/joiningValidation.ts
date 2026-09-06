@@ -366,22 +366,42 @@ export const validateDocuments = (docs: JoiningFormData['documents']): StepValid
   const errors: Record<string, string> = {};
   const missingFields: string[] = [];
 
-  const requiredCategories: (keyof JoiningFormData['documents'])[] = [
-    'PHOTO',
-    'SIGNATURE',
-    'AADHAAR',
-    'PAN',
-    'BANK_PASSBOOK',
-    'EDUCATION_CERTIFICATE'
-  ];
+  // Required documents
+  if (!docs.PHOTO?.file?.name) {
+    errors.PHOTO = 'Passport Size Photograph is required';
+    missingFields.push('Passport Photo');
+  }
 
-  requiredCategories.forEach((cat) => {
-    const doc = docs[cat];
-    if (!doc || !doc.file || !doc.file.name) {
-      errors[cat] = `${doc?.title || cat} is required`;
-      missingFields.push(doc?.title || cat);
-    }
-  });
+  if (!docs.SIGNATURE?.file?.name) {
+    errors.SIGNATURE = 'Specimen Signature is required';
+    missingFields.push('Specimen Signature');
+  }
+
+  // Independent Aadhaar Front & Back validation
+  if (!docs.AADHAAR_FRONT?.file?.name) {
+    errors.AADHAAR_FRONT = 'Aadhaar Card (Front Side) is required';
+    missingFields.push('Aadhaar Front');
+  }
+
+  if (!docs.AADHAAR_BACK?.file?.name) {
+    errors.AADHAAR_BACK = 'Aadhaar Card (Back Side) is required';
+    missingFields.push('Aadhaar Back');
+  }
+
+  if (!docs.PAN?.file?.name) {
+    errors.PAN = 'PAN Card Copy is required';
+    missingFields.push('PAN Card Copy');
+  }
+
+  if (!docs.BANK_PASSBOOK?.file?.name) {
+    errors.BANK_PASSBOOK = 'Bank Passbook / Cancelled Cheque is required';
+    missingFields.push('Bank Passbook / Cheque');
+  }
+
+  if (!docs.EDUCATION_CERTIFICATE?.file?.name) {
+    errors.EDUCATION_CERTIFICATE = 'Highest Qualification Marksheet / Certificate is required';
+    missingFields.push('Education Certificate');
+  }
 
   return {
     isValid: Object.keys(errors).length === 0,

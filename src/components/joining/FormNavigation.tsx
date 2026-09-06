@@ -10,6 +10,7 @@ interface FormNavigationProps {
   onSaveDraft: () => void;
   isSubmitting?: boolean;
   saveNotice?: string | null;
+  isReadOnly?: boolean;
 }
 
 export const FormNavigation: React.FC<FormNavigationProps> = ({
@@ -19,11 +20,12 @@ export const FormNavigation: React.FC<FormNavigationProps> = ({
   onNext,
   onSaveDraft,
   isSubmitting = false,
-  saveNotice = null
+  saveNotice = null,
+  isReadOnly = false
 }) => {
   return (
     <div>
-      {saveNotice && (
+      {saveNotice && !isReadOnly && (
         <div style={{
           marginTop: 'var(--space-4)',
           marginBottom: 'var(--space-2)',
@@ -60,14 +62,16 @@ export const FormNavigation: React.FC<FormNavigationProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <button
-            type="button"
-            className="save-draft-btn"
-            onClick={onSaveDraft}
-          >
-            <Bookmark size={14} />
-            <span>SAVE & CONTINUE LATER</span>
-          </button>
+          {!isReadOnly && (
+            <button
+              type="button"
+              className="save-draft-btn"
+              onClick={onSaveDraft}
+            >
+              <Bookmark size={14} />
+              <span>SAVE & CONTINUE LATER</span>
+            </button>
+          )}
 
           {currentStep < totalSteps ? (
             <Button
@@ -77,9 +81,9 @@ export const FormNavigation: React.FC<FormNavigationProps> = ({
               onClick={onNext}
               icon={<ArrowRight size={14} />}
             >
-              CONTINUE
+              {isReadOnly ? 'NEXT STEP' : 'CONTINUE'}
             </Button>
-          ) : (
+          ) : !isReadOnly ? (
             <Button
               type="button"
               variant="primary"
@@ -90,7 +94,7 @@ export const FormNavigation: React.FC<FormNavigationProps> = ({
             >
               {isSubmitting ? 'SUBMITTING...' : 'SUBMIT JOINING FORM'}
             </Button>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

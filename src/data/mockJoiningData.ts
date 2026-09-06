@@ -113,46 +113,71 @@ export const INITIAL_JOINING_FORM_DATA: JoiningFormData = {
     PHOTO: {
       category: 'PHOTO',
       title: 'Passport Size Photograph',
+      type: 'PHOTO',
+      side: 'SINGLE',
       required: true
     },
     SIGNATURE: {
       category: 'SIGNATURE',
       title: 'Specimen Signature',
+      type: 'SIGNATURE',
+      side: 'SINGLE',
       required: true
     },
-    AADHAAR: {
-      category: 'AADHAAR',
-      title: 'Aadhaar Card (Front & Back)',
+    AADHAAR_FRONT: {
+      category: 'AADHAAR_FRONT',
+      title: 'Aadhaar Card (Front Side)',
+      type: 'AADHAAR',
+      side: 'FRONT',
+      required: true
+    },
+    AADHAAR_BACK: {
+      category: 'AADHAAR_BACK',
+      title: 'Aadhaar Card (Back Side)',
+      type: 'AADHAAR',
+      side: 'BACK',
       required: true
     },
     PAN: {
       category: 'PAN',
       title: 'PAN Card Copy',
+      type: 'PAN',
+      side: 'SINGLE',
       required: true
     },
     BANK_PASSBOOK: {
       category: 'BANK_PASSBOOK',
       title: 'Bank Passbook / Cancelled Cheque',
+      type: 'BANK_PASSBOOK',
+      side: 'SINGLE',
       required: true
     },
     EDUCATION_CERTIFICATE: {
       category: 'EDUCATION_CERTIFICATE',
       title: 'Highest Qualification Marksheet / Certificate',
+      type: 'EDUCATION_CERTIFICATE',
+      side: 'SINGLE',
       required: true
     },
     ADDRESS_PROOF: {
       category: 'ADDRESS_PROOF',
       title: 'Current Residence Proof (Electricity Bill / Rent Agreement)',
+      type: 'ADDRESS_PROOF',
+      side: 'SINGLE',
       required: false
     },
     EXPERIENCE_CERTIFICATE: {
       category: 'EXPERIENCE_CERTIFICATE',
       title: 'Previous Relieving / Experience Letter',
+      type: 'EXPERIENCE_CERTIFICATE',
+      side: 'SINGLE',
       required: false
     },
     OTHER: {
       category: 'OTHER',
       title: 'Additional Statutory Document',
+      type: 'OTHER',
+      side: 'SINGLE',
       required: false
     }
   },
