@@ -143,6 +143,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       employer_enquiries: {
@@ -191,6 +192,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       companies: {
@@ -227,6 +229,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       jobs: {
@@ -269,6 +272,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       joining_forms: {
@@ -428,6 +432,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       emergency_contacts: {
@@ -458,6 +463,7 @@ export interface Database {
           address?: string | null;
           sort_order?: number;
         };
+        Relationships: [];
       };
 
       education_records: {
@@ -488,6 +494,7 @@ export interface Database {
           percentage_or_grade?: string | null;
           sort_order?: number;
         };
+        Relationships: [];
       };
 
       family_details: {
@@ -515,6 +522,7 @@ export interface Database {
           relation?: string;
           sort_order?: number;
         };
+        Relationships: [];
       };
 
       documents: {
@@ -563,6 +571,7 @@ export interface Database {
           verified_at?: string | null;
           verified_by?: string | null;
         };
+        Relationships: [];
       };
 
       declarations: {
@@ -599,6 +608,7 @@ export interface Database {
           candidate_signature_path?: string | null;
           accepted_at?: string | null;
         };
+        Relationships: [];
       };
 
       payments: {
@@ -653,6 +663,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       reference_slips: {
@@ -725,6 +736,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       consultancy_returns: {
@@ -755,6 +767,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       employees: {
@@ -800,6 +813,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       generated_files: {
@@ -833,6 +847,7 @@ export interface Database {
           generated_at?: string;
           generated_by?: string | null;
         };
+        Relationships: [];
       };
 
       activity_logs: {
@@ -863,6 +878,7 @@ export interface Database {
           metadata?: Json | null;
           created_at?: string;
         };
+        Relationships: [];
       };
 
       admin_profiles: {
@@ -890,7 +906,47 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 }
+
+// ==============================================================================
+// Convenience Row Type Aliases
+// ==============================================================================
+export type ApplicationRow = Database['public']['Tables']['applications']['Row'];
+export type ApplicationInsert = Database['public']['Tables']['applications']['Insert'];
+export type ApplicationUpdate = Database['public']['Tables']['applications']['Update'];
+
+export type AdminProfileRow = Database['public']['Tables']['admin_profiles']['Row'];
+export type AdminProfileInsert = Database['public']['Tables']['admin_profiles']['Insert'];
+export type AdminProfileUpdate = Database['public']['Tables']['admin_profiles']['Update'];
+
+export type CompanyRow = Database['public']['Tables']['companies']['Row'];
+export type CompanyInsert = Database['public']['Tables']['companies']['Insert'];
+
+export type JobRow = Database['public']['Tables']['jobs']['Row'];
+export type JoiningFormRow = Database['public']['Tables']['joining_forms']['Row'];
+export type JoiningFormInsert = Database['public']['Tables']['joining_forms']['Insert'];
+export type JoiningFormUpdate = Database['public']['Tables']['joining_forms']['Update'];
+
+export type DocumentRow = Database['public']['Tables']['documents']['Row'];
+export type PaymentRow = Database['public']['Tables']['payments']['Row'];
+export type EmployeeRow = Database['public']['Tables']['employees']['Row'];
+export type ActivityLogRow = Database['public']['Tables']['activity_logs']['Row'];
+export type ActivityLogInsert = Database['public']['Tables']['activity_logs']['Insert'];
+export type ReferenceSlipRow = Database['public']['Tables']['reference_slips']['Row'];
+export type EmployerEnquiryRow = Database['public']['Tables']['employer_enquiries']['Row'];

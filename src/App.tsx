@@ -1,9 +1,21 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Navbar } from './components/layout/Navbar';
-import { Footer } from './components/layout/Footer';
+import { PublicLayout } from './components/layout/PublicLayout';
 import { ScrollToTop } from './components/common/ScrollToTop';
 
+// Admin Context & Components
+import { AdminAuthProvider } from './contexts/AdminAuthContext';
+import { AdminProtectedRoute } from './components/admin/AdminProtectedRoute';
+import { AdminLayout } from './components/admin/AdminLayout';
+
+// Admin Pages
+import { AdminLoginPage } from './pages/admin/AdminLoginPage';
+import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
+import { AdminApplicationsPage } from './pages/admin/AdminApplicationsPage';
+import { AdminApplicationDetailPage } from './pages/admin/AdminApplicationDetailPage';
+import { AdminPlaceholderPage } from './pages/admin/AdminPlaceholderPage';
+
+// Public Pages
 import { Home } from './pages/Home';
 import { About } from './pages/About';
 import { Businesses } from './pages/Businesses';
@@ -19,12 +31,35 @@ import { Policy } from './pages/Policy';
 
 export const App: React.FC = () => {
   return (
-    <Router>
-      <ScrollToTop />
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-        <Navbar />
-        <div style={{ flex: 1 }}>
-          <Routes>
+    <AdminAuthProvider>
+      <Router>
+        <ScrollToTop />
+        <Routes>
+          {/* Admin Login (Publicly accessible to administrators) */}
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+
+          {/* Protected Admin Routes */}
+          <Route path="/admin" element={<AdminProtectedRoute />}>
+            <Route element={<AdminLayout />}>
+              <Route index element={<AdminDashboardPage />} />
+              <Route path="applications" element={<AdminApplicationsPage />} />
+              <Route path="applications/:id" element={<AdminApplicationDetailPage />} />
+              {/* Prepared Future Module Routes */}
+              <Route path="jobs" element={<AdminPlaceholderPage />} />
+              <Route path="companies" element={<AdminPlaceholderPage />} />
+              <Route path="joining" element={<AdminPlaceholderPage />} />
+              <Route path="documents" element={<AdminPlaceholderPage />} />
+              <Route path="payments" element={<AdminPlaceholderPage />} />
+              <Route path="reference-slips" element={<AdminPlaceholderPage />} />
+              <Route path="employees" element={<AdminPlaceholderPage />} />
+              <Route path="files" element={<AdminPlaceholderPage />} />
+              <Route path="activity" element={<AdminPlaceholderPage />} />
+              <Route path="settings" element={<AdminPlaceholderPage />} />
+            </Route>
+          </Route>
+
+          {/* Public Website Routes */}
+          <Route element={<PublicLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
             <Route path="/businesses" element={<Businesses />} />
@@ -40,11 +75,10 @@ export const App: React.FC = () => {
             <Route path="/joining" element={<Joining />} />
             <Route path="/policy" element={<Policy />} />
             <Route path="*" element={<Home />} />
-          </Routes>
-        </div>
-        <Footer />
-      </div>
-    </Router>
+          </Route>
+        </Routes>
+      </Router>
+    </AdminAuthProvider>
   );
 };
 
