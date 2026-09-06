@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ShieldCheck, FileCheck2, Loader2 } from 'lucide-react';
+import { ShieldCheck, FileCheck2, Loader2, LogOut } from 'lucide-react';
 import { Container } from '../components/common/Container';
 import { JoiningForm } from '../components/joining/JoiningForm';
 import { supabase } from '../lib/supabaseClient';
@@ -19,6 +19,7 @@ export const Joining: React.FC = () => {
   const appIdParam = searchParams.get('appId');
 
   const [isAuthorizing, setIsAuthorizing] = useState<boolean>(true);
+  const [authorizedAppId, setAuthorizedAppId] = useState<string>('');
   const [authorizedAppNumber, setAuthorizedAppNumber] = useState<string>('');
 
   useEffect(() => {
@@ -66,6 +67,7 @@ export const Joining: React.FC = () => {
         }
 
         if (isMounted) {
+          setAuthorizedAppId(appData.id);
           setAuthorizedAppNumber(appData.application_number || 'ATG-APP-VERIFIED');
           setIsAuthorizing(false);
         }
@@ -81,6 +83,15 @@ export const Joining: React.FC = () => {
       isMounted = false;
     };
   }, [appIdParam, navigate]);
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('Sign out error:', e);
+    }
+    navigate('/joining/access', { replace: true });
+  };
 
   if (isAuthorizing) {
     return (
@@ -134,27 +145,60 @@ export const Joining: React.FC = () => {
                 </h1>
               </div>
 
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.65rem 1rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'var(--color-pearl-surface)',
-                  border: '1px solid var(--color-border)',
-                  fontSize: 'var(--text-xs)'
-                }}
-              >
-                <FileCheck2 size={16} style={{ color: 'var(--color-midnight-navy)' }} />
-                <div>
-                  <div style={{ color: 'var(--color-text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Authorized Application ID
-                  </div>
-                  <div style={{ fontWeight: 700, color: 'var(--color-midnight-navy)', fontFamily: 'monospace' }}>
-                    {authorizedAppNumber}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '0.65rem 1rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'var(--color-pearl-surface)',
+                    border: '1px solid var(--color-border)',
+                    fontSize: 'var(--text-xs)'
+                  }}
+                >
+                  <FileCheck2 size={16} style={{ color: 'var(--color-midnight-navy)' }} />
+                  <div>
+                    <div style={{ color: 'var(--color-text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Authorized Application ID
+                    </div>
+                    <div style={{ fontWeight: 700, color: 'var(--color-midnight-navy)', fontFamily: 'monospace' }}>
+                      {authorizedAppNumber}
+                    </div>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  title="Sign out of joining session"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.65rem 1rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'var(--color-pearl-surface)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-text-secondary)',
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-crimson-red, #dc2626)';
+                    e.currentTarget.style.color = 'var(--color-crimson-red, #dc2626)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-border)';
+                    e.currentTarget.style.color = 'var(--color-text-secondary)';
+                  }}
+                >
+                  <LogOut size={14} />
+                  <span>Sign Out</span>
+                </button>
               </div>
             </div>
 
@@ -168,7 +212,7 @@ export const Joining: React.FC = () => {
       {/* Main Multi-Step Form Container */}
       <section style={{ marginTop: 'var(--space-6)' }}>
         <Container size="lg">
-          <JoiningForm />
+          <JoiningForm applicationId={authorizedAppId} applicationNumber={authorizedAppNumber} />
         </Container>
       </section>
     </div>

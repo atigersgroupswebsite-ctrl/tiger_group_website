@@ -977,6 +977,18 @@ export interface Database {
         };
         Returns: Json;
       };
+      save_joining_draft_bundle: {
+        Args: {
+          payload: Json;
+        };
+        Returns: Json;
+      };
+      submit_joining_form_bundle: {
+        Args: {
+          payload: Json;
+        };
+        Returns: Json;
+      };
       is_active_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;

@@ -10,6 +10,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Container } from '../components/common/Container';
 import { supabase } from '../lib/supabaseClient';
+import { getAuthorizedApplication } from '../services/joiningService';
 import {
   ShieldCheck,
   Mail,
@@ -213,21 +214,12 @@ export const JoiningAccessPage: React.FC = () => {
       }
 
       // 2. Authoritative Database Gate: Verify that authenticated user email matches application with joining_access_enabled
-      const { data: appData, error: appErr } = await supabase
-        .from('applications')
-        .select('id, application_number, full_name, email, joining_access_enabled')
-        .eq('joining_access_enabled', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (appErr || !appData) {
-        throw new Error('Authorization check failed: No active application with joining access enabled was found for this authenticated account.');
+      const authRes = await getAuthorizedApplication();
+      if (!authRes.success || !authRes.data) {
+        throw new Error(authRes.error || 'Authorization check failed: No active application with joining access enabled was found for this authenticated account.');
       }
 
-      if (appData.email.toLowerCase().trim() !== cleanEmail) {
-        throw new Error('Security Error: Authenticated identity does not match application records.');
-      }
+      const appData = authRes.data;
 
       // 3. Authorization succeeded — show success state then route to /joining
       setStep('SUCCESS_REDIRECT');

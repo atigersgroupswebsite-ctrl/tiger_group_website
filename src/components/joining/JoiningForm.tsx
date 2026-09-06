@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { FormProgress } from './FormProgress';
 import { FormNavigation } from './FormNavigation';
 import { FormError } from './FormError';
@@ -36,12 +37,21 @@ import {
   validateDeclarations,
   validateAllSteps
 } from '../../utils/joiningValidation';
-import { submitJoiningForm } from '../../services/joiningService';
+import {
+  getJoiningForm,
+  saveJoiningDraft,
+  submitJoiningForm
+} from '../../services/joiningService';
 
 const DRAFT_STORAGE_KEY = 'ATG_JOINING_FORM_DRAFT';
 
-export const JoiningForm: React.FC = () => {
-  // Initialize from draft or default initial state
+interface JoiningFormProps {
+  applicationId?: string;
+  applicationNumber?: string;
+}
+
+export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applicationNumber }) => {
+  // Initialize from default initial state or local cache
   const [formData, setFormData] = useState<JoiningFormData>(() => {
     try {
       const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
@@ -69,6 +79,10 @@ export const JoiningForm: React.FC = () => {
     return INITIAL_JOINING_FORM_DATA;
   });
 
+  const [isLoadingDossier, setIsLoadingDossier] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState<boolean>(false);
+
   // Single authoritative source of truth for submission state
   const isSubmitted = formData.status === 'SUBMITTED' || formData.submissionStatus === 'SUBMITTED';
   const isReadOnly = isSubmitted;
@@ -80,7 +94,6 @@ export const JoiningForm: React.FC = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.status === 'SUBMITTED' || parsed.submissionStatus === 'SUBMITTED') {
-          // If viewMode was explicitly 'REVIEW', user was viewing the read-only submission
           return parsed.viewMode !== 'REVIEW';
         }
       }
@@ -105,9 +118,99 @@ export const JoiningForm: React.FC = () => {
   const [confirmationChecked, setConfirmationChecked] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Auto-sync draft to localStorage on changes with 600ms debounce (prevents input/picker lag)
+  // Load from Supabase on mount / when applicationId changes
   useEffect(() => {
-    if (isSubmitted) return;
+    let isMounted = true;
+
+    const loadRemoteDossier = async () => {
+      if (!applicationId) {
+        setIsLoadingDossier(false);
+        return;
+      }
+
+      setIsLoadingDossier(true);
+      setLoadError(null);
+
+      try {
+        const res = await getJoiningForm(applicationId);
+        if (!isMounted) return;
+
+        if (!res.success || !res.data) {
+          setLoadError(res.error || 'Unable to load joining dossier.');
+          setIsLoadingDossier(false);
+          return;
+        }
+
+        const dbData = res.data;
+        const isDbSubmitted = dbData.status === 'SUBMITTED' || dbData.submissionStatus === 'SUBMITTED';
+
+        if (isDbSubmitted) {
+          setFormData(dbData);
+          setCurrentStep(dbData.currentStep || 9);
+          setCompletedSteps([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+          setIsLoadingDossier(false);
+          return;
+        }
+
+        // Local Storage Migration Check (PART 36)
+        const migrationKey = `ATG_JOINING_MIGRATED_${applicationId}`;
+        const hasMigrated = localStorage.getItem(migrationKey) === 'true';
+        let finalData = dbData;
+
+        if (!hasMigrated) {
+          const localRaw = localStorage.getItem(DRAFT_STORAGE_KEY);
+          if (localRaw) {
+            try {
+              const localParsed = JSON.parse(localRaw);
+              if (localParsed && localParsed.submissionStatus !== 'SUBMITTED') {
+                finalData = {
+                  ...dbData,
+                  personal: { ...dbData.personal, ...localParsed.personal },
+                  permanentAddress: { ...dbData.permanentAddress, ...localParsed.permanentAddress },
+                  currentAddress: { ...dbData.currentAddress, ...localParsed.currentAddress },
+                  sameAsPermanentAddress: localParsed.sameAsPermanentAddress ?? dbData.sameAsPermanentAddress,
+                  bank: { ...dbData.bank, ...localParsed.bank },
+                  education: (localParsed.education && localParsed.education.length > 0) ? localParsed.education : dbData.education,
+                  family: (localParsed.family && localParsed.family.length > 0) ? localParsed.family : dbData.family,
+                  emergencyContacts: (localParsed.emergencyContacts && localParsed.emergencyContacts.length > 0) ? localParsed.emergencyContacts : dbData.emergencyContacts,
+                  declarations: { ...dbData.declarations, ...localParsed.declarations }
+                };
+                // Persist migrated draft to Supabase
+                await saveJoiningDraft(applicationId, finalData);
+              }
+            } catch (err) {
+              console.warn('Draft migration parse warning:', err);
+            }
+          }
+          localStorage.setItem(migrationKey, 'true');
+        }
+
+        setFormData(finalData);
+        if (finalData.currentStep && finalData.currentStep > 1) {
+          setCurrentStep(finalData.currentStep);
+          setCompletedSteps(Array.from({ length: finalData.currentStep }, (_, i) => i + 1));
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setLoadError(err.message || 'Failed to connect to recruitment registry.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingDossier(false);
+        }
+      }
+    };
+
+    loadRemoteDossier();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [applicationId]);
+
+  // Auto-sync draft to localStorage on changes with 600ms debounce
+  useEffect(() => {
+    if (isSubmitted || isLoadingDossier) return;
 
     const timer = setTimeout(() => {
       try {
@@ -121,7 +224,7 @@ export const JoiningForm: React.FC = () => {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [formData, currentStep, isSubmitted]);
+  }, [formData, currentStep, isSubmitted, isLoadingDossier]);
 
   // Sync signatory name with candidate name if empty
   useEffect(() => {
@@ -136,21 +239,34 @@ export const JoiningForm: React.FC = () => {
     }
   }, [formData.personal.employeeName, isReadOnly]);
 
-  // Handler: Manual save draft
-  const handleSaveDraft = () => {
-    if (isReadOnly) return;
+  // Handler: Manual save draft to Supabase
+  const handleSaveDraft = async () => {
+    if (isReadOnly || isSavingDraft) return;
+
+    setIsSavingDraft(true);
+    setSaveNotice('Saving draft to secure cloud registry...');
 
     try {
       localStorage.setItem(
         DRAFT_STORAGE_KEY,
         JSON.stringify({ ...formData, currentStep })
       );
+
+      if (applicationId) {
+        const res = await saveJoiningDraft(applicationId, { ...formData, currentStep });
+        if (!res.success) {
+          throw new Error(res.error || 'Failed to save draft to database.');
+        }
+      }
+
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      setSaveNotice(`Draft progress saved to this browser at ${timeStr}.`);
+      setSaveNotice(`Draft progress saved to cloud registry at ${timeStr}.`);
       setTimeout(() => setSaveNotice(null), 4000);
-    } catch (e) {
-      setSaveNotice('Unable to save draft (Storage limit reached).');
-      setTimeout(() => setSaveNotice(null), 4000);
+    } catch (e: any) {
+      setSaveNotice(e.message || 'Unable to save draft to cloud registry.');
+      setTimeout(() => setSaveNotice(null), 5000);
+    } finally {
+      setIsSavingDraft(false);
     }
   };
 
@@ -470,7 +586,7 @@ export const JoiningForm: React.FC = () => {
 
   // Final submit handler
   const handleSubmit = async () => {
-    if (isReadOnly) return;
+    if (isReadOnly || isSubmitting) return;
 
     const allStepValidation = validateAllSteps(formData);
     const hasAnyError = Object.values(allStepValidation).some((res) => !res.isValid);
@@ -489,31 +605,41 @@ export const JoiningForm: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // Connect to backend Supabase service
-      await submitJoiningForm(formData.applicationId, formData);
-    } catch (e) {
-      console.warn('Backend submit notice:', e);
-    }
+      let finalSubmittedAt = new Date().toISOString();
 
-    setIsSubmitting(false);
-    const submittedData: JoiningFormData = {
-      ...formData,
-      status: 'SUBMITTED',
-      submissionStatus: 'SUBMITTED',
-      submittedAt: new Date().toISOString(),
-      currentStep: 9
-    };
-    setFormData(submittedData);
-    setShowSuccessScreen(true);
-    try {
-      localStorage.setItem(
-        DRAFT_STORAGE_KEY,
-        JSON.stringify({ ...submittedData, viewMode: 'SUCCESS' })
-      );
-    } catch (err) {
-      console.warn('Storage error on submit:', err);
+      if (applicationId) {
+        const res = await submitJoiningForm(applicationId, formData);
+        if (!res.success || !res.data) {
+          alert(res.error || 'Submission failed. Please check all fields and try again.');
+          setIsSubmitting(false);
+          return;
+        }
+        finalSubmittedAt = res.data.submittedAt;
+      }
+
+      const submittedData: JoiningFormData = {
+        ...formData,
+        status: 'SUBMITTED',
+        submissionStatus: 'SUBMITTED',
+        submittedAt: finalSubmittedAt,
+        currentStep: 9
+      };
+      setFormData(submittedData);
+      setShowSuccessScreen(true);
+      try {
+        localStorage.setItem(
+          DRAFT_STORAGE_KEY,
+          JSON.stringify({ ...submittedData, viewMode: 'SUCCESS' })
+        );
+      } catch (err) {
+        console.warn('Storage error on submit:', err);
+      }
+    } catch (e: any) {
+      alert(e.message || 'An error occurred during submission.');
+    } finally {
+      setIsSubmitting(false);
+      window.scrollTo({ top: 120, behavior: 'smooth' });
     }
-    window.scrollTo({ top: 120, behavior: 'smooth' });
   };
 
   // Handler to open the read-only submitted dossier from FormSuccess
@@ -557,20 +683,40 @@ export const JoiningForm: React.FC = () => {
     window.scrollTo({ top: 120, behavior: 'smooth' });
   };
 
-  // In post-submission acknowledgment view
+  // Post-submission acknowledgment view (Read-only lock, no reset)
   if (isSubmitted && showSuccessScreen) {
     return (
       <FormSuccess
         formData={formData}
         onViewSubmission={handleViewSubmission}
-        onReset={() => {
-          localStorage.removeItem(DRAFT_STORAGE_KEY);
-          setFormData(INITIAL_JOINING_FORM_DATA);
-          setShowSuccessScreen(false);
-          setCurrentStep(1);
-          setCompletedSteps([1]);
-        }}
       />
+    );
+  }
+
+  if (isLoadingDossier) {
+    return (
+      <div style={{ textAlign: 'center', padding: '4rem 1rem', background: '#ffffff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
+        <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-midnight-navy)', margin: '0 auto 1.25rem auto' }} />
+        <h3 style={{ color: 'var(--color-midnight-navy)', fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+          LOADING JOINING DOSSIER
+        </h3>
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', margin: 0 }}>
+          Connecting to cloud recruitment registry and loading authorized candidate dossier...
+        </p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center', background: '#FEF2F2', border: '1px solid #F87171', borderRadius: 'var(--radius-lg)', color: '#991B1B' }}>
+        <AlertCircle size={36} style={{ margin: '0 auto 0.75rem' }} />
+        <h3 style={{ fontWeight: 800, fontSize: '1.2rem', marginBottom: '0.5rem' }}>Dossier Access Error</h3>
+        <p style={{ fontSize: '0.875rem', maxWidth: '500px', margin: '0 auto 1.25rem auto' }}>{loadError}</p>
+        <button onClick={() => window.location.reload()} className="btn btn-navy btn-sm">
+          RETRY CONNECTION
+        </button>
+      </div>
     );
   }
 
@@ -582,7 +728,7 @@ export const JoiningForm: React.FC = () => {
       {/* Step Progress Bar & Sidebar */}
       <FormProgress
         currentStep={currentStep}
-        applicationId={formData.applicationId}
+        applicationId={applicationNumber || formData.applicationId}
         onSelectStep={handleSelectStep}
         completedSteps={completedSteps}
       />
@@ -665,6 +811,7 @@ export const JoiningForm: React.FC = () => {
           {/* STEP 07 — DOCUMENTS */}
           {currentStep === 7 && (
             <DocumentUploader
+              applicationId={applicationId}
               documents={formData.documents}
               onDocumentChange={handleDocumentChange}
               errors={stepErrors}

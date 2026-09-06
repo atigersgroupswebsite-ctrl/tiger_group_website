@@ -1,7 +1,9 @@
-import React, { useRef } from 'react';
-import { PenTool, Trash2, RefreshCw, UploadCloud } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { PenTool, Trash2, RefreshCw, UploadCloud, Loader2 } from 'lucide-react';
+import { uploadCandidateDocument, removeCandidateDocument } from '../../services/joiningService';
 
 interface SignatureUploaderProps {
+  applicationId?: string;
   signatureDataUrl?: string;
   onSignatureChange: (dataUrl: string | undefined, fileMeta?: { name: string; size: number; type: string }) => void;
   error?: string;
@@ -9,14 +11,16 @@ interface SignatureUploaderProps {
 }
 
 export const SignatureUploader: React.FC<SignatureUploaderProps> = ({
+  applicationId,
   signatureDataUrl,
   onSignatureChange,
   error,
   readOnly = false
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -33,19 +37,50 @@ export const SignatureUploader: React.FC<SignatureUploaderProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      const result = loadEvent.target?.result as string;
-      onSignatureChange(result, {
-        name: file.name,
-        size: file.size,
-        type: file.type
-      });
-    };
-    reader.readAsDataURL(file);
+    if (applicationId) {
+      setIsUploading(true);
+      try {
+        const res = await uploadCandidateDocument(applicationId, 'SIGNATURE', file);
+        if (res.success && res.data) {
+          onSignatureChange(res.data.dataUrl, {
+            name: res.data.name,
+            size: res.data.size,
+            type: res.data.type
+          });
+        } else {
+          alert(res.error || 'Signature upload failed.');
+        }
+      } catch (err: any) {
+        alert(err.message || 'Signature upload error.');
+      } finally {
+        setIsUploading(false);
+      }
+    } else {
+      const reader = new FileReader();
+      reader.onload = (loadEvent) => {
+        const result = loadEvent.target?.result as string;
+        onSignatureChange(result, {
+          name: file.name,
+          size: file.size,
+          type: file.type
+        });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const handleRemove = () => {
+  const handleRemove = async () => {
+    if (readOnly) return;
+    if (applicationId) {
+      setIsUploading(true);
+      try {
+        await removeCandidateDocument(applicationId, 'SIGNATURE');
+      } catch (err) {
+        console.warn('Signature remove error:', err);
+      } finally {
+        setIsUploading(false);
+      }
+    }
     onSignatureChange(undefined);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -92,6 +127,11 @@ export const SignatureUploader: React.FC<SignatureUploaderProps> = ({
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontWeight: 600 }}>
             {signatureDataUrl ? '✓ Specimen Signature Attached (Locked)' : 'No Signature Attached'}
           </span>
+        ) : isUploading ? (
+          <button type="button" disabled className="btn btn-navy btn-sm" style={{ fontSize: '0.75rem', padding: '0.4rem 0.85rem', opacity: 0.75 }}>
+            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+            <span>SAVING...</span>
+          </button>
         ) : signatureDataUrl ? (
           <>
             <button

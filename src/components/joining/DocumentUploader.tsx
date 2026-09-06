@@ -1,10 +1,12 @@
-import React, { useRef } from 'react';
-import { CheckCircle2, Trash2, RefreshCw, UploadCloud } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { CheckCircle2, Trash2, RefreshCw, UploadCloud, Loader2 } from 'lucide-react';
 import { PhotoUploader } from './PhotoUploader';
 import { SignatureUploader } from './SignatureUploader';
 import type { DocumentCategory, UploadedDocument } from '../../types/joining';
+import { uploadCandidateDocument, removeCandidateDocument } from '../../services/joiningService';
 
 interface DocumentUploaderProps {
+  applicationId?: string;
   documents: Record<DocumentCategory, UploadedDocument>;
   onDocumentChange: (
     category: DocumentCategory,
@@ -15,11 +17,14 @@ interface DocumentUploaderProps {
 }
 
 export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
+  applicationId,
   documents,
   onDocumentChange,
   errors,
   readOnly = false
 }) => {
+  const [uploadingCategory, setUploadingCategory] = useState<DocumentCategory | null>(null);
+
   const formatFileSize = (bytes?: number) => {
     if (!bytes) return '';
     if (bytes < 1024) return `${bytes} B`;
@@ -27,7 +32,7 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleFileUpload = (category: DocumentCategory, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (category: DocumentCategory, e: React.ChangeEvent<HTMLInputElement>) => {
     if (readOnly) return;
     const file = e.target.files?.[0];
     if (!file) return;
@@ -38,17 +43,53 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (loadEvt) => {
-      const dataUrl = loadEvt.target?.result as string;
-      onDocumentChange(category, {
-        name: file.name,
-        size: file.size,
-        type: file.type || 'application/pdf',
-        dataUrl
-      });
-    };
-    reader.readAsDataURL(file);
+    if (applicationId) {
+      setUploadingCategory(category);
+      try {
+        const res = await uploadCandidateDocument(applicationId, category, file);
+        if (res.success && res.data) {
+          onDocumentChange(category, {
+            name: res.data.name,
+            size: res.data.size,
+            type: res.data.type,
+            dataUrl: res.data.dataUrl
+          });
+        } else {
+          alert(res.error || 'Document upload failed.');
+        }
+      } catch (err: any) {
+        alert(err.message || 'Document upload error.');
+      } finally {
+        setUploadingCategory(null);
+      }
+    } else {
+      const reader = new FileReader();
+      reader.onload = (loadEvt) => {
+        const dataUrl = loadEvt.target?.result as string;
+        onDocumentChange(category, {
+          name: file.name,
+          size: file.size,
+          type: file.type || 'application/pdf',
+          dataUrl
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDocumentRemove = async (category: DocumentCategory) => {
+    if (readOnly) return;
+    if (applicationId) {
+      setUploadingCategory(category);
+      try {
+        await removeCandidateDocument(applicationId, category);
+      } catch (err) {
+        console.warn('Document remove error:', err);
+      } finally {
+        setUploadingCategory(null);
+      }
+    }
+    onDocumentChange(category, undefined);
   };
 
   const otherCategories: DocumentCategory[] = [
@@ -75,6 +116,7 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       {/* Primary Biometrics: Photo & Signature */}
       <div className="photo-signature-grid">
         <PhotoUploader
+          applicationId={applicationId}
           photoDataUrl={documents.PHOTO?.file?.dataUrl}
           onPhotoChange={(dataUrl, fileMeta) => {
             if (dataUrl && fileMeta) {
@@ -88,6 +130,7 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         />
 
         <SignatureUploader
+          applicationId={applicationId}
           signatureDataUrl={documents.SIGNATURE?.file?.dataUrl}
           onSignatureChange={(dataUrl, fileMeta) => {
             if (dataUrl && fileMeta) {
@@ -107,6 +150,7 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           const doc = documents[cat];
           if (!doc) return null;
           const hasFile = Boolean(doc.file);
+          const isUploadingThis = uploadingCategory === cat;
 
           return (
             <DocumentCardItem
@@ -114,8 +158,9 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
               category={cat}
               doc={doc}
               hasFile={hasFile}
+              isUploading={isUploadingThis}
               onUpload={handleFileUpload}
-              onRemove={() => onDocumentChange(cat, undefined)}
+              onRemove={() => handleDocumentRemove(cat)}
               formatFileSize={formatFileSize}
               error={errors[cat]}
               readOnly={readOnly}
@@ -131,6 +176,7 @@ interface DocumentCardItemProps {
   category: DocumentCategory;
   doc: UploadedDocument;
   hasFile: boolean;
+  isUploading?: boolean;
   onUpload: (category: DocumentCategory, e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemove: () => void;
   formatFileSize: (size?: number) => string;
@@ -142,6 +188,7 @@ const DocumentCardItem: React.FC<DocumentCardItemProps> = ({
   category,
   doc,
   hasFile,
+  isUploading = false,
   onUpload,
   onRemove,
   formatFileSize,
@@ -180,7 +227,12 @@ const DocumentCardItem: React.FC<DocumentCardItemProps> = ({
           />
         )}
 
-        {hasFile && doc.file ? (
+        {isUploading ? (
+          <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: 'var(--color-midnight-navy)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', background: 'rgba(25, 42, 86, 0.04)', borderRadius: 'var(--radius-md)' }}>
+            <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
+            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600 }}>Saving document to cloud...</span>
+          </div>
+        ) : hasFile && doc.file ? (
           <div>
             {/* Independent Image Preview Thumbnail if available */}
             {isImage && doc.file.dataUrl && (
