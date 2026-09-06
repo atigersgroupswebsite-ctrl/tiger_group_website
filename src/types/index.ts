@@ -1,7 +1,73 @@
 // ============================================================================
-// Core Domain Models & Future Phase 2 Contracts
-// A TIGER GLOBAL Career Solution & Consultancy
+// Core Domain Models & Business Verticals
+// A TIGER GROUPS — Multi-Industry Enterprise Ecosystem
 // ============================================================================
+
+export interface BusinessVertical {
+  id: string;
+  verticalNumber: string;
+  name: string;
+  associatedWith?: string;
+  categoryTag: string;
+  description: string;
+  ctaText: string;
+  ctaLink: string;
+  image: string;
+}
+
+export const BUSINESS_VERTICALS: BusinessVertical[] = [
+  {
+    id: 'career-solutions',
+    verticalNumber: 'VERTICAL 01',
+    name: 'A TIGER GLOBAL CAREER SOLUTION & CONSULTANCY',
+    categoryTag: 'Placement & Recruitment',
+    description: 'Job placement consultancy and career-related recruitment services connecting candidates with established regional employers.',
+    ctaText: 'EXPLORE CAREER SOLUTIONS',
+    ctaLink: '/careers',
+    image: '/assets/service_consultancy.jpg'
+  },
+  {
+    id: 'manpower-security',
+    verticalNumber: 'VERTICAL 02',
+    name: 'A TIGER MANPOWER SUPPLY AND SECURITY SERVICES',
+    associatedWith: 'Labour Contractor',
+    categoryTag: 'Industrial Contracting',
+    description: 'Manpower supply, labour contracting, and security staffing solutions for manufacturing plants, warehouses, and commercial facilities.',
+    ctaText: 'EXPLORE MANPOWER SERVICES',
+    ctaLink: '/enquiry/employer',
+    image: '/assets/service_manpower.jpg'
+  },
+  {
+    id: 'infrabuild-properties',
+    verticalNumber: 'VERTICAL 03',
+    name: 'A TIGER INFRABUILD PROPERTIES',
+    categoryTag: 'Real Estate & Properties',
+    description: 'Property-related services and real-estate brokerage across prime residential, industrial, and commercial development corridors.',
+    ctaText: 'EXPLORE PROPERTIES',
+    ctaLink: '/businesses#properties',
+    image: '/assets/vertical_properties.jpg'
+  },
+  {
+    id: 'footwear-store',
+    verticalNumber: 'VERTICAL 04',
+    name: 'A TIGER FOOTWEAR STORE',
+    categoryTag: 'Retail & Footwear',
+    description: 'Quality footwear collection for men, women, and children spanning formal leather, athletic, casual, and durable daily wear.',
+    ctaText: 'VISIT FOOTWEAR STORE',
+    ctaLink: '/businesses#footwear',
+    image: '/assets/vertical_footwear.jpg'
+  },
+  {
+    id: 'fashion-hub',
+    verticalNumber: 'VERTICAL 05',
+    name: 'A TIGER FASHION HUB',
+    categoryTag: 'Apparel & Lifestyle',
+    description: 'Contemporary men’s and women’s fashion and apparel featuring curated everyday styles, formal attire, and seasonal collections.',
+    ctaText: 'EXPLORE FASHION',
+    ctaLink: '/businesses#fashion',
+    image: '/assets/vertical_fashion.jpg'
+  }
+];
 
 export type RegionState = 'Maharashtra' | 'Madhya Pradesh' | 'Chhattisgarh';
 

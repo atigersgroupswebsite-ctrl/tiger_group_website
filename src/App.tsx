@@ -6,7 +6,7 @@ import { ScrollToTop } from './components/common/ScrollToTop';
 
 import { Home } from './pages/Home';
 import { About } from './pages/About';
-import { Services } from './pages/Services';
+import { Businesses } from './pages/Businesses';
 import { Jobs } from './pages/Jobs';
 import { JobDetail } from './pages/JobDetail';
 import { Enquiry } from './pages/Enquiry';
@@ -27,7 +27,9 @@ export const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
-            <Route path="/services" element={<Services />} />
+            <Route path="/businesses" element={<Businesses />} />
+            <Route path="/services" element={<Businesses />} />
+            <Route path="/careers" element={<Jobs />} />
             <Route path="/jobs" element={<Jobs />} />
             <Route path="/jobs/:slug" element={<JobDetail />} />
             <Route path="/enquiry" element={<Enquiry />} />

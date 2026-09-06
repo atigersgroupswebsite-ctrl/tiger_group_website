@@ -15,10 +15,10 @@ export const About: React.FC = () => {
           <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
             <span className="eyebrow">Enterprise Overview</span>
             <h1 style={{ marginBottom: 'var(--space-4)' }}>
-              ABOUT A TIGER GLOBAL
+              ABOUT A TIGER GROUPS
             </h1>
             <p style={{ fontSize: 'var(--text-lg)', color: 'var(--color-text-secondary)', lineHeight: 1.65 }}>
-              A registered proprietorship enterprise delivering trusted career solutions, structured industrial staffing, and facility security contracting across Maharashtra, Madhya Pradesh, and Chhattisgarh.
+              A diversified parent enterprise headquartered in Nagpur, operating across Central India encompassing Career Solutions & Consultancy, Manpower Supply & Security Services, InfraBuild Properties, Footwear, and Fashion.
             </p>
           </div>
         </Container>
@@ -30,8 +30,8 @@ export const About: React.FC = () => {
           <div className="stats-grid">
             <StatCounter value={800} suffix="+" label="People Placed" />
             <StatCounter value={400} suffix="+" label="Active Employees" />
-            <StatCounter value={3} label="States Served" />
-            <StatCounter value={3} suffix="+" label="Major Employer Relationships" />
+            <StatCounter value={5} label="Business Verticals" />
+            <StatCounter value={3} suffix="+" label="States Served" />
           </div>
         </Container>
       </section>
@@ -57,13 +57,13 @@ export const About: React.FC = () => {
               <div>
                 <span className="eyebrow">Who We Are</span>
                 <h2 style={{ marginBottom: 'var(--space-5)' }}>
-                  A Dedicated Workforce Bridge in Central India.
+                  A Diversified Commercial Ecosystem in Central India.
                 </h2>
                 <p style={{ fontSize: 'var(--text-base)', lineHeight: 1.7, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>
-                  <strong>A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY</strong> operates as a registered proprietorship headquartered in Nagpur, Maharashtra. We stand firmly at the intersection of hardworking individuals seeking honest employment and expanding industrial organizations seeking dependable manpower.
+                  <strong>A TIGER GROUPS</strong> operates as a registered enterprise headquartered in Nagpur, Maharashtra. The group manages five specialized commercial verticals spanning recruitment consultancy, industrial manpower contracting, real estate brokerage, and lifestyle retail.
                 </p>
                 <p style={{ fontSize: 'var(--text-base)', lineHeight: 1.7, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-6)' }}>
-                  Unlike unverified brokers, A Tiger Global enforces formal operating standards: thorough document screening, child labour prevention, transparent consultancy fee structures, and direct coordination with prominent regional employers.
+                  Anchored by its cornerstone consultancy — <strong>A Tiger Global Career Solution & Consultancy</strong> — the group enforces formal operating standards: thorough document screening, child labour prevention, statutory PF/ESIC compliance, transparent terms, and direct coordination with leading industrial employers.
                 </p>
 
                 <div style={{
@@ -84,8 +84,8 @@ export const About: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
-                  <Button to="/services" variant="primary" icon={<ArrowRight size={16} />}>
-                    OUR SERVICES
+                  <Button to="/businesses" variant="primary" icon={<ArrowRight size={16} />}>
+                    EXPLORE BUSINESSES
                   </Button>
                   <Button to="/contact" variant="outline">
                     CONTACT US

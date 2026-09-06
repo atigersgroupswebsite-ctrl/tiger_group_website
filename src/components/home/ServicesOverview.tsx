@@ -1,73 +1,65 @@
 import React from 'react';
-import { ArrowRight, Briefcase, Users, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Briefcase, Users, Building, ShoppingBag, Sparkles } from 'lucide-react';
 import { Container } from '../common/Container';
 import { SectionHeading } from '../common/SectionHeading';
 import { ScrollReveal } from '../common/ScrollReveal';
 import { Button } from '../common/Button';
+import { BUSINESS_VERTICALS } from '../../types';
 
 export const ServicesOverview: React.FC = () => {
-  const services = [
-    {
-      id: 'placement',
-      tag: 'Candidate Placement',
-      title: 'Job Placement Consultancy',
-      description: 'Connect candidates with employment opportunities suited to their profile, skills, and aspirations while conducting ethical interview procedures.',
-      icon: <Briefcase size={26} />,
-      image: '/assets/service_consultancy.jpg',
-      ctaText: 'Explore Placement',
-      link: '/services#placement'
-    },
-    {
-      id: 'manpower',
-      tag: 'Workforce Contracting',
-      title: 'Labour & Manpower Supply',
-      description: 'Provide end-to-end workforce solutions based on business requirements, factory operations, logistics loading, and specialized industrial shifts.',
-      icon: <Users size={26} />,
-      image: '/assets/service_manpower.jpg',
-      ctaText: 'Explore Manpower',
-      link: '/services#manpower'
-    },
-    {
-      id: 'security',
-      tag: 'Facility Protection',
-      title: 'Security Guard Supply',
-      description: 'Provide disciplined, verified security manpower for manufacturing units, commercial facilities, and institutions requiring dependable vigilance.',
-      icon: <ShieldCheck size={26} />,
-      image: '/assets/service_security.jpg',
-      ctaText: 'Explore Security',
-      link: '/services#security'
+  const getIcon = (id: string) => {
+    switch (id) {
+      case 'career-solutions':
+        return <Briefcase size={24} />;
+      case 'manpower-security':
+        return <Users size={24} />;
+      case 'infrabuild-properties':
+        return <Building size={24} />;
+      case 'footwear-store':
+        return <ShoppingBag size={24} />;
+      case 'fashion-hub':
+        return <Sparkles size={24} />;
+      default:
+        return <Briefcase size={24} />;
     }
-  ];
+  };
 
   return (
-    <section className="section" id="services-overview">
+    <section className="section" id="business-verticals">
       <Container size="xl">
         <SectionHeading
-          eyebrow="Core Competencies"
-          title="WHAT WE DO"
-          subtitle="Specialized workforce and placement solutions tailored for candidates and enterprises across Central India."
+          eyebrow="A TIGER GROUPS ECOSYSTEM"
+          title="BUSINESS VERTICALS"
+          subtitle="Five specialized commercial ventures operating under the parent group across career solutions, industrial contracting, real estate, and lifestyle retail."
         />
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-8)' }}>
-          {services.map((service, index) => (
-            <ScrollReveal key={service.id} delay={index * 0.15} direction="up">
+          {BUSINESS_VERTICALS.map((vertical, index) => (
+            <ScrollReveal key={vertical.id} delay={index * 0.1} direction="up">
               <div className="service-card">
                 <div className="service-card-media">
-                  <img src={service.image} alt={service.title} loading="lazy" />
-                  <span className="service-card-tag">{service.tag}</span>
+                  <img src={vertical.image} alt={vertical.name} loading="lazy" />
+                  <span className="service-card-tag">{vertical.verticalNumber}</span>
                 </div>
 
                 <div className="service-card-body">
                   <div className="service-card-icon">
-                    {service.icon}
+                    {getIcon(vertical.id)}
                   </div>
 
-                  <h3 className="service-card-title">{service.title}</h3>
-                  <p className="service-card-text">{service.description}</p>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-champagne-dark)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>
+                    {vertical.categoryTag}
+                    {vertical.associatedWith && ` • ${vertical.associatedWith}`}
+                  </div>
+
+                  <h3 className="service-card-title" style={{ fontSize: '1.2rem', minHeight: '3.2rem' }}>
+                    {vertical.name}
+                  </h3>
+                  <p className="service-card-text">{vertical.description}</p>
 
                   <div className="service-card-footer">
-                    <Button to={service.link} variant="outline" size="sm" icon={<ArrowRight size={14} />}>
-                      {service.ctaText}
+                    <Button to={vertical.ctaLink} variant="outline" size="sm" icon={<ArrowRight size={14} />}>
+                      {vertical.ctaText}
                     </Button>
                   </div>
                 </div>

@@ -13,31 +13,95 @@ export const Enquiry: React.FC = () => {
     <div className="enquiry-landing-hero">
       <Container>
         <div className="enquiry-header-center">
-          <motion.span
-            className="enquiry-eyebrow"
-            initial={{ opacity: 0, y: 12 }}
+          {/* Transition Pill from A TIGER GROUPS to Career Vertical */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.45 }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: 'rgba(25, 42, 86, 0.05)',
+              border: '1px solid rgba(25, 42, 86, 0.1)',
+              padding: '0.35rem 0.85rem',
+              borderRadius: 'var(--radius-full)',
+              marginBottom: 'var(--space-4)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'var(--color-midnight-navy)'
+            }}
           >
-            LET'S GET STARTED
-          </motion.span>
+            <span>A TIGER GROUPS</span>
+            <span style={{ color: 'var(--color-champagne-dark)' }}>→</span>
+            <span style={{ color: 'var(--color-champagne-dark)' }}>CAREER SOLUTION VERTICAL</span>
+          </motion.div>
 
-          <motion.h1
-            className="enquiry-heading"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.08 }}
+          {/* Dedicated A TIGER GLOBAL Logo & Heading */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.08 }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0.85rem',
+              marginBottom: 'var(--space-4)'
+            }}
           >
-            WHAT CAN WE HELP YOU WITH?
-          </motion.h1>
+            <div style={{
+              width: '82px',
+              height: '82px',
+              borderRadius: '50%',
+              overflow: 'hidden',
+              boxShadow: 'var(--shadow-md)',
+              border: '2px solid rgba(247, 215, 148, 0.6)',
+              backgroundColor: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <img
+                src="/assets/tiger-logo.jpeg"
+                alt="A TIGER GLOBAL Career Solution & Consultancy"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </div>
+            <div>
+              <h1 style={{
+                fontSize: 'clamp(2.1rem, 4vw, 3.2rem)',
+                fontWeight: 800,
+                color: 'var(--color-midnight-navy)',
+                margin: 0,
+                lineHeight: 1.15,
+                letterSpacing: '-0.025em'
+              }}>
+                A TIGER GLOBAL
+              </h1>
+              <div style={{
+                fontSize: 'clamp(1rem, 1.5vw, 1.3rem)',
+                fontWeight: 700,
+                color: 'var(--color-champagne-dark)',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                marginTop: '0.2rem'
+              }}>
+                Career Solution & Consultancy
+              </div>
+            </div>
+          </motion.div>
 
           <motion.p
             className="enquiry-subtext"
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.16 }}
+            style={{ fontSize: 'clamp(1.05rem, 1.4vw, 1.25rem)', color: 'var(--color-text-secondary)' }}
           >
-            Whether you're looking for your next opportunity or need dependable manpower for your business, tell us what you need and our team will take it from there.
+            Find employment opportunities, connect with employers, and begin your application.
           </motion.p>
         </div>
 

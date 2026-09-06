@@ -13,21 +13,21 @@ export const Footer: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: 'var(--space-4)' }}>
               <img
                 src="/assets/tiger-logo.jpeg"
-                alt="A Tiger Global"
+                alt="A TIGER GROUPS Logo"
                 className="footer-brand-logo"
               />
               <div>
-                <h4 style={{ color: 'var(--color-pearl-white)', fontSize: '1.1rem', fontWeight: 800, margin: 0 }}>
-                  A TIGER GLOBAL
+                <h4 style={{ color: 'var(--color-pearl-white)', fontSize: '1.15rem', fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>
+                  A TIGER GROUPS
                 </h4>
                 <span style={{ color: 'var(--color-champagne)', fontSize: '0.75rem', letterSpacing: '0.05em' }}>
-                  Career Solution & Consultancy
+                  Enterprise & Business Ecosystem
                 </span>
               </div>
             </div>
 
             <p style={{ fontSize: 'var(--text-sm)', color: 'rgba(252, 251, 251, 0.7)', lineHeight: 1.6, marginBottom: 'var(--space-5)' }}>
-              A registered proprietorship enterprise delivering dependable workforce contracting, industrial labour solutions, and security personnel across Maharashtra, Madhya Pradesh, and Chhattisgarh.
+              A diversified enterprise ecosystem headquartered in Nagpur, operating across Central India encompassing Career Solutions & Consultancy, Manpower Supply & Security Services, InfraBuild Properties, Footwear, and Fashion.
             </p>
 
             <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
@@ -68,25 +68,23 @@ export const Footer: React.FC = () => {
             <ul className="footer-links">
               <li><Link to="/" className="footer-link"><ArrowRight size={12} /> Home</Link></li>
               <li><Link to="/about" className="footer-link"><ArrowRight size={12} /> About Us</Link></li>
-              <li><Link to="/services" className="footer-link"><ArrowRight size={12} /> Services</Link></li>
-              <li><Link to="/jobs" className="footer-link"><ArrowRight size={12} /> Opportunities</Link></li>
+              <li><Link to="/businesses" className="footer-link"><ArrowRight size={12} /> Businesses</Link></li>
+              <li><Link to="/careers" className="footer-link"><ArrowRight size={12} /> Careers Portal</Link></li>
               <li><Link to="/enquiry" className="footer-link"><ArrowRight size={12} /> Enquiry Hub</Link></li>
-              <li><Link to="/enquiry/job-seeker" className="footer-link"><ArrowRight size={12} /> Job Seeker Form</Link></li>
-              <li><Link to="/enquiry/employer" className="footer-link"><ArrowRight size={12} /> Manpower Request</Link></li>
               <li><Link to="/contact" className="footer-link"><ArrowRight size={12} /> Contact Us</Link></li>
             </ul>
           </div>
 
-          {/* Core Services */}
+          {/* Business Verticals */}
           <div>
-            <h5 className="footer-title">Our Services</h5>
+            <h5 className="footer-title">Business Verticals</h5>
             <ul className="footer-links">
-              <li><Link to="/services" className="footer-link"><ArrowRight size={12} /> Job Placement</Link></li>
-              <li><Link to="/services" className="footer-link"><ArrowRight size={12} /> Labour Contracting</Link></li>
-              <li><Link to="/services" className="footer-link"><ArrowRight size={12} /> Manpower Supply</Link></li>
-              <li><Link to="/services" className="footer-link"><ArrowRight size={12} /> Security Guard Supply</Link></li>
-              <li><Link to="/joining" className="footer-link"><ArrowRight size={12} /> Joining Roadmap</Link></li>
-              <li><Link to="/policy" className="footer-link"><ArrowRight size={12} /> 10-Point Policy</Link></li>
+              <li><Link to="/careers" className="footer-link"><ArrowRight size={12} /> Career Solution & Consultancy</Link></li>
+              <li><Link to="/businesses#manpower" className="footer-link"><ArrowRight size={12} /> Manpower Supply & Security</Link></li>
+              <li><Link to="/businesses#properties" className="footer-link"><ArrowRight size={12} /> InfraBuild Properties</Link></li>
+              <li><Link to="/businesses#footwear" className="footer-link"><ArrowRight size={12} /> A Tiger Footwear Store</Link></li>
+              <li><Link to="/businesses#fashion" className="footer-link"><ArrowRight size={12} /> A Tiger Fashion Hub</Link></li>
+              <li><Link to="/policy" className="footer-link"><ArrowRight size={12} /> Consultancy Terms & Policy</Link></li>
             </ul>
           </div>
 

@@ -77,21 +77,21 @@ export const AboutPreview: React.FC = () => {
                 </h2>
 
                 <p style={{ fontSize: 'var(--text-lg)', lineHeight: 1.65, color: 'var(--color-midnight-navy)', fontWeight: 500, marginBottom: 'var(--space-6)' }}>
-                  A Tiger Global Career Solution & Consultancy works at the intersection of people and business — helping candidates discover opportunities while helping organizations access the manpower they need.
+                  A TIGER GROUPS operates a multi-industry ecosystem across Central India, anchored by our flagship recruitment vertical — A Tiger Global Career Solution & Consultancy.
                 </p>
 
                 <p style={{ fontSize: 'var(--text-sm)', lineHeight: 1.7, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-8)' }}>
-                  Based in Nagpur, Maharashtra, our proprietorship operations bridge the employment divide across Central India. With over <strong>800+ people placed</strong> and <strong>400+ active employees</strong> deployed across <strong>3 states</strong>, we combine personalized candidate guidance with industrial-grade compliance, verification, and reliable workforce management.
+                  Headquartered in Nagpur, Maharashtra, our enterprise ecosystem bridges employment, industrial contracting, property development, and retail commerce across Maharashtra, Madhya Pradesh, and Chhattisgarh. Combining verified candidate guidance with industrial-grade compliance, we build lasting partnerships with both job seekers and corporate enterprises.
                 </p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-8)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-midnight-navy)' }}>
                     <CheckCircle2 size={18} style={{ color: 'var(--color-champagne-dark)' }} />
-                    <span>Transparent ₹1,000 Model</span>
+                    <span>5 Dedicated Business Verticals</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-midnight-navy)' }}>
                     <CheckCircle2 size={18} style={{ color: 'var(--color-champagne-dark)' }} />
-                    <span>3-Company Selection Choice</span>
+                    <span>3-State Operating Reach</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-midnight-navy)' }}>
                     <CheckCircle2 size={18} style={{ color: 'var(--color-champagne-dark)' }} />
@@ -105,7 +105,7 @@ export const AboutPreview: React.FC = () => {
 
                 <div>
                   <Button to="/about" variant="navy" size="lg" icon={<ArrowRight size={18} />}>
-                    ABOUT A TIGER GLOBAL
+                    ABOUT A TIGER GROUPS
                   </Button>
                 </div>
               </div>

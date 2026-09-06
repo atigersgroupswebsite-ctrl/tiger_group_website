@@ -25,10 +25,8 @@ export const Navbar: React.FC = () => {
   const navLinks = [
     { label: 'Home', path: '/' },
     { label: 'About', path: '/about' },
-    { label: 'Services', path: '/services' },
-    { label: 'Jobs', path: '/jobs' },
-    { label: 'Enquiry', path: '/enquiry' },
-    { label: 'For Employers', path: '/employers' },
+    { label: 'Businesses', path: '/businesses' },
+    { label: 'Careers', path: '/careers' },
     { label: 'Contact', path: '/contact' }
   ];
 
@@ -38,15 +36,14 @@ export const Navbar: React.FC = () => {
         <Container size="xl">
           <div className="navbar-inner">
             {/* Logo */}
-            <Link to="/" className="navbar-brand" aria-label="A Tiger Global Homepage">
+            <Link to="/" className="navbar-brand" aria-label="A Tiger Groups Homepage">
               <img
                 src="/assets/tiger-logo.jpeg"
-                alt="A TIGER GROUP'S Logo"
+                alt="A TIGER GROUPS Logo"
                 className="navbar-logo"
               />
               <div className="navbar-brand-text">
-                <span className="navbar-brand-title">A TIGER GLOBAL</span>
-                <span className="navbar-brand-sub">Career Solution & Consultancy</span>
+                <span className="navbar-brand-title">A TIGER GROUPS</span>
               </div>
             </Link>
 
@@ -115,8 +112,7 @@ export const Navbar: React.FC = () => {
           <div className="mobile-drawer">
             <div className="mobile-drawer-header">
               <div className="navbar-brand-text">
-                <span className="navbar-brand-title">A TIGER GLOBAL</span>
-                <span className="navbar-brand-sub">Career Solution & Consultancy</span>
+                <span className="navbar-brand-title">A TIGER GROUPS</span>
               </div>
               <button
                 type="button"

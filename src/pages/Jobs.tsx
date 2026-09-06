@@ -39,11 +39,40 @@ export const Jobs: React.FC = () => {
       {/* Header */}
       <section className="section section-pearl" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '3rem' }}>
         <Container size="xl">
-          <div style={{ maxWidth: '780px', margin: '0 auto', textAlign: 'center' }}>
-            <span className="eyebrow">Verified Openings</span>
-            <h1 style={{ marginBottom: 'var(--space-3)' }}>
-              CURRENT OPPORTUNITIES
+          <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: 'rgba(25, 42, 86, 0.05)',
+              border: '1px solid rgba(25, 42, 86, 0.1)',
+              padding: '0.35rem 0.85rem',
+              borderRadius: 'var(--radius-full)',
+              marginBottom: 'var(--space-3)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'var(--color-midnight-navy)'
+            }}>
+              <span>A TIGER GROUPS</span>
+              <span style={{ color: 'var(--color-champagne-dark)' }}>→</span>
+              <span style={{ color: 'var(--color-champagne-dark)' }}>CAREER SOLUTION & CONSULTANCY</span>
+            </div>
+
+            <h1 style={{ marginBottom: 'var(--space-2)' }}>
+              CAREER OPPORTUNITIES
             </h1>
+            <div style={{
+              fontSize: 'var(--text-sm)',
+              fontWeight: 700,
+              color: 'var(--color-champagne-dark)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              marginBottom: 'var(--space-3)'
+            }}>
+              A TIGER GLOBAL CAREER SOLUTION & CONSULTANCY
+            </div>
             <p style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-secondary)', lineHeight: 1.65 }}>
               Browse genuine industrial, warehousing, security, and technical job openings across Maharashtra, Madhya Pradesh, and Chhattisgarh.
             </p>

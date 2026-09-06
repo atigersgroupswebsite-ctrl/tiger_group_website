@@ -30,7 +30,7 @@ export const Hero: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
             >
-              A Tiger Global connects businesses with dependable manpower while helping people discover meaningful employment opportunities across Maharashtra, Madhya Pradesh and Chhattisgarh.
+              A TIGER GROUPS is a diversified enterprise ecosystem delivering trusted career placement, industrial workforce contracting, infrastructure properties, and retail ventures across Central India.
             </motion.p>
 
             <motion.div
@@ -39,11 +39,11 @@ export const Hero: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
             >
-              <Button to="/jobs" variant="primary" size="lg" icon={<ArrowRight size={18} />}>
-                FIND A JOB
+              <Button to="/businesses" variant="primary" size="lg" icon={<ArrowRight size={18} />}>
+                EXPLORE BUSINESSES
               </Button>
-              <Button to="/enquiry/employer" variant="navy" size="lg" icon={<Users size={18} />}>
-                HIRE MANPOWER
+              <Button to="/careers" variant="navy" size="lg" icon={<Briefcase size={18} />}>
+                CAREER SOLUTIONS
               </Button>
             </motion.div>
 
@@ -55,17 +55,17 @@ export const Hero: React.FC = () => {
             >
               <div className="hero-highlight-item">
                 <Briefcase size={15} style={{ color: 'var(--color-midnight-navy)' }} />
-                <span>Job Placement</span>
+                <span>Careers & Manpower</span>
               </div>
               <div className="hero-highlight-item">
                 <span className="hero-highlight-dot" />
                 <Users size={15} style={{ color: 'var(--color-midnight-navy)' }} />
-                <span>Labour Supply</span>
+                <span>Properties</span>
               </div>
               <div className="hero-highlight-item">
                 <span className="hero-highlight-dot" />
                 <ShieldCheck size={15} style={{ color: 'var(--color-midnight-navy)' }} />
-                <span>Security Guards</span>
+                <span>Footwear & Fashion</span>
               </div>
             </motion.div>
           </div>
