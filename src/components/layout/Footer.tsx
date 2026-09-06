@@ -85,7 +85,16 @@ export const Footer: React.FC = () => {
               <li><Link to="/businesses#properties" className="footer-link"><ArrowRight size={12} /> InfraBuild Properties</Link></li>
               <li><Link to="/businesses#footwear" className="footer-link"><ArrowRight size={12} /> A Tiger Footwear Store</Link></li>
               <li><Link to="/businesses#fashion" className="footer-link"><ArrowRight size={12} /> A Tiger Fashion Hub</Link></li>
-              <li><Link to="/policy" className="footer-link"><ArrowRight size={12} /> Consultancy Terms & Policy</Link></li>
+            </ul>
+          </div>
+
+          {/* Legal / Compliance */}
+          <div>
+            <h5 className="footer-title">Legal / Compliance</h5>
+            <ul className="footer-links">
+              <li><Link to="/policy#terms" className="footer-link"><ArrowRight size={12} /> Terms & Conditions</Link></li>
+              <li><Link to="/policy#consultancy" className="footer-link"><ArrowRight size={12} /> Consultancy Policy</Link></li>
+              <li><Link to="/policy#privacy" className="footer-link"><ArrowRight size={12} /> Privacy Policy</Link></li>
             </ul>
           </div>
 

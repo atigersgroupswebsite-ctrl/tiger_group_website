@@ -9,6 +9,7 @@ import { HowItWorksSection } from '../components/home/HowItWorksSection';
 import { AboutPreview } from '../components/home/AboutPreview';
 import { OpportunitiesPreview } from '../components/home/OpportunitiesPreview';
 import { EmployerCTA } from '../components/home/EmployerCTA';
+import { RegistrationSection } from '../components/compliance/RegistrationSection';
 import { FinalCTA } from '../components/home/FinalCTA';
 
 export const Home: React.FC = () => {
@@ -24,6 +25,7 @@ export const Home: React.FC = () => {
       <AboutPreview />
       <OpportunitiesPreview />
       <EmployerCTA />
+      <RegistrationSection />
       <FinalCTA />
     </main>
   );
