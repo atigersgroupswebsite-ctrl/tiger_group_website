@@ -1,3 +1,4 @@
+import React, { useEffect } from 'react';
 import { ArrowRight, CheckCircle2, ShieldCheck, Award, MapPin } from 'lucide-react';
 import { Container } from '../components/common/Container';
 import { SectionHeading } from '../components/common/SectionHeading';
@@ -7,6 +8,10 @@ import { StatCounter } from '../components/common/StatCounter';
 import { PARTNER_ORGANIZATIONS } from '../data/partnersData';
 
 export const About: React.FC = () => {
+  useEffect(() => {
+    document.title = "About Us | A TIGER GROUPS";
+  }, []);
+
   return (
     <main style={{ paddingTop: 'calc(var(--header-height) + 2rem)' }}>
       {/* Page Header */}
@@ -169,7 +174,7 @@ export const About: React.FC = () => {
         <Container size="xl">
           <SectionHeading
             eyebrow="Dual Commitment"
-            title="THE A TIGER GLOBAL ADVANTAGE"
+            title="THE A TIGER GROUPS ADVANTAGE"
             subtitle="Built on structured accountability for both employers and prospective employees."
           />
 
