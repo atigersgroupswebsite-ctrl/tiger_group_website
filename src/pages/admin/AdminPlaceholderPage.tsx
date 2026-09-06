@@ -5,7 +5,8 @@
 
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Construction, ArrowLeft } from 'lucide-react';
+import { Construction, ArrowLeft, Download, Clock } from 'lucide-react';
+import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 
 export const AdminPlaceholderPage: React.FC = () => {
   const location = useLocation();
@@ -41,13 +42,34 @@ export const AdminPlaceholderPage: React.FC = () => {
         <Construction size={32} />
       </div>
 
+      {/* Status Pill */}
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          fontSize: '0.75rem',
+          fontWeight: 800,
+          color: '#8C6400',
+          backgroundColor: '#FDF3DB',
+          padding: '3px 10px',
+          borderRadius: '4px',
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          marginBottom: '0.75rem'
+        }}
+      >
+        <Clock size={12} />
+        <span>Status: Coming in next implementation stage</span>
+      </div>
+
       <h1
         style={{
           fontFamily: 'Plus Jakarta Sans, sans-serif',
-          fontSize: '1.5rem',
+          fontSize: '1.6rem',
           fontWeight: 800,
           color: '#192A56',
-          marginBottom: '0.4rem'
+          marginBottom: '0.5rem'
         }}
       >
         {pathName || 'OPERATIONS MODULE'}
@@ -57,21 +79,25 @@ export const AdminPlaceholderPage: React.FC = () => {
         style={{
           fontSize: '0.9rem',
           color: '#64748B',
-          maxWidth: '480px',
+          maxWidth: '520px',
           lineHeight: 1.6,
-          marginBottom: '1.5rem'
+          marginBottom: '1.75rem'
         }}
       >
-        This operational module is scheduled for upcoming deployment in Stage 3. For immediate data
-        requirements, please utilize the Exports section or Applications directory.
+        Candidate, corporate records, and lifecycle operations for this module will appear here in the
+        upcoming administrative update. All data access remains strictly guarded within internal administration.
       </p>
 
-      <div style={{ display: 'flex', gap: '0.75rem' }}>
-        <Link to="/admin" className="btn-admin-secondary">
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <Link to={ADMIN_ROUTES.dashboard} className="btn-admin-secondary">
           <ArrowLeft size={15} />
           <span>Dashboard</span>
         </Link>
-        <Link to="/admin/exports" className="btn-admin-primary">
+        <Link to={ADMIN_ROUTES.applications} className="btn-admin-secondary">
+          <span>Applications</span>
+        </Link>
+        <Link to={ADMIN_ROUTES.exports} className="btn-admin-primary">
+          <Download size={14} />
           <span>Go to Exports</span>
         </Link>
       </div>

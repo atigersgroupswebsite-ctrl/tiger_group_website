@@ -18,11 +18,13 @@ import {
   FileText,
   UserCheck,
   Download,
+  FolderArchive,
   Activity,
   Settings,
   ExternalLink,
   X
 } from 'lucide-react';
+import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 
 interface AdminSidebarProps {
   mobileOpen: boolean;
@@ -37,22 +39,23 @@ interface NavItemDef {
 }
 
 const CORE_NAV_ITEMS: NavItemDef[] = [
-  { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-  { name: 'Applications', path: '/admin/applications', icon: Users },
-  { name: 'Employer Enquiries', path: '/admin/employer-enquiries', icon: Building2 },
-  { name: 'Exports', path: '/admin/exports', icon: Download }
+  { name: 'Dashboard', path: ADMIN_ROUTES.dashboard, icon: LayoutDashboard },
+  { name: 'Applications', path: ADMIN_ROUTES.applications, icon: Users },
+  { name: 'Employer Enquiries', path: ADMIN_ROUTES.employerEnquiries, icon: Building2 },
+  { name: 'Exports', path: ADMIN_ROUTES.exports, icon: Download }
 ];
 
 const MANAGEMENT_SUITE_ITEMS: NavItemDef[] = [
-  { name: 'Jobs', path: '/admin/jobs', icon: Briefcase, isStage3: true },
-  { name: 'Companies', path: '/admin/companies', icon: Factory, isStage3: true },
-  { name: 'Joining', path: '/admin/joining', icon: FileCheck2, isStage3: true },
-  { name: 'Documents', path: '/admin/documents', icon: FolderOpen, isStage3: true },
-  { name: 'Payments', path: '/admin/payments', icon: CreditCard, isStage3: true },
-  { name: 'Reference Slips', path: '/admin/reference-slips', icon: FileText, isStage3: true },
-  { name: 'Employees', path: '/admin/employees', icon: UserCheck, isStage3: true },
-  { name: 'Activity', path: '/admin/activity', icon: Activity, isStage3: true },
-  { name: 'Settings', path: '/admin/settings', icon: Settings, isStage3: true }
+  { name: 'Jobs', path: ADMIN_ROUTES.jobs, icon: Briefcase, isStage3: true },
+  { name: 'Companies', path: ADMIN_ROUTES.companies, icon: Factory, isStage3: true },
+  { name: 'Joining', path: ADMIN_ROUTES.joining, icon: FileCheck2, isStage3: true },
+  { name: 'Documents', path: ADMIN_ROUTES.documents, icon: FolderOpen, isStage3: true },
+  { name: 'Payments', path: ADMIN_ROUTES.payments, icon: CreditCard, isStage3: true },
+  { name: 'Reference Slips', path: ADMIN_ROUTES.referenceSlips, icon: FileText, isStage3: true },
+  { name: 'Employees', path: ADMIN_ROUTES.employees, icon: UserCheck, isStage3: true },
+  { name: 'Files', path: ADMIN_ROUTES.files, icon: FolderArchive, isStage3: true },
+  { name: 'Activity', path: ADMIN_ROUTES.activity, icon: Activity, isStage3: true },
+  { name: 'Settings', path: ADMIN_ROUTES.settings, icon: Settings, isStage3: true }
 ];
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseMobile }) => {
@@ -100,7 +103,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseM
                 <NavLink
                   key={item.path}
                   to={item.path}
-                  end={item.path === '/admin'}
+                  end={item.path === ADMIN_ROUTES.dashboard}
                   onClick={onCloseMobile}
                   className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}
                 >

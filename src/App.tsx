@@ -1,3 +1,15 @@
+// ==============================================================================
+// File: src/App.tsx
+// Description: Master Router Architecture for A TIGER GROUPS
+// Routing Architecture:
+//   1. Public Admin Auth: /admin/login
+//   2. Isolated Protected Admin Subtree: /admin/*
+//      - Protected by AdminProtectedRoute (Supabase Auth + admin_profiles validation)
+//      - Shared AdminLayout shell (Header + Sidebar + Breadcrumbs)
+//      - Dedicated AdminNotFoundPage 404 (prevents fallthrough to public routes)
+//   3. Public Website Subtree: / (PublicLayout)
+// ==============================================================================
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { PublicLayout } from './components/layout/PublicLayout';
@@ -16,6 +28,7 @@ import { AdminApplicationDetailPage } from './pages/admin/AdminApplicationDetail
 import { AdminEmployerEnquiriesPage } from './pages/admin/AdminEmployerEnquiriesPage';
 import { AdminExportsPage } from './pages/admin/AdminExportsPage';
 import { AdminPlaceholderPage } from './pages/admin/AdminPlaceholderPage';
+import { AdminNotFoundPage } from './pages/admin/AdminNotFoundPage';
 
 // Public Pages
 import { Home } from './pages/Home';
@@ -37,32 +50,45 @@ export const App: React.FC = () => {
       <Router>
         <ScrollToTop />
         <Routes>
-          {/* Admin Login (Publicly accessible to administrators) */}
+          {/* 1. Admin Login (Publicly accessible login gateway for administrators) */}
           <Route path="/admin/login" element={<AdminLoginPage />} />
 
-          {/* Protected Admin Routes */}
+          {/* 2. Self-Contained Protected Admin Route Tree */}
           <Route path="/admin" element={<AdminProtectedRoute />}>
             <Route element={<AdminLayout />}>
+              {/* Core Operations */}
               <Route index element={<AdminDashboardPage />} />
               <Route path="applications" element={<AdminApplicationsPage />} />
               <Route path="applications/:id" element={<AdminApplicationDetailPage />} />
               <Route path="employer-enquiries" element={<AdminEmployerEnquiriesPage />} />
               <Route path="exports" element={<AdminExportsPage />} />
-              {/* Prepared Future Module Routes */}
+
+              {/* Management Suite Modules */}
               <Route path="jobs" element={<AdminPlaceholderPage />} />
+              <Route path="jobs/:id" element={<AdminPlaceholderPage />} />
               <Route path="companies" element={<AdminPlaceholderPage />} />
+              <Route path="companies/:id" element={<AdminPlaceholderPage />} />
               <Route path="joining" element={<AdminPlaceholderPage />} />
+              <Route path="joining/:id" element={<AdminPlaceholderPage />} />
               <Route path="documents" element={<AdminPlaceholderPage />} />
+              <Route path="documents/:id" element={<AdminPlaceholderPage />} />
               <Route path="payments" element={<AdminPlaceholderPage />} />
+              <Route path="payments/:id" element={<AdminPlaceholderPage />} />
               <Route path="reference-slips" element={<AdminPlaceholderPage />} />
+              <Route path="reference-slips/:id" element={<AdminPlaceholderPage />} />
               <Route path="employees" element={<AdminPlaceholderPage />} />
+              <Route path="employees/:id" element={<AdminPlaceholderPage />} />
               <Route path="files" element={<AdminPlaceholderPage />} />
+              <Route path="files/:id" element={<AdminPlaceholderPage />} />
               <Route path="activity" element={<AdminPlaceholderPage />} />
               <Route path="settings" element={<AdminPlaceholderPage />} />
+
+              {/* Admin 404 Fallback - Keeps all unknown /admin/* paths strictly inside AdminLayout */}
+              <Route path="*" element={<AdminNotFoundPage />} />
             </Route>
           </Route>
 
-          {/* Public Website Routes */}
+          {/* 3. Public Website Route Tree */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
@@ -78,6 +104,8 @@ export const App: React.FC = () => {
             <Route path="/contact" element={<Contact />} />
             <Route path="/joining" element={<Joining />} />
             <Route path="/policy" element={<Policy />} />
+
+            {/* Public 404 Fallback - Only catches non-admin URLs */}
             <Route path="*" element={<Home />} />
           </Route>
         </Routes>

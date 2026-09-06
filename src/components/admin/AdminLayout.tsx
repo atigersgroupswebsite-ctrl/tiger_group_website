@@ -8,6 +8,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 import type { BreadcrumbItem } from './AdminBreadcrumbs';
+import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 
 export const AdminLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -16,30 +17,61 @@ export const AdminLayout: React.FC = () => {
   // Generate dynamic breadcrumbs based on pathname
   const generateBreadcrumbs = (): BreadcrumbItem[] => {
     const path = location.pathname;
-    if (path === '/admin') {
+
+    if (path === ADMIN_ROUTES.dashboard) {
       return [{ label: 'Dashboard' }];
     }
-    if (path === '/admin/applications') {
-      return [{ label: 'Dashboard', path: '/admin' }, { label: 'Applications' }];
+    if (path === ADMIN_ROUTES.applications) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Applications' }];
     }
     if (path.startsWith('/admin/applications/')) {
       return [
-        { label: 'Dashboard', path: '/admin' },
-        { label: 'Applications', path: '/admin/applications' },
+        { label: 'Dashboard', path: ADMIN_ROUTES.dashboard },
+        { label: 'Applications', path: ADMIN_ROUTES.applications },
         { label: 'Application Record' }
       ];
     }
-    if (path === '/admin/employer-enquiries') {
-      return [{ label: 'Dashboard', path: '/admin' }, { label: 'Employer Enquiries' }];
+    if (path === ADMIN_ROUTES.employerEnquiries) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Employer Enquiries' }];
     }
-    if (path === '/admin/exports') {
-      return [{ label: 'Dashboard', path: '/admin' }, { label: 'Enquiry Exports' }];
+    if (path === ADMIN_ROUTES.exports) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Data & Enquiry Exports' }];
+    }
+    if (path === ADMIN_ROUTES.jobs) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Jobs Management' }];
+    }
+    if (path === ADMIN_ROUTES.companies) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Partner Companies' }];
+    }
+    if (path === ADMIN_ROUTES.joining) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Digital Joining Packets' }];
+    }
+    if (path === ADMIN_ROUTES.documents) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Document Verification' }];
+    }
+    if (path === ADMIN_ROUTES.payments) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Payment Transactions' }];
+    }
+    if (path === ADMIN_ROUTES.referenceSlips) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Reference Slips' }];
+    }
+    if (path === ADMIN_ROUTES.employees) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Employees Directory' }];
+    }
+    if (path === ADMIN_ROUTES.files) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Generated Files Archive' }];
+    }
+    if (path === ADMIN_ROUTES.activity) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'System Audit Activity' }];
+    }
+    if (path === ADMIN_ROUTES.settings) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Administration Settings' }];
     }
 
-    // Default formatting for other routes
+    // Default formatting for other dynamic or unmapped admin paths
     const segment = path.replace('/admin/', '').replace(/-/g, ' ');
-    const formatted = segment.charAt(0).toUpperCase() + segment.slice(1);
-    return [{ label: 'Dashboard', path: '/admin' }, { label: formatted }];
+    const formatted = segment ? segment.charAt(0).toUpperCase() + segment.slice(1) : 'Admin Area';
+    return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: formatted }];
   };
 
   return (
