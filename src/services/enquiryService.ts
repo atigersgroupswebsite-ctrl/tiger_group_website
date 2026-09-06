@@ -7,6 +7,7 @@
 // ==============================================================================
 
 import { supabase } from '../lib/supabaseClient';
+import { normalizeIndianMobile } from '../utils/phoneUtils';
 
 export interface CreateJobSeekerInput {
   fullName: string;
@@ -50,7 +51,6 @@ const activeJobSeekerSubmissions = new Set<string>();
 const activeEmployerSubmissions = new Set<string>();
 
 const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-const INDIAN_PHONE_REGEX = /^[6-9]\d{9}$/;
 
 /**
  * Validates and submits a new Candidate Job Seeker Application to Supabase.
@@ -66,7 +66,7 @@ export async function createJobSeekerApplication(
   const trimmedName = input.fullName?.trim() || '';
   const trimmedFatherName = input.fatherName?.trim() || '';
   const rawMobile = input.mobile?.trim() || '';
-  const normalizedMobile = rawMobile.replace(/^(?:\+91|91|0)/, '').replace(/\D/g, '');
+  const mobileNorm = normalizeIndianMobile(rawMobile);
   const trimmedEmail = input.email?.trim().toLowerCase() || '';
   const trimmedAddress = input.address?.trim() || '';
   const trimmedCompany = input.desiredCompany?.trim() || '';
@@ -80,10 +80,10 @@ export async function createJobSeekerApplication(
   if (!trimmedFatherName || trimmedFatherName.length < 2) {
     return { success: false, error: "Father's Name is required (minimum 2 characters)." };
   }
-  if (!normalizedMobile || !INDIAN_PHONE_REGEX.test(normalizedMobile)) {
+  if (!mobileNorm.isValid) {
     return {
       success: false,
-      error: 'A valid 10-digit Indian mobile number is required (starting with 6, 7, 8, or 9).'
+      error: mobileNorm.error || 'A valid 10-digit Indian mobile number is required (starting with 6, 7, 8, or 9).'
     };
   }
   if (!trimmedEmail || !EMAIL_REGEX.test(trimmedEmail)) {
@@ -103,7 +103,7 @@ export async function createJobSeekerApplication(
   }
 
   // 2. Concurrency / In-Flight Duplicate Locking
-  const lockKey = `${trimmedEmail}:${normalizedMobile}`;
+  const lockKey = `${trimmedEmail}:${mobileNorm.normalized}`;
   if (activeJobSeekerSubmissions.has(lockKey)) {
     return {
       success: false,
@@ -119,7 +119,7 @@ export async function createJobSeekerApplication(
       .insert({
         full_name: trimmedName,
         father_name: trimmedFatherName,
-        mobile: normalizedMobile,
+        mobile: mobileNorm.normalized,
         email: trimmedEmail,
         address: trimmedAddress,
         desired_company: trimmedCompany,
@@ -174,7 +174,7 @@ export async function createEmployerEnquiry(
   const trimmedCompany = input.companyName?.trim() || '';
   const trimmedEmail = input.email?.trim().toLowerCase() || '';
   const rawPhone = input.phone?.trim() || '';
-  const normalizedPhone = rawPhone.replace(/^(?:\+91|91|0)/, '').replace(/\D/g, '');
+  const phoneNorm = normalizeIndianMobile(rawPhone);
   const trimmedAddress = input.address?.trim() || '';
   const trimmedDistrict = input.district?.trim() || '';
   const trimmedState = input.state?.trim() || '';
@@ -189,8 +189,11 @@ export async function createEmployerEnquiry(
   if (!trimmedEmail || !EMAIL_REGEX.test(trimmedEmail)) {
     return { success: false, error: 'A valid official corporate email is required.' };
   }
-  if (!normalizedPhone || !INDIAN_PHONE_REGEX.test(normalizedPhone)) {
-    return { success: false, error: 'A valid 10-digit contact phone number is required.' };
+  if (!phoneNorm.isValid) {
+    return {
+      success: false,
+      error: phoneNorm.error || 'A valid 10-digit contact phone number is required.'
+    };
   }
   if (!trimmedAddress || trimmedAddress.length < 5) {
     return { success: false, error: 'Plant / Office address is required.' };
@@ -225,7 +228,7 @@ export async function createEmployerEnquiry(
       .insert({
         company_name: trimmedCompany,
         email: trimmedEmail,
-        phone: normalizedPhone,
+        phone: phoneNorm.normalized,
         address: trimmedAddress,
         district: trimmedDistrict,
         state: trimmedState,

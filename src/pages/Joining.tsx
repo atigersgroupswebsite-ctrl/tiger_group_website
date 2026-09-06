@@ -1,12 +1,104 @@
-import React from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { ShieldCheck, FileCheck2 } from 'lucide-react';
+// ==============================================================================
+// File: src/pages/Joining.tsx
+// Description: Candidate Joining & Statutory Dossier Form
+// Security: Protected route requiring active Supabase candidate authentication
+//           AND application joining_access_enabled = true. Direct unverified
+//           visitors are automatically redirected to /joining/access.
+// ==============================================================================
+
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { ShieldCheck, FileCheck2, Loader2 } from 'lucide-react';
 import { Container } from '../components/common/Container';
 import { JoiningForm } from '../components/joining/JoiningForm';
+import { supabase } from '../lib/supabaseClient';
 
 export const Joining: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const appIdParam = searchParams.get('appId') || 'ATG-APP-2026-8491';
+  const navigate = useNavigate();
+  const appIdParam = searchParams.get('appId');
+
+  const [isAuthorizing, setIsAuthorizing] = useState<boolean>(true);
+  const [authorizedAppNumber, setAuthorizedAppNumber] = useState<string>('');
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const verifyCandidateAccess = async () => {
+      try {
+        // 1. Verify active Supabase auth session
+        const { data: { user }, error: authErr } = await supabase.auth.getUser();
+        if (authErr || !user || !user.email) {
+          // Unauthenticated -> redirect to access gateway
+          navigate('/joining/access', { replace: true });
+          return;
+        }
+
+        const candidateEmail = user.email.toLowerCase().trim();
+
+        // 2. Query application record for this candidate
+        // Database RLS guarantees only applications where:
+        // lower(trim(email)) = jwt_email AND joining_access_enabled = true
+        // are returned
+        let query = supabase
+          .from('applications')
+          .select('id, application_number, email, joining_access_enabled')
+          .eq('joining_access_enabled', true);
+
+        if (appIdParam) {
+          query = query.eq('id', appIdParam);
+        } else {
+          query = query.order('created_at', { ascending: false }).limit(1);
+        }
+
+        const { data: appData, error: appErr } = await query.maybeSingle();
+
+        if (appErr || !appData) {
+          // No authorized application or joining_access_enabled = false
+          navigate('/joining/access', { replace: true });
+          return;
+        }
+
+        // Additional identity and gate validation
+        if (appData.email.toLowerCase().trim() !== candidateEmail || !appData.joining_access_enabled) {
+          navigate('/joining/access', { replace: true });
+          return;
+        }
+
+        if (isMounted) {
+          setAuthorizedAppNumber(appData.application_number || 'ATG-APP-VERIFIED');
+          setIsAuthorizing(false);
+        }
+      } catch (err) {
+        console.error('[Joining] Authorization check failed:', err);
+        navigate('/joining/access', { replace: true });
+      }
+    };
+
+    verifyCandidateAccess();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [appIdParam, navigate]);
+
+  if (isAuthorizing) {
+    return (
+      <div style={{ paddingTop: 'calc(var(--header-height) + 4rem)', minHeight: '80vh', textAlign: 'center', backgroundColor: 'var(--color-pearl-white)' }}>
+        <Container size="sm">
+          <div style={{ padding: '4rem 1rem' }}>
+            <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-midnight-navy)', margin: '0 auto 1.25rem auto' }} />
+            <h2 style={{ color: 'var(--color-midnight-navy)', fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+              VERIFYING CANDIDATE AUTHORIZATION
+            </h2>
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', margin: 0 }}>
+              Connecting to secure onboarding registry and loading your dossier...
+            </p>
+          </div>
+        </Container>
+      </div>
+    );
+  }
 
   return (
     <div style={{ paddingTop: 'calc(var(--header-height) + 1.5rem)', minHeight: '90vh', paddingBottom: '5rem' }}>
@@ -60,7 +152,7 @@ export const Joining: React.FC = () => {
                     Authorized Application ID
                   </div>
                   <div style={{ fontWeight: 700, color: 'var(--color-midnight-navy)', fontFamily: 'monospace' }}>
-                    {appIdParam}
+                    {authorizedAppNumber}
                   </div>
                 </div>
               </div>

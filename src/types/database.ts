@@ -965,6 +965,18 @@ export interface Database {
         };
         Returns: Json;
       };
+      delete_employer_enquiry_permanently: {
+        Args: {
+          target_enquiry_id: string;
+        };
+        Returns: Json;
+      };
+      check_joining_access_status: {
+        Args: {
+          candidate_email: string;
+        };
+        Returns: Json;
+      };
       is_active_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;

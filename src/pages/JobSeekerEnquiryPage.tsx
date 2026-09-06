@@ -16,6 +16,7 @@ import {
 import { KNOWN_EMPLOYERS, type JobSeekerEnquiry } from '../types/enquiry';
 import { SAMPLE_JOBS } from '../data/jobsData';
 import { createJobSeekerApplication } from '../services/enquiryService';
+import { normalizeIndianMobile } from '../utils/phoneUtils';
 
 export const JobSeekerEnquiryPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -88,11 +89,11 @@ export const JobSeekerEnquiryPage: React.FC = () => {
     if (!formData.fullName.trim()) errs.fullName = 'Full Name is required.';
     if (!formData.fatherName.trim()) errs.fatherName = "Father's Name is required.";
 
-    const cleanMobile = formData.mobileNumber.replace(/^(?:\+91|91|0)/, '').replace(/\D/g, '');
+    const mobileNorm = normalizeIndianMobile(formData.mobileNumber);
     if (!formData.mobileNumber.trim()) {
       errs.mobileNumber = 'Mobile number is required.';
-    } else if (!/^[6-9]\d{9}$/.test(cleanMobile)) {
-      errs.mobileNumber = 'Please enter a valid 10-digit Indian mobile number.';
+    } else if (!mobileNorm.isValid) {
+      errs.mobileNumber = mobileNorm.error || 'Please enter a valid 10-digit Indian mobile number.';
     }
 
     const trimmedEmail = formData.email.trim();

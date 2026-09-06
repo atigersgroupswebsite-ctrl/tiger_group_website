@@ -4,6 +4,7 @@ import { StatsSection } from '../components/home/StatsSection';
 import { TrustedEmployers } from '../components/home/TrustedEmployers';
 import { ServicesOverview } from '../components/home/ServicesOverview';
 import { TwoAudienceSection } from '../components/home/TwoAudienceSection';
+import { AlreadyRegisteredCTA } from '../components/home/AlreadyRegisteredCTA';
 import { RegionalPresence } from '../components/home/RegionalPresence';
 import { HowItWorksSection } from '../components/home/HowItWorksSection';
 import { AboutPreview } from '../components/home/AboutPreview';
@@ -20,6 +21,7 @@ export const Home: React.FC = () => {
       <TrustedEmployers />
       <ServicesOverview />
       <TwoAudienceSection />
+      <AlreadyRegisteredCTA />
       <RegionalPresence />
       <HowItWorksSection />
       <AboutPreview />

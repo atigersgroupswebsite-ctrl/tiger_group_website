@@ -15,6 +15,7 @@ import {
 } from '../components/forms';
 import { OPERATING_STATES, type EmployerEnquiry } from '../types/enquiry';
 import { createEmployerEnquiry } from '../services/enquiryService';
+import { normalizeIndianMobile } from '../utils/phoneUtils';
 
 export const EmployerEnquiryPage: React.FC = () => {
   useEffect(() => {
@@ -61,10 +62,11 @@ export const EmployerEnquiryPage: React.FC = () => {
       errs.email = 'Please provide a valid official email address.';
     }
 
+    const phoneNorm = normalizeIndianMobile(formData.phoneNumber);
     if (!formData.phoneNumber.trim()) {
       errs.phoneNumber = 'Official contact phone number is required.';
-    } else if (!/^[6-9]\d{9}$/.test(formData.phoneNumber)) {
-      errs.phoneNumber = 'Please enter a valid 10-digit phone number.';
+    } else if (!phoneNorm.isValid) {
+      errs.phoneNumber = phoneNorm.error || 'Please enter a valid 10-digit phone number.';
     }
 
     if (!formData.address.trim()) errs.address = 'Facility / Office address is required.';

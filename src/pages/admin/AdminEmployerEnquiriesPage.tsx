@@ -25,7 +25,8 @@ import {
   AlertCircle,
   X,
   Save,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 
 const PAGE_SIZE = 15;
@@ -41,7 +42,8 @@ const ALL_EMPLOYER_STATUSES: { value: EmployerEnquiryStatus; label: string }[] =
 export const AdminEmployerEnquiriesPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
-  const { user } = useAdminAuth();
+  const { user, role } = useAdminAuth();
+  const isSuperAdmin = role === 'SUPER_ADMIN';
   const { markEmployerEnquiryNotificationsAsRead } = useAdminNotifications();
 
   // Data states
@@ -61,6 +63,12 @@ export const AdminEmployerEnquiriesPage: React.FC = () => {
   const [selectedEnquiry, setSelectedEnquiry] = useState<EmployerEnquiryRow | null>(null);
   const [editingStatus, setEditingStatus] = useState<EmployerEnquiryStatus>('NEW');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
+
+  // Permanent Delete State (SUPER_ADMIN only)
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [confirmNumberInput, setConfirmNumberInput] = useState<string>('');
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Debounce search
   useEffect(() => {
@@ -205,6 +213,44 @@ export const AdminEmployerEnquiriesPage: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to update enquiry status.');
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleExecuteDelete = async () => {
+    if (!selectedEnquiry) return;
+    const targetRef = selectedEnquiry.enquiry_number || selectedEnquiry.id;
+    if (confirmNumberInput !== targetRef) return;
+
+    if (!isSuperAdmin) {
+      setDeleteError('Unauthorized: Only SUPER_ADMIN users can permanently delete employer enquiries.');
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const { error: rpcErr } = await supabase.rpc('delete_employer_enquiry_permanently', {
+        target_enquiry_id: selectedEnquiry.id
+      });
+
+      if (rpcErr) throw new Error(rpcErr.message);
+
+      const deletedCompanyName = selectedEnquiry.company_name;
+      setShowDeleteModal(false);
+      setSelectedEnquiry(null);
+      setConfirmNumberInput('');
+      setSuccessMsg(`Employer enquiry ${targetRef} (${deletedCompanyName}) permanently deleted.`);
+
+      if (id) {
+        navigate(ADMIN_ROUTES.employerEnquiries, { replace: true });
+      }
+
+      fetchEnquiries();
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete employer enquiry.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -692,6 +738,205 @@ export const AdminEmployerEnquiriesPage: React.FC = () => {
                   <span>Save</span>
                 </button>
               </div>
+            </div>
+
+            {/* Super Admin Danger Zone — Delete Employer Enquiry */}
+            {isSuperAdmin && (
+              <div
+                style={{
+                  marginTop: '1.25rem',
+                  paddingTop: '1rem',
+                  borderTop: '1px solid #E2DFD8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#DC2626', textTransform: 'uppercase' }}>
+                    Danger Zone
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                    Permanently delete this employer enquiry record. This cannot be undone.
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteModal(true);
+                    setConfirmNumberInput('');
+                    setDeleteError(null);
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    backgroundColor: '#FEE2E2',
+                    color: '#DC2626',
+                    border: '1px solid #FCA5A5',
+                    borderRadius: '6px',
+                    padding: '0.55rem 0.9rem',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Trash2 size={14} />
+                  <span>DELETE EMPLOYER ENQUIRY</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Explicit Delete Confirmation Modal */}
+      {showDeleteModal && selectedEnquiry && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(25, 42, 86, 0.65)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '1rem'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '12px',
+              maxWidth: '480px',
+              width: '100%',
+              padding: '2rem',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: '#FEE2E2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#DC2626',
+                  flexShrink: 0
+                }}
+              >
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#192A56' }}>
+                  Delete Employer Enquiry
+                </h3>
+                <div style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                  Reference: <strong style={{ color: '#192A56', fontFamily: 'monospace' }}>{selectedEnquiry.enquiry_number || selectedEnquiry.id}</strong>
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.875rem', color: '#4A5568', lineHeight: 1.5, marginBottom: '1.25rem' }}>
+              This action permanently deletes the enquiry. Enter the reference number to confirm.
+            </p>
+
+            {deleteError && (
+              <div
+                style={{
+                  backgroundColor: '#FBF0EF',
+                  border: '1px solid #EDA6A3',
+                  borderRadius: '6px',
+                  padding: '0.65rem 0.85rem',
+                  marginBottom: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.825rem',
+                  color: '#DC2626',
+                  fontWeight: 600
+                }}
+              >
+                <AlertCircle size={16} />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <p style={{ fontSize: '0.825rem', color: '#192A56', fontWeight: 600, marginBottom: '0.5rem' }}>
+              Please type <code style={{ backgroundColor: '#F1F5F9', padding: '2px 5px', borderRadius: '4px', color: '#DC2626' }}>{selectedEnquiry.enquiry_number || selectedEnquiry.id}</code> to confirm:
+            </p>
+
+            <input
+              type="text"
+              value={confirmNumberInput}
+              onChange={(e) => setConfirmNumberInput(e.target.value.trim())}
+              placeholder={selectedEnquiry.enquiry_number || selectedEnquiry.id}
+              disabled={isDeleting}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '0.65rem 0.85rem',
+                backgroundColor: '#FCFBFB',
+                border: '1px solid',
+                borderColor: confirmNumberInput === (selectedEnquiry.enquiry_number || selectedEnquiry.id) ? '#10B981' : '#D2CECE',
+                borderRadius: '6px',
+                fontFamily: 'monospace',
+                fontSize: '0.9rem',
+                color: '#192A56',
+                outline: 'none',
+                marginBottom: '1.5rem'
+              }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setConfirmNumberInput('');
+                  setDeleteError(null);
+                }}
+                disabled={isDeleting}
+                className="btn-admin-secondary"
+              >
+                CANCEL
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteDelete}
+                disabled={isDeleting || confirmNumberInput !== (selectedEnquiry.enquiry_number || selectedEnquiry.id)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: confirmNumberInput === (selectedEnquiry.enquiry_number || selectedEnquiry.id) ? '#DC2626' : '#FCA5A5',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '0.6rem 1.25rem',
+                  fontSize: '0.825rem',
+                  fontWeight: 800,
+                  cursor: confirmNumberInput === (selectedEnquiry.enquiry_number || selectedEnquiry.id) && !isDeleting ? 'pointer' : 'not-allowed',
+                  transition: 'background-color 0.15s ease'
+                }}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                    <span>DELETING...</span>
+                  </>
+                ) : (
+                  <span>DELETE PERMANENTLY</span>
+                )}
+              </button>
             </div>
           </div>
         </div>
