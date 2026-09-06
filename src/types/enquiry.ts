@@ -7,6 +7,7 @@ export interface JobSeekerEnquiry {
   fullName: string;
   fatherName: string;
   mobileNumber: string;
+  email: string;
   address: string;
   desiredCompany: string;
   designation: string;

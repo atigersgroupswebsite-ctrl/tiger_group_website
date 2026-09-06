@@ -156,6 +156,7 @@ export interface Database {
       employer_enquiries: {
         Row: {
           id: string;
+          enquiry_number: string;
           company_name: string;
           email: string;
           phone: string;
@@ -171,6 +172,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          enquiry_number?: string | null;
           company_name: string;
           email: string;
           phone: string;
@@ -186,6 +188,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          enquiry_number?: string | null;
           company_name?: string;
           email?: string;
           phone?: string;

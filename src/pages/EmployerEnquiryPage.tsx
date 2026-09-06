@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ShieldCheck, Users, PhoneCall } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Users, PhoneCall, AlertCircle } from 'lucide-react';
 import { Container } from '../components/common/Container';
 import {
   FormField,
@@ -89,9 +89,12 @@ export const EmployerEnquiryPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!validate()) return;
 
     setIsSubmitting(true);
+    setErrors({});
+
     try {
       const result = await createEmployerEnquiry({
         companyName: formData.companyName,
@@ -107,23 +110,36 @@ export const EmployerEnquiryPage: React.FC = () => {
 
       setIsSubmitting(false);
 
-      if (result.success && result.enquiryId) {
-        setDemoId(result.enquiryId);
+      if (result.success && (result.enquiryNumber || result.enquiryId)) {
+        setDemoId(result.enquiryNumber || result.enquiryId || '');
         setIsSubmitted(true);
+        // Clear form state only on server confirmation
+        setFormData({
+          companyName: '',
+          email: '',
+          phoneNumber: '',
+          address: '',
+          district: '',
+          state: 'Maharashtra',
+          employeesRequired: '',
+          jobRole: '',
+          description: '',
+          acknowledgedAccurate: false
+        });
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
+        // Display real database/server error — NEVER show fake success
         setErrors((prev) => ({
           ...prev,
-          general: result.error || 'Failed to submit enquiry. Please try again.'
+          general: result.error || 'Failed to submit employer enquiry. Please check your information and try again.'
         }));
       }
-    } catch (err: any) {
-      console.warn('[EmployerEnquiry] Submission error, using fallback:', err);
+    } catch (err: unknown) {
       setIsSubmitting(false);
-      const fallbackId = `ATG-DEMO-${Math.floor(100000 + Math.random() * 900000)}`;
-      setDemoId(fallbackId);
-      setIsSubmitted(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setErrors((prev) => ({
+        ...prev,
+        general: err instanceof Error ? err.message : 'An unexpected error occurred during submission. Please try again.'
+      }));
     }
   };
 
@@ -206,14 +222,36 @@ export const EmployerEnquiryPage: React.FC = () => {
             >
               {isSubmitted ? (
                 <SuccessState
-                  title="REQUEST RECEIVED."
-                  copy="Thank you for sharing your manpower requirement. Our team will review your request and contact you shortly."
-                  referenceLabel="Request ID"
+                  title="ENQUIRY RECEIVED"
+                  copy="Thank you for sharing your manpower requirement. Our corporate recruitment team will review your request and contact you shortly."
+                  referenceLabel="Employer Reference Number"
                   referenceId={demoId}
                   onReset={handleReset}
                 />
               ) : (
                 <form onSubmit={handleSubmit} noValidate>
+                  {errors.general && (
+                    <div
+                      style={{
+                        padding: '0.85rem 1rem',
+                        marginBottom: '1.5rem',
+                        backgroundColor: 'rgba(237, 166, 163, 0.15)',
+                        border: '1px solid #EDA6A3',
+                        borderRadius: '8px',
+                        color: '#EDA6A3',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                      role="alert"
+                    >
+                      <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                      <span>{errors.general}</span>
+                    </div>
+                  )}
+
                   {/* SECTION A — COMPANY DETAILS */}
                   <FormSection
                     tag="SECTION A"

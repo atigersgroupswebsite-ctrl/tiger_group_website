@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Briefcase, ShieldCheck, MapPin, FileText } from 'lucide-react';
+import { ArrowLeft, Briefcase, ShieldCheck, MapPin, FileText, AlertCircle } from 'lucide-react';
 import { Container } from '../components/common/Container';
 import {
   FormField,
@@ -30,6 +30,7 @@ export const JobSeekerEnquiryPage: React.FC = () => {
     fullName: '',
     fatherName: '',
     mobileNumber: '',
+    email: '',
     address: '',
     desiredCompany: '',
     designation: '',
@@ -86,17 +87,25 @@ export const JobSeekerEnquiryPage: React.FC = () => {
 
     if (!formData.fullName.trim()) errs.fullName = 'Full Name is required.';
     if (!formData.fatherName.trim()) errs.fatherName = "Father's Name is required.";
-    
+
+    const cleanMobile = formData.mobileNumber.replace(/^(?:\+91|91|0)/, '').replace(/\D/g, '');
     if (!formData.mobileNumber.trim()) {
       errs.mobileNumber = 'Mobile number is required.';
-    } else if (!/^[6-9]\d{9}$/.test(formData.mobileNumber)) {
+    } else if (!/^[6-9]\d{9}$/.test(cleanMobile)) {
       errs.mobileNumber = 'Please enter a valid 10-digit Indian mobile number.';
+    }
+
+    const trimmedEmail = formData.email.trim();
+    if (!trimmedEmail) {
+      errs.email = 'Email Address is required for candidate registration and updates.';
+    } else if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(trimmedEmail)) {
+      errs.email = 'Please enter a valid email address.';
     }
 
     if (!formData.address.trim()) errs.address = 'Residential / permanent address is required.';
     if (!formData.desiredCompany) errs.desiredCompany = 'Please select a company preference.';
     if (!formData.designation.trim()) errs.designation = 'Designation / job position is required.';
-    
+
     if (!formData.acknowledgedAccurate) {
       errs.acknowledgedAccurate = 'Please confirm that the information provided is accurate.';
     }
@@ -107,14 +116,18 @@ export const JobSeekerEnquiryPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!validate()) return;
 
     setIsSubmitting(true);
+    setErrors({});
+
     try {
       const result = await createJobSeekerApplication({
         fullName: formData.fullName,
         fatherName: formData.fatherName,
         mobile: formData.mobileNumber,
+        email: formData.email,
         address: formData.address,
         desiredCompany: formData.desiredCompany,
         designation: formData.designation,
@@ -126,20 +139,33 @@ export const JobSeekerEnquiryPage: React.FC = () => {
       if (result.success && result.applicationNumber) {
         setDemoId(result.applicationNumber);
         setIsSubmitted(true);
+        // Clear form state only on server success
+        setFormData({
+          fullName: '',
+          fatherName: '',
+          mobileNumber: '',
+          email: '',
+          address: '',
+          desiredCompany: '',
+          designation: '',
+          description: '',
+          acknowledgedAccurate: false,
+          acknowledgedTerms: false
+        });
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
+        // Display real database/server error — NEVER show fake success
         setErrors((prev) => ({
           ...prev,
-          general: result.error || 'Failed to submit application. Please try again.'
+          general: result.error || 'Failed to submit application. Please check your details and try again.'
         }));
       }
-    } catch (err: any) {
-      console.warn('[JobSeekerEnquiry] Submission error, using fallback:', err);
+    } catch (err: unknown) {
       setIsSubmitting(false);
-      const fallbackId = `ATG-DEMO-${Math.floor(100000 + Math.random() * 900000)}`;
-      setDemoId(fallbackId);
-      setIsSubmitted(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setErrors((prev) => ({
+        ...prev,
+        general: err instanceof Error ? err.message : 'An unexpected error occurred during submission. Please try again.'
+      }));
     }
   };
 
@@ -148,6 +174,7 @@ export const JobSeekerEnquiryPage: React.FC = () => {
       fullName: '',
       fatherName: '',
       mobileNumber: '',
+      email: '',
       address: '',
       desiredCompany: '',
       designation: '',
@@ -230,14 +257,36 @@ export const JobSeekerEnquiryPage: React.FC = () => {
             >
               {isSubmitted ? (
                 <SuccessState
-                  title="ENQUIRY RECEIVED."
-                  copy="Thank you for contacting A Tiger Global. Our team will review your details and get in touch with you regarding suitable opportunities."
-                  referenceLabel="Enquiry ID"
+                  title="ENQUIRY RECEIVED"
+                  copy="Thank you for contacting A Tiger Global. Our team will review your details and get in touch regarding suitable opportunities."
+                  referenceLabel="Application Number"
                   referenceId={demoId}
                   onReset={handleReset}
                 />
               ) : (
                 <form onSubmit={handleSubmit} noValidate>
+                  {errors.general && (
+                    <div
+                      style={{
+                        padding: '0.85rem 1rem',
+                        marginBottom: '1.5rem',
+                        backgroundColor: 'rgba(237, 166, 163, 0.15)',
+                        border: '1px solid #EDA6A3',
+                        borderRadius: '8px',
+                        color: '#EDA6A3',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                      role="alert"
+                    >
+                      <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                      <span>{errors.general}</span>
+                    </div>
+                  )}
+
                   {/* SECTION A — PERSONAL DETAILS */}
                   <FormSection
                     tag="SECTION A"
@@ -279,20 +328,41 @@ export const JobSeekerEnquiryPage: React.FC = () => {
                     </FormField>
                   </div>
 
-                  <FormField
-                    id="mobileNumber"
-                    label="MOBILE NUMBER"
-                    required
-                    error={errors.mobileNumber}
-                    hint="10-digit Indian mobile number for interview communication"
-                  >
-                    <PhoneInput
+                  <div className="form-grid-2">
+                    <FormField
                       id="mobileNumber"
-                      value={formData.mobileNumber}
-                      onChange={(val) => handleTextChange('mobileNumber', val)}
-                      hasError={Boolean(errors.mobileNumber)}
-                    />
-                  </FormField>
+                      label="MOBILE NUMBER"
+                      required
+                      error={errors.mobileNumber}
+                      hint="10-digit Indian mobile number for interview communication"
+                    >
+                      <PhoneInput
+                        id="mobileNumber"
+                        value={formData.mobileNumber}
+                        onChange={(val) => handleTextChange('mobileNumber', val)}
+                        hasError={Boolean(errors.mobileNumber)}
+                      />
+                    </FormField>
+
+                    <FormField
+                      id="email"
+                      label="EMAIL ADDRESS"
+                      required
+                      error={errors.email}
+                      hint="Required for candidate registration and official updates"
+                    >
+                      <TextInput
+                        id="email"
+                        name="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => handleTextChange('email', e.target.value)}
+                        placeholder="e.g. candidate@example.com"
+                        hasError={Boolean(errors.email)}
+                        autoComplete="email"
+                      />
+                    </FormField>
+                  </div>
 
                   <FormField
                     id="address"

@@ -387,7 +387,12 @@ export const AdminEmployerEnquiriesPage: React.FC = () => {
                       style={{ cursor: 'pointer' }}
                     >
                       <td style={{ fontWeight: 700, color: '#192A56' }}>
-                        {enq.company_name}
+                        <div>{enq.company_name}</div>
+                        {enq.enquiry_number && (
+                          <div style={{ fontSize: '0.7rem', color: '#64748B', fontFamily: 'monospace', fontWeight: 600 }}>
+                            {enq.enquiry_number}
+                          </div>
+                        )}
                       </td>
                       <td style={{ color: '#4A5568', fontSize: '0.825rem' }}>
                         {enq.email}
@@ -486,17 +491,34 @@ export const AdminEmployerEnquiriesPage: React.FC = () => {
               }}
             >
               <div>
-                <h2
-                  style={{
-                    fontFamily: 'Plus Jakarta Sans, sans-serif',
-                    fontSize: '1.25rem',
-                    fontWeight: 800,
-                    color: '#192A56',
-                    margin: '0 0 0.25rem 0'
-                  }}
-                >
-                  {selectedEnquiry.company_name}
-                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <h2
+                    style={{
+                      fontFamily: 'Plus Jakarta Sans, sans-serif',
+                      fontSize: '1.25rem',
+                      fontWeight: 800,
+                      color: '#192A56',
+                      margin: '0'
+                    }}
+                  >
+                    {selectedEnquiry.company_name}
+                  </h2>
+                  {selectedEnquiry.enquiry_number && (
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        backgroundColor: '#F7D794',
+                        color: '#192A56',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontFamily: 'monospace'
+                      }}
+                    >
+                      {selectedEnquiry.enquiry_number}
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: '0.8rem', color: '#64748B' }}>
                   Submitted on {new Date(selectedEnquiry.created_at).toLocaleDateString('en-IN', { dateStyle: 'long' })}
                 </div>
