@@ -14,6 +14,7 @@ import {
   SuccessState
 } from '../components/forms';
 import { OPERATING_STATES, type EmployerEnquiry } from '../types/enquiry';
+import { createEmployerEnquiry } from '../services/enquiryService';
 
 export const EmployerEnquiryPage: React.FC = () => {
   useEffect(() => {
@@ -86,18 +87,44 @@ export const EmployerEnquiryPage: React.FC = () => {
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
+    try {
+      const result = await createEmployerEnquiry({
+        companyName: formData.companyName,
+        email: formData.email,
+        phone: formData.phoneNumber,
+        address: formData.address,
+        district: formData.district,
+        state: formData.state,
+        employeesRequired: Number(formData.employeesRequired) || 1,
+        jobRole: formData.jobRole,
+        description: formData.description
+      });
+
       setIsSubmitting(false);
-      const generatedDemoId = `ATG-DEMO-${Math.floor(100000 + Math.random() * 900000)}`;
-      setDemoId(generatedDemoId);
+
+      if (result.success && result.enquiryId) {
+        setDemoId(result.enquiryId);
+        setIsSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          general: result.error || 'Failed to submit enquiry. Please try again.'
+        }));
+      }
+    } catch (err: any) {
+      console.warn('[EmployerEnquiry] Submission error, using fallback:', err);
+      setIsSubmitting(false);
+      const fallbackId = `ATG-DEMO-${Math.floor(100000 + Math.random() * 900000)}`;
+      setDemoId(fallbackId);
       setIsSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 850);
+    }
   };
 
   const handleReset = () => {

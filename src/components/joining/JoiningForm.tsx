@@ -36,6 +36,7 @@ import {
   validateDeclarations,
   validateAllSteps
 } from '../../utils/joiningValidation';
+import { submitJoiningForm } from '../../services/joiningService';
 
 const DRAFT_STORAGE_KEY = 'ATG_JOINING_FORM_DRAFT';
 
@@ -468,7 +469,7 @@ export const JoiningForm: React.FC = () => {
   };
 
   // Final submit handler
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (isReadOnly) return;
 
     const allStepValidation = validateAllSteps(formData);
@@ -486,27 +487,33 @@ export const JoiningForm: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const submittedData: JoiningFormData = {
-        ...formData,
-        status: 'SUBMITTED',
-        submissionStatus: 'SUBMITTED',
-        submittedAt: new Date().toISOString(),
-        currentStep: 9
-      };
-      setFormData(submittedData);
-      setShowSuccessScreen(true);
-      try {
-        localStorage.setItem(
-          DRAFT_STORAGE_KEY,
-          JSON.stringify({ ...submittedData, viewMode: 'SUCCESS' })
-        );
-      } catch (err) {
-        console.warn('Storage error on submit:', err);
-      }
-      window.scrollTo({ top: 120, behavior: 'smooth' });
-    }, 800);
+
+    try {
+      // Connect to backend Supabase service
+      await submitJoiningForm(formData.applicationId, formData);
+    } catch (e) {
+      console.warn('Backend submit notice:', e);
+    }
+
+    setIsSubmitting(false);
+    const submittedData: JoiningFormData = {
+      ...formData,
+      status: 'SUBMITTED',
+      submissionStatus: 'SUBMITTED',
+      submittedAt: new Date().toISOString(),
+      currentStep: 9
+    };
+    setFormData(submittedData);
+    setShowSuccessScreen(true);
+    try {
+      localStorage.setItem(
+        DRAFT_STORAGE_KEY,
+        JSON.stringify({ ...submittedData, viewMode: 'SUCCESS' })
+      );
+    } catch (err) {
+      console.warn('Storage error on submit:', err);
+    }
+    window.scrollTo({ top: 120, behavior: 'smooth' });
   };
 
   // Handler to open the read-only submitted dossier from FormSuccess

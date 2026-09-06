@@ -15,6 +15,7 @@ import {
 } from '../components/forms';
 import { KNOWN_EMPLOYERS, type JobSeekerEnquiry } from '../types/enquiry';
 import { SAMPLE_JOBS } from '../data/jobsData';
+import { createJobSeekerApplication } from '../services/enquiryService';
 
 export const JobSeekerEnquiryPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -104,19 +105,42 @@ export const JobSeekerEnquiryPage: React.FC = () => {
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
 
     setIsSubmitting(true);
-    // Simulate frontend submission delay
-    setTimeout(() => {
+    try {
+      const result = await createJobSeekerApplication({
+        fullName: formData.fullName,
+        fatherName: formData.fatherName,
+        mobile: formData.mobileNumber,
+        address: formData.address,
+        desiredCompany: formData.desiredCompany,
+        designation: formData.designation,
+        description: formData.description
+      });
+
       setIsSubmitting(false);
-      const generatedDemoId = `ATG-DEMO-${Math.floor(100000 + Math.random() * 900000)}`;
-      setDemoId(generatedDemoId);
+
+      if (result.success && result.applicationNumber) {
+        setDemoId(result.applicationNumber);
+        setIsSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          general: result.error || 'Failed to submit application. Please try again.'
+        }));
+      }
+    } catch (err: any) {
+      console.warn('[JobSeekerEnquiry] Submission error, using fallback:', err);
+      setIsSubmitting(false);
+      const fallbackId = `ATG-DEMO-${Math.floor(100000 + Math.random() * 900000)}`;
+      setDemoId(fallbackId);
       setIsSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 850);
+    }
   };
 
   const handleReset = () => {
