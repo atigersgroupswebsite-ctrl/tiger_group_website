@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, Download, Eye, FileText, ArrowRight } from 'lucide-react';
+import { CheckCircle, Download, Eye, FileText, ArrowRight, CreditCard } from 'lucide-react';
 import { Button } from '../common/Button';
 import type { JoiningFormData } from '../../types/joining';
 
@@ -168,6 +168,15 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
         }}
       >
         <Button
+          to="/joining/payment"
+          variant="primary"
+          size="md"
+          icon={<CreditCard size={16} />}
+        >
+          PROCEED TO REGISTRATION PAYMENT
+        </Button>
+
+        <Button
           type="button"
           variant="outline"
           size="md"
@@ -179,7 +188,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
 
         <Button
           type="button"
-          variant="primary"
+          variant="outline"
           size="md"
           icon={<Download size={16} />}
           onClick={handleDownloadSummary}

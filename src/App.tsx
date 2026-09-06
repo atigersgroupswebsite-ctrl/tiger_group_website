@@ -43,6 +43,7 @@ import { Employers } from './pages/Employers';
 import { Contact } from './pages/Contact';
 import { Joining } from './pages/Joining';
 import { JoiningAccessPage } from './pages/JoiningAccessPage';
+import { CandidatePaymentPage } from './pages/CandidatePaymentPage';
 import { Policy } from './pages/Policy';
 
 export const App: React.FC = () => {
@@ -63,6 +64,7 @@ export const App: React.FC = () => {
               <Route path="applications/:id" element={<AdminApplicationDetailPage />} />
               <Route path="applications/:id/documents" element={<AdminApplicationDetailPage defaultTab="documents" />} />
               <Route path="applications/:id/joining" element={<AdminApplicationDetailPage defaultTab="joining" />} />
+              <Route path="applications/:id/payment" element={<AdminApplicationDetailPage defaultTab="payment" />} />
               <Route path="employer-enquiries" element={<AdminEmployerEnquiriesPage />} />
               <Route path="employer-enquiries/:id" element={<AdminEmployerEnquiriesPage />} />
               <Route path="exports" element={<AdminExportsPage />} />
@@ -107,6 +109,7 @@ export const App: React.FC = () => {
             <Route path="/employers" element={<Employers />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/joining/access" element={<JoiningAccessPage />} />
+            <Route path="/joining/payment" element={<CandidatePaymentPage />} />
             <Route path="/joining" element={<Joining />} />
             <Route path="/policy" element={<Policy />} />
 

@@ -37,6 +37,7 @@ import {
 import { AdminStatusBadge } from '../../components/admin/AdminStatusBadge';
 import { JoiningReview } from '../../components/admin/JoiningReview';
 import { DocumentVerificationPanel } from '../../components/admin/DocumentVerificationPanel';
+import { AdminPaymentPanel } from '../../components/admin/AdminPaymentPanel';
 import {
   ArrowLeft,
   Lock,
@@ -93,6 +94,7 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
   const isSuperAdmin = profile?.role === 'SUPER_ADMIN';
   const canVerify = profile?.role === 'SUPER_ADMIN' || profile?.role === 'DOCUMENT_VERIFIER' || profile?.role === 'COORDINATOR';
   const canEditCompanyInfo = profile?.role === 'SUPER_ADMIN' || profile?.role === 'COORDINATOR';
+  const canManagePayments = isSuperAdmin || profile?.role === 'COORDINATOR' || profile?.role === 'ACCOUNTANT';
 
   // Active Tab state synced with URL
   const [activeTab, setActiveTab] = useState<ApplicationDetailTab>(() => {
@@ -1123,30 +1125,15 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
       )}
 
       {/* =========================================================================
-          TAB 4: PAYMENT (Stage 6 Placeholder Shell)
+          TAB 4: PAYMENT (Stage 6 Functional Gateway & Ledger)
           ========================================================================= */}
       {activeTab === 'payment' && (
-        <div className="admin-card" style={{ padding: '2.5rem 1.5rem', textAlign: 'center' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#EFF6FF', color: '#1D4ED8', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-            <CreditCard size={24} />
-          </div>
-          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', fontWeight: 800, color: '#192A56' }}>
-            Candidate Registration & Consultancy Fee Gateway
-          </h3>
-          <p style={{ margin: '0 auto 1.5rem auto', maxWidth: '550px', fontSize: '0.85rem', color: '#64748B', lineHeight: 1.5 }}>
-            Online payment collection via Razorpay will be configured in <strong>Stage 6</strong>.
-            Candidates will receive payment links and automated receipt generation once document verification is finalized.
-          </p>
-
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', borderRadius: '8px', backgroundColor: docStats.allRequiredVerified ? '#DCFCE7' : '#FEF3C7', color: docStats.allRequiredVerified ? '#166534' : '#92400E', fontSize: '0.825rem', fontWeight: 700 }}>
-            {docStats.allRequiredVerified ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-            <span>
-              {docStats.allRequiredVerified
-                ? 'Document verification complete • Application is ready for Payment Stage'
-                : 'Awaiting completion of document verification before fee collection'}
-            </span>
-          </div>
-        </div>
+        <AdminPaymentPanel
+          application={application}
+          payments={payments}
+          canManagePayments={canManagePayments}
+          onRefresh={loadApplicationData}
+        />
       )}
 
       {/* =========================================================================

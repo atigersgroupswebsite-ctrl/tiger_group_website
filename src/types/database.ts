@@ -19,10 +19,16 @@ export type ApplicationStatus =
   | 'INTERVIEW_SELECTED'
   | 'JOINING_ACCESS_GRANTED'
   | 'JOINING_SUBMITTED'
+  | 'DOCUMENT_VERIFIED'
+  | 'PAYMENT_PENDING'
+  | 'PAYMENT_SUCCESSFUL'
   | 'VERIFICATION_PENDING'
   | 'VERIFIED_ACTIVE'
   | 'REJECTED'
   | 'ARCHIVED';
+
+export type PaymentPurpose = 'REGISTRATION' | 'CONSULTANCY' | 'OTHER';
+
 
 export type EmployerEnquiryStatus =
   | 'NEW'
@@ -999,6 +1005,40 @@ export interface Database {
         Args: {
           p_doc_id: string;
           p_reason: string;
+        };
+        Returns: Json;
+      };
+      create_or_get_pending_payment: {
+        Args: {
+          p_app_id: string;
+          p_purpose: string;
+          p_amount: number;
+        };
+        Returns: Json;
+      };
+      complete_verified_payment: {
+        Args: {
+          p_payment_id: string;
+          p_gateway_order_id: string;
+          p_gateway_payment_id: string;
+          p_payment_method?: string;
+        };
+        Returns: Json;
+      };
+      mark_payment_failed: {
+        Args: {
+          p_payment_id: string;
+          p_reason?: string;
+        };
+        Returns: Json;
+      };
+      record_offline_payment: {
+        Args: {
+          p_app_id: string;
+          p_purpose: string;
+          p_amount: number;
+          p_received_by: string;
+          p_notes?: string;
         };
         Returns: Json;
       };

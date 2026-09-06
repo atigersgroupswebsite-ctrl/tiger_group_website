@@ -10,6 +10,7 @@ export const ADMIN_ROUTES = {
   applicationDetail: (id: string = ':id') => `/admin/applications/${id}`,
   applicationDocuments: (id: string = ':id') => `/admin/applications/${id}/documents`,
   applicationJoining: (id: string = ':id') => `/admin/applications/${id}/joining`,
+  applicationPayment: (id: string = ':id') => `/admin/applications/${id}?tab=payment`,
   employerEnquiries: '/admin/employer-enquiries',
   employerEnquiryDetail: (id: string = ':id') => `/admin/employer-enquiries/${id}`,
   exports: '/admin/exports',
