@@ -421,6 +421,24 @@ export const JoiningAccessPage: React.FC = () => {
                     </>
                   )}
                 </button>
+
+                <div style={{ textAlign: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #EAE8E4' }}>
+                  <Link
+                    to="/joining?preview=true"
+                    style={{
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      color: '#64748B',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem'
+                    }}
+                  >
+                    <span>Preview Joining Form (Review Mode)</span>
+                    <ArrowRight size={13} />
+                  </Link>
+                </div>
               </form>
             </div>
           )}

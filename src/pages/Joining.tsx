@@ -27,6 +27,17 @@ export const Joining: React.FC = () => {
 
     const verifyCandidateAccess = async () => {
       try {
+        // Direct preview/demo mode for development and client review
+        const isPreview = searchParams.get('preview') === 'true' || searchParams.get('mode') === 'preview';
+        if (isPreview) {
+          if (isMounted) {
+            setAuthorizedAppId('PREVIEW-DEMO-APP');
+            setAuthorizedAppNumber('ATG-DEMO-2026');
+            setIsAuthorizing(false);
+          }
+          return;
+        }
+
         // 1. Verify active Supabase auth session
         const { data: { user }, error: authErr } = await supabase.auth.getUser();
         if (authErr || !user || !user.email) {

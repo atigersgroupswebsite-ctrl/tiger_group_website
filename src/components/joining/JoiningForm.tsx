@@ -123,7 +123,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
     let isMounted = true;
 
     const loadRemoteDossier = async () => {
-      if (!applicationId) {
+      if (!applicationId || applicationId.startsWith('PREVIEW')) {
         setIsLoadingDossier(false);
         return;
       }
@@ -252,7 +252,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
         JSON.stringify({ ...formData, currentStep })
       );
 
-      if (applicationId) {
+      if (applicationId && !applicationId.startsWith('PREVIEW')) {
         const res = await saveJoiningDraft(applicationId, { ...formData, currentStep });
         if (!res.success) {
           throw new Error(res.error || 'Failed to save draft to database.');
@@ -607,7 +607,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
     try {
       let finalSubmittedAt = new Date().toISOString();
 
-      if (applicationId) {
+      if (applicationId && !applicationId.startsWith('PREVIEW')) {
         const res = await submitJoiningForm(applicationId, formData);
         if (!res.success || !res.data) {
           alert(res.error || 'Submission failed. Please check all fields and try again.');
