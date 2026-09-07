@@ -792,3 +792,409 @@
   border-bottom: none;
 }
 
+/* ==========================================================================
+   JoiningFormPrintPreview Master Document Layout
+   ========================================================================== */
+.joining-form-print-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  width: 100%;
+}
+
+.pdf-page-sheet {
+  background: #FFFFFF;
+  border: 1.5px solid #0F1B38;
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(15, 27, 56, 0.08);
+  padding: 2.25rem 2rem;
+  color: #0F172A;
+  box-sizing: border-box;
+}
+
+.pdf-header-box {
+  text-align: center;
+  border-bottom: 2px solid #0F1B38;
+  padding-bottom: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.pdf-brand-title {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #0F1B38;
+  margin: 0 0 0.25rem 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pdf-brand-address,
+.pdf-brand-contact {
+  font-size: 0.72rem;
+  color: #475569;
+  margin: 0 0 0.2rem 0;
+  font-weight: 600;
+}
+
+.pdf-form-badge {
+  display: inline-block;
+  background-color: #0F1B38;
+  color: #FFFFFF;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.25rem 0.85rem;
+  margin-top: 0.4rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 2px;
+}
+
+.pdf-subpage-header {
+  border-bottom: 2px solid #0F1B38;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.pdf-subpage-brand {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #8C7B65;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pdf-subpage-title {
+  font-size: 1rem;
+  font-weight: 900;
+  color: #0F1B38;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pdf-edit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.pdf-page-indicator {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #0F1B38;
+  letter-spacing: 0.05em;
+}
+
+.pdf-btn-edit {
+  background: #FFFFFF;
+  border: 1px solid #0F1B38;
+  color: #0F1B38;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pdf-btn-edit:hover {
+  background: #0F1B38;
+  color: #FFFFFF;
+}
+
+.pdf-section-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #0F1B38;
+  background: #F8FAFC;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #E2E8F0;
+  border-left: 3px solid #0F1B38;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pdf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  margin-bottom: 1rem;
+}
+
+.pdf-table th,
+.pdf-table td {
+  border: 1px solid #CBD5E1;
+  padding: 0.45rem 0.65rem;
+  vertical-align: middle;
+}
+
+.pdf-table th {
+  background: #F1F5F9;
+  color: #0F1B38;
+  font-weight: 800;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.pdf-label {
+  background: #F8FAFC;
+  color: #475569;
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.pdf-val {
+  color: #0F172A;
+}
+
+.pdf-bold {
+  font-weight: 700;
+}
+
+.pdf-mono {
+  font-family: monospace;
+}
+
+.pdf-checklist-table th {
+  background: #0F1B38;
+  color: #FFFFFF;
+}
+
+.pdf-status-cell {
+  font-weight: 700;
+  font-size: 0.72rem;
+  color: #166534;
+}
+
+.pdf-verification-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.pdf-sign-box,
+.pdf-hr-sign-box {
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-sign-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 0.25rem;
+}
+
+.pdf-sig-preview-frame {
+  height: 65px;
+  border: 1px dashed #64748B;
+  background: #F8FAFC;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pdf-rendered-signature {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.pdf-sign-placeholder {
+  font-size: 0.7rem;
+  color: #94A3B8;
+  font-style: italic;
+}
+
+.pdf-sign-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0F172A;
+  margin-top: 0.3rem;
+}
+
+/* ID Card format */
+.pdf-idcard-card {
+  border: 2px solid #0F1B38;
+  border-radius: 6px;
+  max-width: 480px;
+  margin: 1.5rem auto;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.pdf-idcard-header {
+  background: #0F1B38;
+  color: #FFFFFF;
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+}
+
+.pdf-idcard-brand-top {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: #E2E8F0;
+  font-weight: 700;
+}
+
+.pdf-idcard-company {
+  font-size: 0.85rem;
+  font-weight: 900;
+  margin: 0.2rem 0;
+  letter-spacing: 0.04em;
+}
+
+.pdf-idcard-badge {
+  display: inline-block;
+  background: #C5A880;
+  color: #0F1B38;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.15rem 0.5rem;
+  border-radius: 2px;
+  letter-spacing: 0.06em;
+}
+
+.pdf-idcard-body {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: #FFFFFF;
+}
+
+.pdf-idcard-photo-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pdf-idcard-photo-frame {
+  width: 95px;
+  height: 115px;
+  border: 1.5px solid #0F1B38;
+  background: #F8FAFC;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pdf-rendered-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pdf-photo-placeholder {
+  font-size: 0.6rem;
+  text-align: center;
+  color: #94A3B8;
+  padding: 0.25rem;
+}
+
+.pdf-blood-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  background: #FEF2F2;
+  color: #991B1B;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid #FECACA;
+  border-radius: 2px;
+}
+
+.pdf-idcard-info-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pdf-id-row {
+  display: flex;
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.pdf-id-label {
+  font-weight: 700;
+  color: #475569;
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.pdf-id-val {
+  color: #0F172A;
+}
+
+.pdf-idcard-signatures {
+  display: flex;
+  justify-content: space-around;
+  padding: 0.75rem;
+  background: #F8FAFC;
+  border-top: 1px solid #CBD5E1;
+}
+
+.pdf-id-sign-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.pdf-id-sig-frame {
+  width: 120px;
+  height: 45px;
+  border: 1px dashed #94A3B8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #FFFFFF;
+}
+
+.pdf-id-sign-tag {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #475569;
+}
+
+.pdf-legal-prose {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: #1E293B;
+}
+
+.pdf-legal-prose p {
+  margin: 0 0 0.75rem 0;
+}
+
+.pdf-legal-prose ul {
+  margin: 0 0 0.75rem 0;
+  padding-left: 1.25rem;
+}
+
+.pdf-legal-prose li {
+  margin-bottom: 0.35rem;
+}
+
+.pdf-report-proclamation {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+

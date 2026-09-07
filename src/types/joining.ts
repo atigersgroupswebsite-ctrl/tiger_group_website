@@ -41,6 +41,9 @@ export interface AddressDetails {
   state: string;
   country: string;
   pinCode: string;
+  flatHouseRoad?: string;
+  villageOrCity?: string;
+  taluka?: string;
 }
 
 export interface EmergencyContact {
@@ -107,9 +110,29 @@ export interface UploadedDocument {
 }
 
 export interface DeclarationsInfo {
+  // Baseline Undertakings
   candidateDeclarationAcknowledged: boolean;
   rulesAndConductAccepted: boolean;
   backgroundVerificationConsent: boolean;
+
+  // Page 7: Self Declaration (Relieving & Dual Employment)
+  selfDeclarationAcknowledged: boolean;
+  previousEmployerName?: string;
+  previousEmployerLastWorkingDay?: string;
+
+  // Page 8: Relative Employment Declaration
+  relativeDeclarationAcknowledged: boolean;
+  hasRelativeInOrganization: boolean;
+  relativeName?: string;
+  relativeDepartment?: string;
+  relativeDesignation?: string;
+  relativeRelationship?: string;
+
+  // Page 6: Women Worker Night Shift Consent (Female Candidates Only)
+  womenNightShiftConsent: boolean;
+  womenNightShiftPlace?: string;
+
+  // Signatory
   signatoryName: string;
   declarationDate: string;
 }

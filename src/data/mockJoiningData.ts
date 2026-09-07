@@ -157,7 +157,7 @@ export const INITIAL_JOINING_FORM_DATA: JoiningFormData = {
       title: 'Highest Qualification Marksheet / Certificate',
       type: 'EDUCATION_CERTIFICATE',
       side: 'SINGLE',
-      required: true
+      required: false
     },
     ADDRESS_PROOF: {
       category: 'ADDRESS_PROOF',
@@ -185,6 +185,17 @@ export const INITIAL_JOINING_FORM_DATA: JoiningFormData = {
     candidateDeclarationAcknowledged: false,
     rulesAndConductAccepted: false,
     backgroundVerificationConsent: false,
+    selfDeclarationAcknowledged: false,
+    previousEmployerName: '',
+    previousEmployerLastWorkingDay: '',
+    relativeDeclarationAcknowledged: false,
+    hasRelativeInOrganization: false,
+    relativeName: '',
+    relativeDepartment: '',
+    relativeDesignation: '',
+    relativeRelationship: '',
+    womenNightShiftConsent: false,
+    womenNightShiftPlace: 'Nagpur',
     signatoryName: '',
     declarationDate: new Date().toISOString().split('T')[0]
   },

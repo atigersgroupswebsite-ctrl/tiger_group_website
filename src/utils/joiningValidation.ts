@@ -290,37 +290,48 @@ export const validateBank = (bank: JoiningFormData['bank']): StepValidationResul
   };
 };
 
-// Validate Step 05: Education Details
+// Validate Step 05: Education Details (OPTIONAL as per client business requirements)
 export const validateEducation = (records: JoiningFormData['education']): StepValidationResult => {
   const errors: Record<string, string> = {};
   const missingFields: string[] = [];
 
+  // Education is completely optional. If no records are provided, validation passes.
   if (!records || records.length === 0) {
-    errors.education = 'Please add at least one qualification record';
-    missingFields.push('At least one qualification');
-  } else {
-    records.forEach((rec, idx) => {
-      if (!rec.qualification.trim()) {
-        errors[`edu_${rec.id}_qualification`] = `Row #${idx + 1}: Qualification is required`;
-        missingFields.push(`Row #${idx + 1} Qualification`);
-      }
-      if (!rec.boardOrUniversity.trim()) {
-        errors[`edu_${rec.id}_board`] = `Row #${idx + 1}: Board / University is required`;
-        missingFields.push(`Row #${idx + 1} Board/University`);
-      }
-      if (!rec.yearOfPassing.trim()) {
-        errors[`edu_${rec.id}_year`] = `Row #${idx + 1}: Year of Passing is required`;
-        missingFields.push(`Row #${idx + 1} Year of Passing`);
-      } else if (!/^\d{4}$/.test(rec.yearOfPassing.trim())) {
-        errors[`edu_${rec.id}_year`] = `Row #${idx + 1}: Year must be a 4-digit number`;
-        missingFields.push(`Row #${idx + 1} Valid 4-digit Year`);
-      }
-      if (!rec.percentageOrGrade.trim()) {
-        errors[`edu_${rec.id}_percentage`] = `Row #${idx + 1}: Percentage or Grade is required`;
-        missingFields.push(`Row #${idx + 1} Percentage/Grade`);
-      }
-    });
+    return { isValid: true, errors: {}, missingFields: [] };
   }
+
+  // If candidate partially fills a record, validate the entered record
+  records.forEach((rec, idx) => {
+    const hasAnyContent = Boolean(
+      rec.qualification?.trim() ||
+      rec.boardOrUniversity?.trim() ||
+      rec.yearOfPassing?.trim() ||
+      rec.percentageOrGrade?.trim()
+    );
+
+    // If row has no content at all, skip it (candidate chose not to provide it)
+    if (!hasAnyContent) return;
+
+    if (!rec.qualification?.trim()) {
+      errors[`edu_${rec.id}_qualification`] = `Row #${idx + 1}: Qualification is required`;
+      missingFields.push(`Row #${idx + 1} Qualification`);
+    }
+    if (!rec.boardOrUniversity?.trim()) {
+      errors[`edu_${rec.id}_board`] = `Row #${idx + 1}: Board / University is required`;
+      missingFields.push(`Row #${idx + 1} Board/University`);
+    }
+    if (!rec.yearOfPassing?.trim()) {
+      errors[`edu_${rec.id}_year`] = `Row #${idx + 1}: Year of Passing is required`;
+      missingFields.push(`Row #${idx + 1} Year of Passing`);
+    } else if (!/^\d{4}$/.test(rec.yearOfPassing.trim())) {
+      errors[`edu_${rec.id}_year`] = `Row #${idx + 1}: Year must be a 4-digit number`;
+      missingFields.push(`Row #${idx + 1} Valid 4-digit Year`);
+    }
+    if (!rec.percentageOrGrade?.trim()) {
+      errors[`edu_${rec.id}_percentage`] = `Row #${idx + 1}: Percentage or Grade is required`;
+      missingFields.push(`Row #${idx + 1} Percentage/Grade`);
+    }
+  });
 
   return {
     isValid: Object.keys(errors).length === 0,
@@ -398,10 +409,7 @@ export const validateDocuments = (docs: JoiningFormData['documents']): StepValid
     missingFields.push('Bank Passbook / Cheque');
   }
 
-  if (!docs.EDUCATION_CERTIFICATE?.file?.name) {
-    errors.EDUCATION_CERTIFICATE = 'Highest Qualification Marksheet / Certificate is required';
-    missingFields.push('Education Certificate');
-  }
+  // EDUCATION_CERTIFICATE is explicitly OPTIONAL per business requirements
 
   return {
     isValid: Object.keys(errors).length === 0,
@@ -431,6 +439,21 @@ export const validateDeclarations = (
   if (!decl.backgroundVerificationConsent) {
     errors.backgroundVerificationConsent = 'Consent for Aadhaar/KYC background verification is mandatory';
     missingFields.push('Background Verification Consent');
+  }
+
+  if (!decl.selfDeclarationAcknowledged) {
+    errors.selfDeclarationAcknowledged = 'You must acknowledge the Self Declaration regarding dual employment & relieving formalities (Page 07)';
+    missingFields.push('Self Declaration (Page 07)');
+  }
+
+  if (!decl.relativeDeclarationAcknowledged) {
+    errors.relativeDeclarationAcknowledged = 'You must acknowledge the Relative Employment Policy Declaration (Page 08)';
+    missingFields.push('Relative Declaration (Page 08)');
+  }
+
+  if (decl.hasRelativeInOrganization && !decl.relativeName?.trim()) {
+    errors.relativeName = 'Please enter relative name working in organization';
+    missingFields.push('Relative Name');
   }
 
   if (!decl.signatoryName.trim()) {

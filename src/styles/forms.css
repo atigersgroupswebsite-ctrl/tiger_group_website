@@ -440,7 +440,7 @@
   border: 1px solid rgba(25, 42, 86, 0.16);
   background-color: #FFFFFF;
   color: var(--color-midnight-navy);
-  font-size: 0.925rem;
+  font-size: 1rem;
   font-family: inherit;
   transition: all 0.2s ease;
   box-sizing: border-box;

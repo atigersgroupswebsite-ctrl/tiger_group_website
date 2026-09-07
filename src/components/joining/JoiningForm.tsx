@@ -487,7 +487,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
   };
 
   const handleRemoveEducation = (id: string) => {
-    if (isReadOnly || formData.education.length <= 1) return;
+    if (isReadOnly) return;
     setFormData((prev) => ({
       ...prev,
       education: prev.education.filter((r) => r.id !== id)
@@ -813,6 +813,13 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
               declarations={formData.declarations}
               signatureDataUrl={formData.documents.SIGNATURE?.file?.dataUrl}
               candidateName={formData.personal.employeeName}
+              candidateGender={formData.personal.gender}
+              candidateAddress={
+                formData.permanentAddress.city || formData.permanentAddress.address
+                  ? `${formData.permanentAddress.address || ''}, ${formData.permanentAddress.city || ''}, ${formData.permanentAddress.district || ''}`
+                  : ''
+              }
+              candidateDesignation={formData.employment.designation}
               onChange={handleDeclarationChange}
               errors={stepErrors}
               readOnly={isReadOnly}

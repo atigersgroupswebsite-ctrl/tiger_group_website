@@ -14,4 +14,5 @@ export interface RegistrationItem {
   legalScope: string;
   issueDate?: string;
   validityStatus?: string;
+  pages: string[];
 }

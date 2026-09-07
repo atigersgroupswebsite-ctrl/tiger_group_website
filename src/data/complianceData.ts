@@ -16,7 +16,12 @@ export const REGISTRATION_ITEMS: RegistrationItem[] = [
     jurisdiction: 'Nagpur, Maharashtra',
     legalScope: 'Identifies the consultancy and labour contractor nature of the establishment.',
     issueDate: 'On Record',
-    validityStatus: 'Active'
+    validityStatus: 'Active',
+    pages: [
+      '/assets/certificates/establishment-page-1.webp',
+      '/assets/certificates/establishment-page-2.webp',
+      '/assets/certificates/establishment-page-3.webp'
+    ]
   },
   {
     id: 'gst',
@@ -33,7 +38,12 @@ export const REGISTRATION_ITEMS: RegistrationItem[] = [
     jurisdiction: 'Maharashtra, India',
     legalScope: 'Identifies the registered trade name and principal place of business.',
     issueDate: 'On Record',
-    validityStatus: 'Active & Registered'
+    validityStatus: 'Active & Registered',
+    pages: [
+      '/assets/certificates/gst-page-1.webp',
+      '/assets/certificates/gst-page-2.webp',
+      '/assets/certificates/gst-page-3.webp'
+    ]
   },
   {
     id: 'epfo',
@@ -50,7 +60,11 @@ export const REGISTRATION_ITEMS: RegistrationItem[] = [
     jurisdiction: 'Ministry of Labour & Employment, Govt. of India',
     legalScope: 'Provides the PF establishment code for statutory employee provident fund coordination.',
     issueDate: 'On Record',
-    validityStatus: 'Active'
+    validityStatus: 'Active',
+    pages: [
+      '/assets/certificates/epfo-page-1.webp',
+      '/assets/certificates/epfo-page-2.webp'
+    ]
   },
   {
     id: 'esic',
@@ -67,7 +81,11 @@ export const REGISTRATION_ITEMS: RegistrationItem[] = [
     jurisdiction: 'Ministry of Labour & Employment, Govt. of India',
     legalScope: 'Provides the ESIC code for statutory employee social security and healthcare coverage.',
     issueDate: 'On Record',
-    validityStatus: 'Active'
+    validityStatus: 'Active',
+    pages: [
+      '/assets/certificates/esic-page-1.webp',
+      '/assets/certificates/esic-page-2.webp'
+    ]
   },
   {
     id: 'udyam',
@@ -84,7 +102,11 @@ export const REGISTRATION_ITEMS: RegistrationItem[] = [
     jurisdiction: 'Government of India',
     legalScope: 'Identifies the enterprise as Micro and lists employment-related activities.',
     issueDate: 'On Record',
-    validityStatus: 'Active'
+    validityStatus: 'Active',
+    pages: [
+      '/assets/certificates/udyam-page-1.webp',
+      '/assets/certificates/udyam-page-2.webp'
+    ]
   },
   {
     id: 'profession-tax',
@@ -101,6 +123,9 @@ export const REGISTRATION_ITEMS: RegistrationItem[] = [
     jurisdiction: 'Government of Maharashtra',
     legalScope: 'Records manpower providers / labour contractors as the registered business activity.',
     issueDate: 'On Record',
-    validityStatus: 'Active'
+    validityStatus: 'Active',
+    pages: [
+      '/assets/certificates/profession-tax-page-1.webp'
+    ]
   }
 ];

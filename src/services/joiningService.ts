@@ -375,6 +375,16 @@ export async function getJoiningForm(
         candidateDeclarationAcknowledged: declarationRow?.candidate_acceptance ?? false,
         backgroundVerificationConsent: declarationRow?.background_check_consent ?? false,
         rulesAndConductAccepted: declarationRow?.code_of_conduct_acceptance ?? false,
+        selfDeclarationAcknowledged: Boolean((declarationRow as any)?.self_declaration_acknowledged ?? false),
+        previousEmployerName: (declarationRow as any)?.previous_employer_name || '',
+        previousEmployerLastWorkingDay: (declarationRow as any)?.previous_employer_last_day || '',
+        relativeDeclarationAcknowledged: Boolean((declarationRow as any)?.relative_declaration_acknowledged ?? false),
+        hasRelativeInOrganization: Boolean((declarationRow as any)?.has_relative_in_org ?? false),
+        relativeName: (declarationRow as any)?.relative_name || '',
+        relativeDepartment: (declarationRow as any)?.relative_dept || '',
+        relativeRelationship: (declarationRow as any)?.relative_relation || '',
+        womenNightShiftConsent: Boolean((declarationRow as any)?.women_night_shift_consent ?? false),
+        womenNightShiftPlace: (declarationRow as any)?.women_night_shift_place || '',
         signatoryName: declarationRow?.signatory_name || formRecord.candidate_name || '',
         declarationDate: declarationRow?.declaration_date || new Date().toISOString().split('T')[0]
       }
