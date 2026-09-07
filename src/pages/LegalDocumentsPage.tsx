@@ -48,7 +48,7 @@ export const LegalDocumentsPage: React.FC = () => {
         <div className="legal-doc-info-bar">
           <div>
             <span style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.08em', color: 'var(--color-champagne-dark)', textTransform: 'uppercase' }}>
-              TIGER GROUPS
+              A Tiger Group's
             </span>
             <h2 className="legal-doc-brand-title" style={{ marginTop: '0.15rem' }}>
               A TIGER GLOBAL Career Solution & Consultancy

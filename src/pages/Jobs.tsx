@@ -55,7 +55,7 @@ export const Jobs: React.FC = () => {
               textTransform: 'uppercase',
               color: 'var(--color-midnight-navy)'
             }}>
-              <span>TIGER GROUPS</span>
+              <span>A Tiger Group's</span>
               <span style={{ color: 'var(--color-champagne-dark)' }}>→</span>
               <span style={{ color: 'var(--color-champagne-dark)' }}>CAREER SOLUTION & CONSULTANCY</span>
             </div>

@@ -28,7 +28,7 @@ export const ServicesOverview: React.FC = () => {
     <section className="section" id="business-verticals">
       <Container size="xl">
         <SectionHeading
-          eyebrow="TIGER GROUPS ECOSYSTEM"
+          eyebrow="A Tiger Group's ECOSYSTEM"
           title="BUSINESS VERTICALS"
           subtitle="Five specialized commercial ventures operating under the parent group across career solutions, industrial contracting, real estate, and lifestyle retail."
         />
