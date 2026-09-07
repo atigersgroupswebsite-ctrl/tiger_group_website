@@ -1,7 +1,12 @@
 // ==============================================================================
 // File: src/components/admin/AdminProtectedRoute.tsx
 // Description: Multi-tier Route Protection Guard for Admin Panel
-// Hierarchy: Check Supabase Auth -> Check admin_profiles -> Verify active === true
+// Hierarchy:
+//   1. Check if auth session is loading -> wait
+//   2. Check if session exists -> if not, redirect to /admin/login
+//   3. Check if admin profile is loading -> wait
+//   4. Check if active admin verified -> if not, show Access Denied
+//   5. Render protected admin routes
 // ==============================================================================
 
 import React from 'react';
@@ -11,11 +16,11 @@ import { Loader2, ShieldAlert, LogOut } from 'lucide-react';
 import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 
 export const AdminProtectedRoute: React.FC = () => {
-  const { user, profile, isAdmin, loading, signOut } = useAdminAuth();
+  const { user, profile, isAdmin, authLoading, profileLoading, signOut } = useAdminAuth();
   const location = useLocation();
 
-  // 1. Loading state while checking Supabase session & admin_profiles
-  if (loading) {
+  // 1. Loading state: wait while checking Supabase session
+  if (authLoading) {
     return (
       <div
         style={{
@@ -37,8 +42,8 @@ export const AdminProtectedRoute: React.FC = () => {
             marginBottom: '1rem'
           }}
         />
-        <p style={{ fontSize: '0.95rem', color: '#94A3B8', letterSpacing: '0.05em' }}>
-          VERIFYING ADMIN CREDENTIALS...
+        <p style={{ fontSize: '0.95rem', color: '#94A3B8', letterSpacing: '0.05em', fontWeight: 600 }}>
+          CHECKING SESSION...
         </p>
         <style>{`
           @keyframes spin {
@@ -55,7 +60,43 @@ export const AdminProtectedRoute: React.FC = () => {
     return <Navigate to={ADMIN_ROUTES.login} state={{ from: location }} replace />;
   }
 
-  // 3. If authenticated but not an authorized/active administrator -> DENY ACCESS
+  // 3. Loading state: session exists, wait while checking admin_profiles authorization
+  if (profileLoading) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#0B0F19',
+          color: '#E2E8F0',
+          fontFamily: 'Inter, system-ui, sans-serif'
+        }}
+      >
+        <Loader2
+          size={36}
+          style={{
+            color: '#F59E0B',
+            animation: 'spin 1s linear infinite',
+            marginBottom: '1rem'
+          }}
+        />
+        <p style={{ fontSize: '0.95rem', color: '#94A3B8', letterSpacing: '0.05em', fontWeight: 600 }}>
+          VERIFYING ADMIN PROFILE...
+        </p>
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  // 4. Session exists and profile check finished: if not an authorized, active admin -> DENY ACCESS
   if (!isAdmin) {
     return (
       <div
@@ -154,6 +195,6 @@ export const AdminProtectedRoute: React.FC = () => {
     );
   }
 
-  // 4. Authorized -> Render protected AdminLayout and child routes
+  // 5. Authorized -> Render protected AdminLayout and child routes
   return <Outlet />;
 };

@@ -9,11 +9,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, isSupabaseConfigured, supabaseDiagnostics } from '../../lib/supabaseClient';
 import {
   Lock,
   Mail,
   AlertCircle,
+  AlertTriangle,
   Eye,
   EyeOff,
   ShieldCheck,
@@ -26,7 +27,7 @@ import {
 type LoginMethod = 'PASSWORD' | 'EMAIL_OTP';
 
 export const AdminLoginPage: React.FC = () => {
-  const { signIn, isAdmin, loading: authLoading, error: authError } = useAdminAuth();
+  const { signIn, isAdmin, authLoading, profileLoading, error: authError } = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -40,19 +41,29 @@ export const AdminLoginPage: React.FC = () => {
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState<boolean>(false);
 
-  // If already authenticated and active admin, redirect immediately
+  // If already authenticated and active admin, redirect immediately (safe from login loops)
   useEffect(() => {
-    if (!authLoading && isAdmin) {
-      const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/admin';
-      navigate(from, { replace: true });
+    if (!authLoading && !profileLoading && isAdmin) {
+      const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
+      const destination = (!from || from === '/admin/login') ? '/admin' : from;
+      navigate(destination, { replace: true });
     }
-  }, [isAdmin, authLoading, navigate, location.state]);
+  }, [isAdmin, authLoading, profileLoading, navigate, location.state]);
 
   // Handle password submit
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
     setSuccessNotice(null);
+
+    if (!isSupabaseConfigured) {
+      setLocalError(
+        'Supabase production environment variables are missing from this build. ' +
+        'Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY) ' +
+        'are configured in your Vercel Project Settings, then redeploy.'
+      );
+      return;
+    }
 
     if (!email.trim() || !password) {
       setLocalError('Please enter both email and password.');
@@ -64,8 +75,9 @@ export const AdminLoginPage: React.FC = () => {
     try {
       const res = await signIn(email.trim().toLowerCase(), password);
       if (res.success) {
-        const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/admin';
-        navigate(from, { replace: true });
+        const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
+        const destination = (!from || from === '/admin/login') ? '/admin' : from;
+        navigate(destination, { replace: true });
       } else {
         setLocalError(res.error || 'Authentication failed. Please verify your email and password.');
       }
@@ -297,6 +309,33 @@ export const AdminLoginPage: React.FC = () => {
             Email OTP / Link
           </button>
         </div>
+
+        {/* Supabase Environment Missing Warning */}
+        {!isSupabaseConfigured && (
+          <div
+            style={{
+              backgroundColor: '#FEF3C7',
+              border: '1px solid #F59E0B',
+              borderRadius: '8px',
+              padding: '0.85rem 1rem',
+              marginBottom: '1.25rem',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.75rem'
+            }}
+          >
+            <AlertTriangle size={20} color="#B45309" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <div style={{ fontSize: '0.825rem', fontWeight: 800, color: '#92400E', marginBottom: '0.2rem' }}>
+                Vercel Configuration Required
+              </div>
+              <p style={{ fontSize: '0.78rem', color: '#78350F', margin: 0, lineHeight: 1.45 }}>
+                Supabase client environment variables are not detected in this build.
+                In your Vercel Project Settings &rarr; Environment Variables, add <strong>VITE_SUPABASE_URL</strong> and <strong>VITE_SUPABASE_ANON_KEY</strong> (or <strong>VITE_SUPABASE_PUBLISHABLE_KEY</strong>), then redeploy.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Error Alert Box */}
         {(localError || authError) && (
@@ -725,6 +764,32 @@ export const AdminLoginPage: React.FC = () => {
             >
               shoaibsheikh2312@gmail.com
             </button>
+          </div>
+        </div>
+
+        {/* Safe Diagnostic Status Indicator (No secrets exposed) */}
+        <div
+          style={{
+            marginTop: '1.25rem',
+            padding: '0.65rem 0.85rem',
+            backgroundColor: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '8px',
+            fontSize: '0.72rem',
+            color: '#64748B'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <span>Supabase Target:</span>
+            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0F1B38' }}>
+              {supabaseDiagnostics.urlHost}
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Client Credentials:</span>
+            <span style={{ fontWeight: 700, color: isSupabaseConfigured ? '#16A34A' : '#DC2626' }}>
+              {isSupabaseConfigured ? `Configured (${supabaseDiagnostics.configuredKeyVariable})` : 'MISSING IN BUILD'}
+            </span>
           </div>
         </div>
 
