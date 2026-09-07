@@ -192,13 +192,12 @@ export const INITIAL_JOINING_FORM_DATA: JoiningFormData = {
 };
 
 export const JOINING_STEPS = [
-  { step: 1, id: 'employment', label: 'Employment', shortLabel: '01 Employment' },
-  { step: 2, id: 'personal', label: 'Personal Information', shortLabel: '02 Personal' },
-  { step: 3, id: 'address', label: 'Address & Emergency', shortLabel: '03 Address & Emergency' },
-  { step: 4, id: 'bank', label: 'Bank Details', shortLabel: '04 Bank' },
-  { step: 5, id: 'education', label: 'Education Details', shortLabel: '05 Education' },
-  { step: 6, id: 'family', label: 'Family Details', shortLabel: '06 Family' },
-  { step: 7, id: 'documents', label: 'Documents & Photos', shortLabel: '07 Documents' },
-  { step: 8, id: 'declarations', label: 'Declarations & Consent', shortLabel: '08 Declarations' },
-  { step: 9, id: 'review', label: 'Review & Submit', shortLabel: '09 Review' }
+  { step: 1, id: 'personal', label: 'Personal Information', shortLabel: '01 Personal' },
+  { step: 2, id: 'address', label: 'Address & Emergency', shortLabel: '02 Address & Emergency' },
+  { step: 3, id: 'bank', label: 'Bank Details', shortLabel: '03 Bank' },
+  { step: 4, id: 'education', label: 'Education Details', shortLabel: '04 Education' },
+  { step: 5, id: 'family', label: 'Family Details', shortLabel: '05 Family' },
+  { step: 6, id: 'documents', label: 'Documents & Photos', shortLabel: '06 Documents' },
+  { step: 7, id: 'declarations', label: 'Declarations & Consent', shortLabel: '07 Declarations' },
+  { step: 8, id: 'review', label: 'Review & Submit', shortLabel: '08 Review' }
 ];

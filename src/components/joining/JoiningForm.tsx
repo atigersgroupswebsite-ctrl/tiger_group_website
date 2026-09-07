@@ -4,7 +4,6 @@ import { FormProgress } from './FormProgress';
 import { FormNavigation } from './FormNavigation';
 import { FormError } from './FormError';
 import { FormSuccess } from './FormSuccess';
-import { EmploymentSection } from './EmploymentSection';
 import { PersonalSection } from './PersonalSection';
 import { AddressSection } from './AddressSection';
 import { BankSection } from './BankSection';
@@ -27,7 +26,6 @@ import type {
   DeclarationsInfo
 } from '../../types/joining';
 import {
-  validateEmployment,
   validatePersonal,
   validateAddress,
   validateBank,
@@ -105,29 +103,24 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
 
   const [currentStep, setCurrentStep] = useState<number>(() => {
     if (isSubmitted) {
-      return formData.currentStep || 9;
+      return formData.currentStep || 8;
     }
     return formData.currentStep || 1;
   });
 
   const [completedSteps, setCompletedSteps] = useState<number[]>(
-    isSubmitted ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : [1]
+    isSubmitted ? [1, 2, 3, 4, 5, 6, 7, 8] : [1]
   );
   const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [confirmationChecked, setConfirmationChecked] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Load from Supabase on mount / when applicationId changes
+  // Load from Supabase on mount
   useEffect(() => {
     let isMounted = true;
 
     const loadRemoteDossier = async () => {
-      if (!applicationId || applicationId.startsWith('PREVIEW')) {
-        setIsLoadingDossier(false);
-        return;
-      }
-
       setIsLoadingDossier(true);
       setLoadError(null);
 
@@ -146,8 +139,8 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
 
         if (isDbSubmitted) {
           setFormData(dbData);
-          setCurrentStep(dbData.currentStep || 9);
-          setCompletedSteps([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+          setCurrentStep(8);
+          setCompletedSteps([1, 2, 3, 4, 5, 6, 7, 8]);
           setIsLoadingDossier(false);
           return;
         }
@@ -280,12 +273,9 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
 
     switch (step) {
       case 1:
-        result = validateEmployment();
-        break;
-      case 2:
         result = validatePersonal(formData.personal);
         break;
-      case 3:
+      case 2:
         result = validateAddress(
           formData.permanentAddress,
           formData.currentAddress,
@@ -293,25 +283,25 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
           formData.emergencyContacts
         );
         break;
-      case 4:
+      case 3:
         result = validateBank(formData.bank);
         break;
-      case 5:
+      case 4:
         result = validateEducation(formData.education);
         break;
-      case 6:
+      case 5:
         result = validateFamily(formData.family);
         break;
-      case 7:
+      case 6:
         result = validateDocuments(formData.documents);
         break;
-      case 8:
+      case 7:
         result = validateDeclarations(
           formData.declarations,
           !!formData.documents.SIGNATURE?.file?.dataUrl
         );
         break;
-      case 9:
+      case 8:
         result = { isValid: true, errors: {} };
         break;
       default:
@@ -324,7 +314,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
 
   const handleNext = () => {
     if (isReadOnly) {
-      if (currentStep < 9) {
+      if (currentStep < 8) {
         const nextStep = currentStep + 1;
         setCurrentStep(nextStep);
         window.scrollTo({ top: 120, behavior: 'smooth' });
@@ -343,7 +333,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
       setCompletedSteps((prev) => [...prev, currentStep]);
     }
 
-    if (currentStep < 9) {
+    if (currentStep < 8) {
       const nextStep = currentStep + 1;
       setCurrentStep(nextStep);
       setFormData((prev) => ({ ...prev, currentStep: nextStep }));
@@ -593,7 +583,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
 
     if (hasAnyError) {
       alert('Please complete all mandatory fields in the form before submitting.');
-      setCurrentStep(9);
+      setCurrentStep(8);
       return;
     }
 
@@ -606,15 +596,17 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
 
     try {
       let finalSubmittedAt = new Date().toISOString();
+      let generatedJoiningRef = formData.joiningReference;
 
-      if (applicationId && !applicationId.startsWith('PREVIEW')) {
-        const res = await submitJoiningForm(applicationId, formData);
-        if (!res.success || !res.data) {
-          alert(res.error || 'Submission failed. Please check all fields and try again.');
-          setIsSubmitting(false);
-          return;
-        }
-        finalSubmittedAt = res.data.submittedAt;
+      const res = await submitJoiningForm(formData.formId || applicationId, formData);
+      if (!res.success || !res.data) {
+        alert(res.error || 'Submission failed. Please check all fields and try again.');
+        setIsSubmitting(false);
+        return;
+      }
+      finalSubmittedAt = res.data.submittedAt;
+      if (res.data.joiningReference) {
+        generatedJoiningRef = res.data.joiningReference;
       }
 
       const submittedData: JoiningFormData = {
@@ -622,7 +614,8 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
         status: 'SUBMITTED',
         submissionStatus: 'SUBMITTED',
         submittedAt: finalSubmittedAt,
-        currentStep: 9
+        joiningReference: generatedJoiningRef,
+        currentStep: 8
       };
       setFormData(submittedData);
       setShowSuccessScreen(true);
@@ -645,7 +638,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
   // Handler to open the read-only submitted dossier from FormSuccess
   const handleViewSubmission = () => {
     setShowSuccessScreen(false);
-    setCurrentStep(9);
+    setCurrentStep(8);
     try {
       localStorage.setItem(
         DRAFT_STORAGE_KEY,
@@ -654,7 +647,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
           status: 'SUBMITTED',
           submissionStatus: 'SUBMITTED',
           viewMode: 'REVIEW',
-          currentStep: 9
+          currentStep: 8
         })
       );
     } catch (e) {
@@ -674,7 +667,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
           status: 'SUBMITTED',
           submissionStatus: 'SUBMITTED',
           viewMode: 'SUCCESS',
-          currentStep: 9
+          currentStep: 8
         })
       );
     } catch (e) {
@@ -728,7 +721,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
       {/* Step Progress Bar & Sidebar */}
       <FormProgress
         currentStep={currentStep}
-        applicationId={applicationNumber || formData.applicationId}
+        applicationId={formData.joiningReference || applicationNumber || formData.applicationId || 'Active Session'}
         onSelectStep={handleSelectStep}
         completedSteps={completedSteps}
       />
@@ -743,13 +736,8 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
             />
           )}
 
-          {/* STEP 01 — EMPLOYMENT */}
+          {/* STEP 01 — PERSONAL */}
           {currentStep === 1 && (
-            <EmploymentSection employment={formData.employment} />
-          )}
-
-          {/* STEP 02 — PERSONAL */}
-          {currentStep === 2 && (
             <PersonalSection
               data={formData.personal}
               onChange={handlePersonalChange}
@@ -758,8 +746,8 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
             />
           )}
 
-          {/* STEP 03 — ADDRESS & EMERGENCY */}
-          {currentStep === 3 && (
+          {/* STEP 02 — ADDRESS & EMERGENCY */}
+          {currentStep === 2 && (
             <AddressSection
               permanentAddress={formData.permanentAddress}
               currentAddress={formData.currentAddress}
@@ -776,8 +764,8 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
             />
           )}
 
-          {/* STEP 04 — BANK */}
-          {currentStep === 4 && (
+          {/* STEP 03 — BANK */}
+          {currentStep === 3 && (
             <BankSection
               data={formData.bank}
               onChange={handleBankChange}
@@ -786,8 +774,8 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
             />
           )}
 
-          {/* STEP 05 — EDUCATION */}
-          {currentStep === 5 && (
+          {/* STEP 04 — EDUCATION */}
+          {currentStep === 4 && (
             <EducationTable
               records={formData.education}
               onAdd={handleAddEducation}
@@ -797,8 +785,8 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
             />
           )}
 
-          {/* STEP 06 — FAMILY */}
-          {currentStep === 6 && (
+          {/* STEP 05 — FAMILY */}
+          {currentStep === 5 && (
             <FamilyTable
               records={formData.family}
               onAdd={handleAddFamily}
@@ -808,10 +796,10 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
             />
           )}
 
-          {/* STEP 07 — DOCUMENTS */}
-          {currentStep === 7 && (
+          {/* STEP 06 — DOCUMENTS */}
+          {currentStep === 6 && (
             <DocumentUploader
-              applicationId={applicationId}
+              applicationId={formData.formId || applicationId}
               documents={formData.documents}
               onDocumentChange={handleDocumentChange}
               errors={stepErrors}
@@ -819,8 +807,8 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
             />
           )}
 
-          {/* STEP 08 — DECLARATIONS */}
-          {currentStep === 8 && (
+          {/* STEP 07 — DECLARATIONS */}
+          {currentStep === 7 && (
             <DeclarationSection
               declarations={formData.declarations}
               signatureDataUrl={formData.documents.SIGNATURE?.file?.dataUrl}
@@ -831,8 +819,8 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
             />
           )}
 
-          {/* STEP 09 — REVIEW */}
-          {currentStep === 9 && (
+          {/* STEP 08 — REVIEW */}
+          {currentStep === 8 && (
             <ReviewSection
               formData={formData}
               stepValidation={allStepValidation}
@@ -845,8 +833,8 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
             />
           )}
 
-          {/* Form Navigation Controls (Steps 1-8) */}
-          {currentStep < 9 && (
+          {/* Form Navigation Controls (Steps 1-7) */}
+          {currentStep < 8 && (
             <FormNavigation
               currentStep={currentStep}
               totalSteps={JOINING_STEPS.length}

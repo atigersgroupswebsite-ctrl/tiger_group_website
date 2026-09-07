@@ -22,6 +22,7 @@ import {
   Activity,
   Settings,
   ExternalLink,
+  ShieldCheck,
   X
 } from 'lucide-react';
 import { ADMIN_ROUTES } from '../../constants/adminRoutes';
@@ -41,14 +42,15 @@ interface NavItemDef {
 const CORE_NAV_ITEMS: NavItemDef[] = [
   { name: 'Dashboard', path: ADMIN_ROUTES.dashboard, icon: LayoutDashboard },
   { name: 'Applications', path: ADMIN_ROUTES.applications, icon: Users },
+  { name: 'Joining Submissions', path: ADMIN_ROUTES.joining, icon: FileCheck2 },
   { name: 'Employer Enquiries', path: ADMIN_ROUTES.employerEnquiries, icon: Building2 },
+  { name: 'Admin Directory', path: ADMIN_ROUTES.adminUsers, icon: ShieldCheck },
   { name: 'Exports', path: ADMIN_ROUTES.exports, icon: Download }
 ];
 
 const MANAGEMENT_SUITE_ITEMS: NavItemDef[] = [
   { name: 'Jobs', path: ADMIN_ROUTES.jobs, icon: Briefcase, isStage3: true },
   { name: 'Companies', path: ADMIN_ROUTES.companies, icon: Factory, isStage3: true },
-  { name: 'Joining', path: ADMIN_ROUTES.joining, icon: FileCheck2, isStage3: true },
   { name: 'Documents', path: ADMIN_ROUTES.documents, icon: FolderOpen, isStage3: true },
   { name: 'Payments', path: ADMIN_ROUTES.payments, icon: CreditCard, isStage3: true },
   { name: 'Reference Slips', path: ADMIN_ROUTES.referenceSlips, icon: FileText, isStage3: true },

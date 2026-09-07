@@ -1,114 +1,66 @@
 // ==============================================================================
 // File: src/pages/Joining.tsx
-// Description: Candidate Joining & Statutory Dossier Form
-// Security: Protected route requiring active Supabase candidate authentication
-//           AND application joining_access_enabled = true. Direct unverified
-//           visitors are automatically redirected to /joining/access.
+// Description: Candidate Joining Dossier Page
+// Security: Requires active authenticated Supabase candidate session (via Magic Link).
+//           Unauthenticated candidates are directed to /joining/access.
+//           Standalone candidate identity (no prior enquiry/application required).
 // ==============================================================================
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, FileCheck2, Loader2, LogOut } from 'lucide-react';
 import { Container } from '../components/common/Container';
 import { JoiningForm } from '../components/joining/JoiningForm';
 import { supabase } from '../lib/supabaseClient';
 
 export const Joining: React.FC = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const appIdParam = searchParams.get('appId');
 
   const [isAuthorizing, setIsAuthorizing] = useState<boolean>(true);
-  const [authorizedAppId, setAuthorizedAppId] = useState<string>('');
-  const [authorizedAppNumber, setAuthorizedAppNumber] = useState<string>('');
+  const [candidateEmail, setCandidateEmail] = useState<string>('');
 
   useEffect(() => {
     let isMounted = true;
 
-    const verifyCandidateAccess = async () => {
+    const verifyCandidateSession = async () => {
       try {
-        // Direct preview/demo mode for development and client review
-        const isPreview = searchParams.get('preview') === 'true' || searchParams.get('mode') === 'preview';
-        if (isPreview) {
-          if (isMounted) {
-            setAuthorizedAppId('PREVIEW-DEMO-APP');
-            setAuthorizedAppNumber('ATG-DEMO-2026');
-            setIsAuthorizing(false);
-          }
-          return;
-        }
-
-        // 1. Verify active Supabase auth session
+        // 1. Verify active Supabase candidate session
         const { data: { user }, error: authErr } = await supabase.auth.getUser();
+
         if (authErr || !user || !user.email) {
-          // In development mode, allow direct access so the form can be tested without OTP
-          if (import.meta.env.DEV) {
-            if (isMounted) {
-              setAuthorizedAppId('PREVIEW-DEMO-APP');
-              setAuthorizedAppNumber('ATG-DEMO-2026');
-              setIsAuthorizing(false);
-            }
-            return;
+          // Unauthenticated -> redirect to Magic Link access gateway
+          if (isMounted) {
+            navigate('/joining/access', { replace: true });
           }
-          // Unauthenticated in production -> redirect to access gateway
-          navigate('/joining/access', { replace: true });
-          return;
-        }
-
-        const candidateEmail = user.email.toLowerCase().trim();
-
-        // 2. Query application record for this candidate
-        let query = supabase
-          .from('applications')
-          .select('id, application_number, email, joining_access_enabled')
-          .eq('joining_access_enabled', true);
-
-        if (appIdParam) {
-          query = query.eq('id', appIdParam);
-        } else {
-          query = query.order('created_at', { ascending: false }).limit(1);
-        }
-
-        const { data: appData, error: appErr } = await query.maybeSingle();
-
-        if (appErr || !appData) {
-          // In development mode, fall back to test candidate if no application with access enabled exists
-          if (import.meta.env.DEV) {
-            if (isMounted) {
-              setAuthorizedAppId('PREVIEW-DEMO-APP');
-              setAuthorizedAppNumber('ATG-DEMO-2026');
-              setIsAuthorizing(false);
-            }
-            return;
-          }
-          // No authorized application or joining_access_enabled = false
-          navigate('/joining/access', { replace: true });
-          return;
-        }
-
-        // Additional identity and gate validation
-        if (appData.email.toLowerCase().trim() !== candidateEmail || !appData.joining_access_enabled) {
-          navigate('/joining/access', { replace: true });
           return;
         }
 
         if (isMounted) {
-          setAuthorizedAppId(appData.id);
-          setAuthorizedAppNumber(appData.application_number || 'ATG-APP-VERIFIED');
+          setCandidateEmail(user.email);
           setIsAuthorizing(false);
         }
       } catch (err) {
-        console.error('[Joining] Authorization check failed:', err);
-        navigate('/joining/access', { replace: true });
+        console.error('[Joining] Session verification error:', err);
+        if (isMounted) {
+          navigate('/joining/access', { replace: true });
+        }
       }
     };
 
-    verifyCandidateAccess();
+    verifyCandidateSession();
+
+    // Subscribe to auth state changes to detect session expiration
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session && isMounted) {
+        navigate('/joining/access', { replace: true });
+      }
+    });
 
     return () => {
       isMounted = false;
+      subscription.unsubscribe();
     };
-  }, [appIdParam, navigate]);
+  }, [navigate]);
 
   const handleSignOut = async () => {
     try {
@@ -126,10 +78,10 @@ export const Joining: React.FC = () => {
           <div style={{ padding: '4rem 1rem' }}>
             <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-midnight-navy)', margin: '0 auto 1.25rem auto' }} />
             <h2 style={{ color: 'var(--color-midnight-navy)', fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-              VERIFYING CANDIDATE AUTHORIZATION
+              VERIFYING CANDIDATE ACCESS
             </h2>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', margin: 0 }}>
-              Connecting to secure onboarding registry and loading your dossier...
+              Connecting to onboarding registry and loading your dossier...
             </p>
           </div>
         </Container>
@@ -167,7 +119,7 @@ export const Joining: React.FC = () => {
                   </span>
                 </div>
                 <h1 style={{ fontSize: 'clamp(1.75rem, 3vw, 2.35rem)', color: 'var(--color-midnight-navy)', margin: 0, fontWeight: 800, letterSpacing: '-0.01em' }}>
-                  CANDIDATE JOINING & STATUTORY PACKET
+                  CANDIDATE JOINING & REGISTRATION FORM
                 </h1>
               </div>
 
@@ -187,10 +139,10 @@ export const Joining: React.FC = () => {
                   <FileCheck2 size={16} style={{ color: 'var(--color-midnight-navy)' }} />
                   <div>
                     <div style={{ color: 'var(--color-text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Authorized Application ID
+                      Candidate Account
                     </div>
-                    <div style={{ fontWeight: 700, color: 'var(--color-midnight-navy)', fontFamily: 'monospace' }}>
-                      {authorizedAppNumber}
+                    <div style={{ fontWeight: 700, color: 'var(--color-midnight-navy)' }}>
+                      {candidateEmail}
                     </div>
                   </div>
                 </div>
@@ -198,7 +150,7 @@ export const Joining: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  title="Sign out of joining session"
+                  title="Sign out of candidate session"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -229,7 +181,7 @@ export const Joining: React.FC = () => {
             </div>
 
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: '0.5rem 0 0 0', maxWidth: '750px', lineHeight: 1.6 }}>
-              Welcome to A Tiger Global. Please fill in your personal, banking, educational, and statutory declaration records. All information is securely prepared for your official 14-page physical onboarding dossier.
+              Welcome to A Tiger Global. Please fill in your personal, address, banking, educational, and statutory declaration records. All information is securely prepared for your official onboarding record.
             </p>
           </div>
         </Container>
@@ -238,7 +190,7 @@ export const Joining: React.FC = () => {
       {/* Main Multi-Step Form Container */}
       <section style={{ marginTop: 'var(--space-6)' }}>
         <Container size="lg">
-          <JoiningForm applicationId={authorizedAppId} applicationNumber={authorizedAppNumber} />
+          <JoiningForm />
         </Container>
       </section>
     </div>

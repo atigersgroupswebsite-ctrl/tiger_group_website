@@ -34,6 +34,43 @@ export function paymentApiPlugin(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url || '';
 
+        // Handle privileged Admin Directory operations
+        if (url.startsWith('/api/admin/users')) {
+          const method = req.method?.toUpperCase();
+          const authHeader = req.headers['authorization'];
+          try {
+            const {
+              listAdminUsersHandler,
+              inviteAdminUserHandler,
+              toggleAdminStatusHandler
+            } = await import('./adminServer');
+
+            if (url === '/api/admin/users' && method === 'GET') {
+              const result = await listAdminUsersHandler(authHeader);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
+
+            if (url === '/api/admin/users/invite' && method === 'POST') {
+              const rawBody = await parseRequestBody(req);
+              const body = JSON.parse(rawBody || '{}');
+              const result = await inviteAdminUserHandler(body, authHeader);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
+
+            if (url === '/api/admin/users/toggle-status' && method === 'POST') {
+              const rawBody = await parseRequestBody(req);
+              const body = JSON.parse(rawBody || '{}');
+              const result = await toggleAdminStatusHandler(body, authHeader);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
+
+            return next();
+          } catch (adminErr: any) {
+            console.error('[API_ADMIN_ERROR]', adminErr);
+            return sendJsonResponse(res, 500, { success: false, error: adminErr.message || 'Admin operation failed' });
+          }
+        }
+
         if (!url.startsWith('/api/payments')) {
           return next();
         }

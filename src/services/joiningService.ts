@@ -1,13 +1,7 @@
 // ==============================================================================
 // File: src/services/joiningService.ts
-// Description: Candidate Joining Dossier Service Layer
+// Description: Candidate Joining Dossier Service Layer (Standalone & Application Compatible)
 // Brand: A TIGER GROUPS — Certified Recruitment & Manpower Solutions
-// Security:
-//   - Gated by Supabase passwordless auth and applications.joining_access_enabled
-//   - Sensitive PII (Aadhaar, PAN, Bank) is never logged
-//   - Admin-controlled fields are immutable to candidates
-//   - Atomic transactional persistence via save_joining_draft_bundle and submit_joining_form_bundle
-//   - Private Supabase Storage with signed preview URLs
 // ==============================================================================
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
@@ -17,7 +11,6 @@ import { INITIAL_JOINING_FORM_DATA } from '../data/mockJoiningData';
 import { validateAllSteps } from '../utils/joiningValidation';
 
 type ApplicationRow = Database['public']['Tables']['applications']['Row'];
-type JoiningFormRow = Database['public']['Tables']['joining_forms']['Row'];
 type EmergencyContactRow = Database['public']['Tables']['emergency_contacts']['Row'];
 type EducationRecordRow = Database['public']['Tables']['education_records']['Row'];
 type FamilyDetailRow = Database['public']['Tables']['family_details']['Row'];
@@ -33,8 +26,23 @@ export interface JoiningServiceResult<T = any> {
 }
 
 /**
- * Resolves the authorized application for the currently authenticated candidate.
- * Strictly verifies auth.jwt email matches application.email AND joining_access_enabled = true.
+ * Resolves the authenticated candidate's active session.
+ */
+export async function getCandidateSession(): Promise<{ authenticated: boolean; user?: any; email?: string; error?: string }> {
+  try {
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !user || !user.email) {
+      return { authenticated: false, error: authErr?.message || 'No active candidate session' };
+    }
+    return { authenticated: true, user, email: user.email.toLowerCase().trim() };
+  } catch (err: any) {
+    return { authenticated: false, error: err.message };
+  }
+}
+
+/**
+ * Backward compatibility: Resolves application if one exists for the email.
+ * Does not block if no application exists.
  */
 export async function getAuthorizedApplication(
   appIdParam?: string | null
@@ -54,20 +62,19 @@ export async function getAuthorizedApplication(
   }
 
   try {
-    const { data: { user }, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !user || !user.email) {
+    const sessionRes = await getCandidateSession();
+    if (!sessionRes.authenticated || !sessionRes.email) {
       return { success: false, accessDenied: true, error: 'Candidate session not found or expired.' };
     }
 
-    const candidateEmail = user.email.toLowerCase().trim();
+    const candidateEmail = sessionRes.email;
 
     let query = supabase
       .from('applications')
       .select('*')
-      .ilike('email', candidateEmail)
-      .eq('joining_access_enabled', true);
+      .ilike('email', candidateEmail);
 
-    if (appIdParam) {
+    if (appIdParam && appIdParam !== 'STANDALONE') {
       query = query.eq('id', appIdParam);
     } else {
       query = query.order('created_at', { ascending: false }).limit(1);
@@ -78,231 +85,248 @@ export async function getAuthorizedApplication(
     if (appErr || !appData) {
       return {
         success: false,
-        accessDenied: true,
-        error: 'No active application with joining access enabled was found for your account.'
+        notFound: true,
+        error: 'No application record found.'
       };
     }
 
-    const app = appData as ApplicationRow;
-    if (app.email.toLowerCase().trim() !== candidateEmail || !app.joining_access_enabled) {
-      return {
-        success: false,
-        accessDenied: true,
-        error: 'Security authorization check failed for this application.'
-      };
-    }
-
-    return { success: true, data: app };
+    return { success: true, data: appData as ApplicationRow };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Authorization check failed.' };
+    return { success: false, error: err.message || 'Application lookup error.' };
   }
 }
 
 /**
- * Retrieves the normalized Joining Form dossier for an authorized application.
- * Generates temporary signed URLs for private candidate documents.
+ * Retrieves or initializes the Joining Form dossier for the authenticated candidate.
+ * Operates standalone based on the authenticated Supabase user session.
  */
 export async function getJoiningForm(
-  applicationId: string
+  identifier?: string | null
 ): Promise<JoiningServiceResult<JoiningFormData>> {
-  if (!applicationId) {
-    return { success: false, error: 'Application ID is required.' };
-  }
-
   if (!isSupabaseConfigured) {
     return {
       success: true,
       data: {
         ...INITIAL_JOINING_FORM_DATA,
-        applicationId
+        applicationId: identifier || 'demo-app-id',
+        joiningReference: 'JOIN-2026-000001'
       }
     };
   }
 
   try {
-    // 1. Verify parent application existence and access grant
-    const authRes = await getAuthorizedApplication(applicationId);
-    if (!authRes.success || !authRes.data) {
-      return {
-        success: false,
-        accessDenied: authRes.accessDenied,
-        error: authRes.error || 'Unauthorized application access.'
-      };
-    }
-    const application = authRes.data;
-
-    // 2. Fetch joining_forms record
-    const { data: formRecordData, error: formErr } = await (supabase
-      .from('joining_forms')
-      .select('*')
-      .eq('application_id', application.id)
-      .maybeSingle() as any);
-
-    if (formErr) {
-      return { success: false, error: formErr.message };
+    const sessionRes = await getCandidateSession();
+    if (!sessionRes.authenticated || !sessionRes.user || !sessionRes.email) {
+      return { success: false, accessDenied: true, error: 'Please log in with your secure magic link to access your joining form.' };
     }
 
-    let formRecord = formRecordData as JoiningFormRow | null;
+    const user = sessionRes.user;
+    const candidateEmail = sessionRes.email;
 
-    // If no joining_forms row exists yet, initialize a clean draft safely
+    // 1. Fetch existing joining_forms record by user_id, email, or identifier
+    let formRecord: any = null;
+
+    if (identifier && identifier !== 'STANDALONE' && identifier !== 'PREVIEW-DEMO-APP') {
+      const { data: byId } = await (supabase
+        .from('joining_forms')
+        .select('*')
+        .or(`id.eq.${identifier},application_id.eq.${identifier},joining_reference.eq.${identifier}`)
+        .maybeSingle() as any);
+
+      if (byId) {
+        formRecord = byId;
+      }
+    }
+
+    if (!formRecord) {
+      // Find candidate's own form
+      const { data: byUser } = await (supabase
+        .from('joining_forms')
+        .select('*')
+        .or(`user_id.eq.${user.id},email.eq.${candidateEmail}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle() as any);
+
+      if (byUser) {
+        formRecord = byUser;
+      }
+    }
+
+    // 2. If no record exists, initialize a new standalone record
     if (!formRecord) {
       const { data: newForm, error: initErr } = await (supabase
         .from('joining_forms')
         .insert({
-          application_id: application.id,
-          submission_status: 'DRAFT',
-          email: application.email,
-          employee_contact_number: application.mobile,
-          permanent_address: application.address
+          user_id: user.id,
+          email: candidateEmail,
+          candidate_name: user.user_metadata?.full_name || '',
+          submission_status: 'DRAFT'
         } as any)
         .select('*')
         .single() as any);
 
       if (initErr) {
-        // In case another concurrent call inserted it, fetch again
-        const { data: refetched } = await (supabase
-          .from('joining_forms')
-          .select('*')
-          .eq('application_id', application.id)
-          .maybeSingle() as any);
-        formRecord = refetched as JoiningFormRow | null;
-      } else {
-        formRecord = newForm as JoiningFormRow;
+        return { success: false, error: initErr.message };
       }
+      formRecord = newForm;
     }
 
-    // 3. Fetch repeatable child tables if form exists
-    let emergencyRows: EmergencyContactRow[] = [];
-    let educationRows: EducationRecordRow[] = [];
-    let familyRows: FamilyDetailRow[] = [];
-    let declarationRow: DeclarationRow | null = null;
+    const formId = formRecord.id;
 
-    if (formRecord?.id) {
-      const [emRes, eduRes, famRes, declRes] = await Promise.all([
-        supabase.from('emergency_contacts').select('*').eq('joining_form_id', formRecord.id).order('sort_order', { ascending: true }),
-        supabase.from('education_records').select('*').eq('joining_form_id', formRecord.id).order('sort_order', { ascending: true }),
-        supabase.from('family_details').select('*').eq('joining_form_id', formRecord.id).order('sort_order', { ascending: true }),
-        supabase.from('declarations').select('*').eq('joining_form_id', formRecord.id).maybeSingle()
-      ]);
+    // 3. Fetch repeatable child records
+    const [
+      { data: emergencyData },
+      { data: educationData },
+      { data: familyData },
+      { data: declarationsData }
+    ] = await Promise.all([
+      supabase.from('emergency_contacts').select('*').eq('joining_form_id', formId).order('sort_order'),
+      supabase.from('education_records').select('*').eq('joining_form_id', formId).order('sort_order'),
+      supabase.from('family_details').select('*').eq('joining_form_id', formId).order('sort_order'),
+      supabase.from('declarations').select('*').eq('joining_form_id', formId).maybeSingle()
+    ]);
 
-      emergencyRows = (emRes.data as any[]) || [];
-      educationRows = (eduRes.data as any[]) || [];
-      familyRows = (famRes.data as any[]) || [];
-      declarationRow = (declRes.data as any) || null;
+    const emergencyRows = (emergencyData || []) as EmergencyContactRow[];
+    const educationRows = (educationData || []) as EducationRecordRow[];
+    const familyRows = (familyData || []) as FamilyDetailRow[];
+    const declarationRow = declarationsData as DeclarationRow | null;
+
+    // 4. Generate signed URLs for private photos and signatures if available
+    let signedPhotoUrl: string | undefined = undefined;
+    let signedSigUrl: string | undefined = undefined;
+
+    if (formRecord.photo_path) {
+      const { data: pUrl } = await supabase.storage
+        .from('candidate-documents')
+        .createSignedUrl(formRecord.photo_path, 3600);
+      signedPhotoUrl = pUrl?.signedUrl;
     }
 
-    // 4. Fetch uploaded documents for application
-    const { data: docRowsData } = await (supabase
-      .from('documents')
-      .select('*')
-      .eq('application_id', application.id) as any);
+    if (formRecord.candidate_signature_path) {
+      const { data: sUrl } = await supabase.storage
+        .from('candidate-documents')
+        .createSignedUrl(formRecord.candidate_signature_path, 3600);
+      signedSigUrl = sUrl?.signedUrl;
+    }
 
-    const docRows = (docRowsData as DocumentRow[]) || [];
+    // 5. Fetch associated document records
+    const documentQuery = formRecord.application_id
+      ? supabase.from('documents').select('*').eq('application_id', formRecord.application_id)
+      : null;
 
-    // Map database documents into frontend categories with signed URLs
+    const { data: docsData } = documentQuery ? await (documentQuery as any) : { data: [] };
+    const docRows = (docsData || []) as DocumentRow[];
+
     const normalizedDocs: Record<DocumentCategory, UploadedDocument> = {
       ...INITIAL_JOINING_FORM_DATA.documents
     };
 
-    await Promise.all(
-      docRows.map(async (doc) => {
-        let cat: DocumentCategory | null = null;
-
-        if (doc.document_type === 'PHOTO') cat = 'PHOTO';
-        else if (doc.document_type === 'SIGNATURE') cat = 'SIGNATURE';
-        else if (doc.document_type === 'AADHAAR') {
-          cat = doc.document_side === 'BACK' ? 'AADHAAR_BACK' : 'AADHAAR_FRONT';
-        } else if (doc.document_type === 'PAN') cat = 'PAN';
-        else if (doc.document_type === 'BANK_PASSBOOK') cat = 'BANK_PASSBOOK';
-        else if (doc.document_type === 'EDUCATION_CERTIFICATE') cat = 'EDUCATION_CERTIFICATE';
-        else if (doc.document_type === 'ADDRESS_PROOF') cat = 'ADDRESS_PROOF';
-        else if (doc.document_type === 'EXPERIENCE_CERTIFICATE') cat = 'EXPERIENCE_CERTIFICATE';
-        else if (doc.document_type === 'OTHER') cat = 'OTHER';
-
-        if (cat && normalizedDocs[cat]) {
-          let signedUrl: string | undefined = undefined;
-          if (doc.storage_path) {
-            const { data: urlData } = await supabase.storage
-              .from('candidate-documents')
-              .createSignedUrl(doc.storage_path, 3600);
-            signedUrl = urlData?.signedUrl;
-          }
-
-          normalizedDocs[cat] = {
-            ...normalizedDocs[cat],
-            verificationStatus: doc.verification_status,
-            rejectionReason: doc.rejection_reason || undefined,
-            file: {
-              name: doc.original_file_name || (doc as any).file_name || 'Document',
-              size: doc.file_size || 0,
-              type: doc.mime_type || 'application/pdf',
-              dataUrl: signedUrl
-            }
-          };
+    for (const doc of docRows) {
+      const cat = doc.document_type as DocumentCategory;
+      if (normalizedDocs[cat]) {
+        let signedUrl: string | undefined = undefined;
+        if (doc.storage_path) {
+          const { data: sUrl } = await supabase.storage
+            .from('candidate-documents')
+            .createSignedUrl(doc.storage_path, 3600);
+          signedUrl = sUrl?.signedUrl;
         }
-      })
-    );
 
-    const isSubmitted = formRecord?.submission_status === 'SUBMITTED';
+        normalizedDocs[cat] = {
+          ...normalizedDocs[cat],
+          verificationStatus: doc.verification_status as any,
+          rejectionReason: doc.rejection_reason || undefined,
+          file: {
+            name: doc.original_file_name || (doc as any).file_name || 'Document',
+            size: doc.file_size || 0,
+            type: doc.mime_type || 'application/octet-stream',
+            dataUrl: signedUrl
+          }
+        };
+      }
+    }
 
-    // 5. Construct full normalized JoiningFormData
+    // Embed signed photo & signature into normalized documents
+    if (signedPhotoUrl && normalizedDocs.PHOTO) {
+      normalizedDocs.PHOTO.file = {
+        name: 'Passport Photo',
+        size: 0,
+        type: 'image/jpeg',
+        dataUrl: signedPhotoUrl
+      };
+    }
+
+    if (signedSigUrl && normalizedDocs.SIGNATURE) {
+      normalizedDocs.SIGNATURE.file = {
+        name: 'Candidate Signature',
+        size: 0,
+        type: 'image/png',
+        dataUrl: signedSigUrl
+      };
+    }
+
+    const resolvedStatus = (formRecord.submission_status === 'SUBMITTED' ? 'SUBMITTED' : 'DRAFT') as 'DRAFT' | 'SUBMITTED';
+
     const result: JoiningFormData = {
-      applicationId: application.application_number || application.id,
-      currentStep: isSubmitted ? 9 : 1,
-      status: isSubmitted ? 'SUBMITTED' : 'DRAFT',
-      submissionStatus: isSubmitted ? 'SUBMITTED' : 'DRAFT',
-      submittedAt: formRecord?.submitted_at || undefined,
+      applicationId: formRecord.application_id || undefined,
+      formId: formRecord.id,
+      joiningReference: formRecord.joining_reference || 'JOIN-2026-PENDING',
+      userEmail: candidateEmail,
+      currentStep: resolvedStatus === 'SUBMITTED' ? 8 : 1,
+      status: resolvedStatus,
+      submissionStatus: resolvedStatus,
+      submittedAt: formRecord.submitted_at || undefined,
 
-      // Admin-controlled fields (Read-Only to candidate)
       employment: {
-        companyName: formRecord?.company_address ? application.desired_company : INITIAL_JOINING_FORM_DATA.employment.companyName,
-        unit: formRecord?.unit || INITIAL_JOINING_FORM_DATA.employment.unit,
-        address: formRecord?.company_address || INITIAL_JOINING_FORM_DATA.employment.address,
-        employeeCode: formRecord?.employee_code || INITIAL_JOINING_FORM_DATA.employment.employeeCode,
-        designation: formRecord?.designation || application.designation || INITIAL_JOINING_FORM_DATA.employment.designation,
-        department: formRecord?.department || INITIAL_JOINING_FORM_DATA.employment.department,
-        subDepartment: formRecord?.sub_department || INITIAL_JOINING_FORM_DATA.employment.subDepartment,
-        location: formRecord?.location || INITIAL_JOINING_FORM_DATA.employment.location,
-        dateOfJoining: formRecord?.date_of_joining || INITIAL_JOINING_FORM_DATA.employment.dateOfJoining,
-        grossSalaryCTC: formRecord?.gross_salary ? String(formRecord.gross_salary) : INITIAL_JOINING_FORM_DATA.employment.grossSalaryCTC,
+        companyName: formRecord.company_address ? 'Designated Employer Partner' : 'To Be Allocated by A Tiger Global',
+        unit: formRecord.unit || 'Assigned Operations Unit',
+        address: formRecord.company_address || 'Nagpur Industrial Cluster, MH',
+        employeeCode: formRecord.employee_code || formRecord.joining_reference || 'Assigned on Deployment',
+        designation: formRecord.designation || 'Staff / Trainee Associate',
+        department: formRecord.department || 'Operations',
+        subDepartment: formRecord.sub_department || 'General Operations',
+        location: formRecord.location || 'Nagpur, Maharashtra',
+        dateOfJoining: formRecord.date_of_joining || '',
+        grossSalaryCTC: formRecord.gross_salary ? `₹${formRecord.gross_salary.toLocaleString()} / Month` : 'As per Client Offer Letter',
         ownership: INITIAL_JOINING_FORM_DATA.employment.ownership
       },
 
       personal: {
-        employeeName: application.full_name || '',
-        dateOfBirth: formRecord?.date_of_birth || '',
-        gender: (formRecord?.gender as any) || '',
-        fatherName: application.father_name || '',
-        motherOrHusbandName: formRecord?.mother_or_husband_name || '',
-        maritalStatus: (formRecord?.marital_status as any) || '',
-        spouseName: formRecord?.spouse_name || '',
-        bloodGroup: formRecord?.blood_group || '',
-        aadhaarNumber: formRecord?.aadhaar_number || '',
-        panNumber: formRecord?.pan_number || '',
-        employeeContactNumber: formRecord?.employee_contact_number || application.mobile || '',
-        otherContactNumber: formRecord?.other_contact_number || '',
-        emailId: formRecord?.email || application.email || ''
+        employeeName: formRecord.candidate_name || '',
+        dateOfBirth: formRecord.date_of_birth || '',
+        gender: (formRecord.gender as any) || '',
+        fatherName: formRecord.father_name || '',
+        motherOrHusbandName: formRecord.mother_or_husband_name || '',
+        maritalStatus: (formRecord.marital_status as any) || '',
+        spouseName: formRecord.spouse_name || '',
+        bloodGroup: formRecord.blood_group || '',
+        aadhaarNumber: formRecord.aadhaar_number || '',
+        panNumber: formRecord.pan_number || '',
+        employeeContactNumber: formRecord.employee_contact_number || '',
+        otherContactNumber: formRecord.other_contact_number || '',
+        emailId: formRecord.email || candidateEmail
       },
 
       permanentAddress: {
-        address: formRecord?.permanent_address || application.address || '',
-        city: formRecord?.permanent_city || '',
-        district: formRecord?.permanent_district || '',
-        state: formRecord?.permanent_state || '',
-        country: formRecord?.permanent_country || 'India',
-        pinCode: formRecord?.permanent_pin_code || ''
+        address: formRecord.permanent_address || '',
+        city: formRecord.permanent_city || '',
+        district: formRecord.permanent_district || '',
+        state: formRecord.permanent_state || 'Maharashtra',
+        country: formRecord.permanent_country || 'India',
+        pinCode: formRecord.permanent_pin_code || ''
       },
 
       currentAddress: {
-        address: formRecord?.current_address || '',
-        city: formRecord?.current_city || '',
-        district: formRecord?.current_district || '',
-        state: formRecord?.current_state || '',
-        country: formRecord?.current_country || 'India',
-        pinCode: formRecord?.current_pin_code || ''
+        address: formRecord.current_address || '',
+        city: formRecord.current_city || '',
+        district: formRecord.current_district || '',
+        state: formRecord.current_state || 'Maharashtra',
+        country: formRecord.current_country || 'India',
+        pinCode: formRecord.current_pin_code || ''
       },
 
-      sameAsPermanentAddress: formRecord?.same_as_permanent ?? false,
+      sameAsPermanentAddress: formRecord.same_as_permanent ?? false,
 
       emergencyContacts: emergencyRows.length > 0
         ? emergencyRows.map((em) => ({
@@ -315,15 +339,15 @@ export async function getJoiningForm(
         : INITIAL_JOINING_FORM_DATA.emergencyContacts,
 
       bank: {
-        accountHolderName: formRecord?.bank_account_holder || application.full_name || '',
-        bankAccountNumber: formRecord?.bank_account_number || '',
-        confirmBankAccountNumber: formRecord?.bank_account_number || '',
-        ifscCode: formRecord?.ifsc_code || '',
-        bankName: formRecord?.bank_name || '',
-        branchName: formRecord?.branch_name || '',
-        uanNumber: formRecord?.uan || '',
-        esicNumber: formRecord?.esic_number || '',
-        ptNumber: formRecord?.pt_number || ''
+        accountHolderName: formRecord.bank_account_holder || formRecord.candidate_name || '',
+        bankAccountNumber: formRecord.bank_account_number || '',
+        confirmBankAccountNumber: formRecord.bank_account_number || '',
+        ifscCode: formRecord.ifsc_code || '',
+        bankName: formRecord.bank_name || '',
+        branchName: formRecord.branch_name || '',
+        uanNumber: formRecord.uan || '',
+        esicNumber: formRecord.esic_number || '',
+        ptNumber: formRecord.pt_number || ''
       },
 
       education: educationRows.length > 0
@@ -351,7 +375,7 @@ export async function getJoiningForm(
         candidateDeclarationAcknowledged: declarationRow?.candidate_acceptance ?? false,
         backgroundVerificationConsent: declarationRow?.background_check_consent ?? false,
         rulesAndConductAccepted: declarationRow?.code_of_conduct_acceptance ?? false,
-        signatoryName: declarationRow?.signatory_name || application.full_name || '',
+        signatoryName: declarationRow?.signatory_name || formRecord.candidate_name || '',
         declarationDate: declarationRow?.declaration_date || new Date().toISOString().split('T')[0]
       }
     };
@@ -364,29 +388,19 @@ export async function getJoiningForm(
 
 /**
  * Saves draft progress of the Joining Form via transactional RPC.
- * Persists joining_forms, education, family, emergency contacts, and declarations.
  */
 export async function saveJoiningDraft(
-  applicationId: string,
+  identifier: string | undefined,
   data: Partial<JoiningFormData>
 ): Promise<JoiningServiceResult> {
-  if (!applicationId) {
-    return { success: false, error: 'Application ID is required.' };
-  }
-
   if (!isSupabaseConfigured) {
     return { success: true };
   }
 
   try {
-    const authRes = await getAuthorizedApplication(applicationId);
-    if (!authRes.success || !authRes.data) {
-      return { success: false, accessDenied: true, error: authRes.error || 'Unauthorized.' };
-    }
-    const realAppId = authRes.data.id;
-
     const payload = {
-      application_id: realAppId,
+      form_id: data.formId || identifier,
+      application_id: data.applicationId || null,
       personal: data.personal || {},
       permanent_address: data.permanentAddress || {},
       current_address: data.currentAddress || {},
@@ -395,7 +409,9 @@ export async function saveJoiningDraft(
       emergency_contacts: data.emergencyContacts || [],
       education: data.education || [],
       family: data.family || [],
-      declarations: data.declarations || {}
+      declarations: data.declarations || {},
+      photo_path: data.documents?.PHOTO?.file?.dataUrl?.includes('storage/v1') ? undefined : undefined,
+      candidate_signature_path: data.documents?.SIGNATURE?.file?.dataUrl?.includes('storage/v1') ? undefined : undefined
     };
 
     const { data: rpcRes, error: rpcErr } = await supabase.rpc('save_joining_draft_bundle', {
@@ -411,7 +427,7 @@ export async function saveJoiningDraft(
       return { success: false, error: res?.error || 'Failed to save draft.' };
     }
 
-    return { success: true };
+    return { success: true, data: res };
   } catch (err: any) {
     return { success: false, error: err.message || 'Draft saving failed.' };
   }
@@ -419,16 +435,11 @@ export async function saveJoiningDraft(
 
 /**
  * Submits the completed Joining Form via transactional RPC.
- * Locks status to SUBMITTED and creates admin notification.
  */
 export async function submitJoiningForm(
-  applicationId: string,
+  identifier: string | undefined,
   data: JoiningFormData
-): Promise<JoiningServiceResult<{ submittedAt: string }>> {
-  if (!applicationId) {
-    return { success: false, error: 'Application ID is required.' };
-  }
-
+): Promise<JoiningServiceResult<{ submittedAt: string; joiningReference?: string; formId?: string }>> {
   // 1. Step-by-step client validation check
   const stepValidation = validateAllSteps(data);
   const hasErrors = Object.values(stepValidation).some((res) => !res.isValid);
@@ -439,28 +450,26 @@ export async function submitJoiningForm(
   if (!isSupabaseConfigured) {
     return {
       success: true,
-      data: { submittedAt: new Date().toISOString() }
+      data: {
+        submittedAt: new Date().toISOString(),
+        joiningReference: 'JOIN-2026-000001'
+      }
     };
   }
 
   try {
-    const authRes = await getAuthorizedApplication(applicationId);
-    if (!authRes.success || !authRes.data) {
-      return { success: false, accessDenied: true, error: authRes.error || 'Unauthorized.' };
-    }
-    const realAppId = authRes.data.id;
-
     const payload = {
-      application_id: realAppId,
-      personal: data.personal,
-      permanent_address: data.permanentAddress,
-      current_address: data.currentAddress,
-      same_as_permanent: data.sameAsPermanentAddress,
-      bank: data.bank,
-      emergency_contacts: data.emergencyContacts,
-      education: data.education,
-      family: data.family,
-      declarations: data.declarations
+      form_id: data.formId || identifier,
+      application_id: data.applicationId || null,
+      personal: data.personal || {},
+      permanent_address: data.permanentAddress || {},
+      current_address: data.currentAddress || {},
+      same_as_permanent: data.sameAsPermanentAddress ?? false,
+      bank: data.bank || {},
+      emergency_contacts: data.emergencyContacts || [],
+      education: data.education || [],
+      family: data.family || [],
+      declarations: data.declarations || {}
     };
 
     const { data: rpcRes, error: rpcErr } = await supabase.rpc('submit_joining_form_bundle', {
@@ -471,34 +480,43 @@ export async function submitJoiningForm(
       return { success: false, error: rpcErr.message };
     }
 
-    const res = rpcRes as { success?: boolean; error?: string; submitted_at?: string };
+    const res = rpcRes as {
+      success?: boolean;
+      error?: string;
+      submitted_at?: string;
+      joining_reference?: string;
+      form_id?: string;
+    };
+
     if (!res?.success) {
-      return { success: false, error: res?.error || 'Failed to submit joining dossier.' };
+      return { success: false, error: res?.error || 'Submission failed.' };
     }
 
     return {
       success: true,
-      data: { submittedAt: res.submitted_at || new Date().toISOString() }
+      data: {
+        submittedAt: res.submitted_at || new Date().toISOString(),
+        joiningReference: res.joining_reference,
+        formId: res.form_id
+      }
     };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Joining submission failed.' };
+    return { success: false, error: err.message || 'Form submission failed.' };
   }
 }
 
 /**
- * Uploads a candidate statutory document to private Supabase Storage and records it in public.documents.
- * Aadhaar Front and Back are stored as separate records and files.
+ * Uploads a candidate statutory document to private Supabase Storage.
  */
 export async function uploadCandidateDocument(
-  applicationId: string,
+  identifier: string | undefined,
   category: DocumentCategory,
   file: File
 ): Promise<JoiningServiceResult<{ name: string; size: number; type: string; dataUrl: string; storagePath: string }>> {
-  if (!applicationId || !file) {
-    return { success: false, error: 'Application and file are required.' };
+  if (!file) {
+    return { success: false, error: 'File is required.' };
   }
 
-  // Max 5MB check
   if (file.size > 5 * 1024 * 1024) {
     return { success: false, error: 'File size must not exceed 5MB.' };
   }
@@ -511,43 +529,19 @@ export async function uploadCandidateDocument(
         size: file.size,
         type: file.type,
         dataUrl: URL.createObjectURL(file),
-        storagePath: 'mock/path'
+        storagePath: `mock/${category.toLowerCase()}`
       }
     };
   }
 
   try {
-    const authRes = await getAuthorizedApplication(applicationId);
-    if (!authRes.success || !authRes.data) {
-      return { success: false, accessDenied: true, error: authRes.error || 'Unauthorized.' };
-    }
-    const realAppId = authRes.data.id;
+    const session = await getCandidateSession();
+    const candidateOwner = session?.user?.id || identifier || 'anonymous';
 
-    // Map category to document_type and document_side
-    let docType = 'OTHER';
-    let docSide: 'FRONT' | 'BACK' | null = null;
+    const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `candidates/${candidateOwner}/${category.toLowerCase()}_${Date.now()}_${cleanFileName}`;
 
-    if (category === 'PHOTO') docType = 'PHOTO';
-    else if (category === 'SIGNATURE') docType = 'SIGNATURE';
-    else if (category === 'AADHAAR_FRONT') {
-      docType = 'AADHAAR';
-      docSide = 'FRONT';
-    } else if (category === 'AADHAAR_BACK') {
-      docType = 'AADHAAR';
-      docSide = 'BACK';
-    } else if (category === 'PAN') docType = 'PAN';
-    else if (category === 'BANK_PASSBOOK') docType = 'BANK_PASSBOOK';
-    else if (category === 'EDUCATION_CERTIFICATE') docType = 'EDUCATION_CERTIFICATE';
-    else if (category === 'ADDRESS_PROOF') docType = 'ADDRESS_PROOF';
-    else if (category === 'EXPERIENCE_CERTIFICATE') docType = 'EXPERIENCE_CERTIFICATE';
-    else if (category === 'OTHER') docType = 'OTHER';
-
-    // File path: ${applicationId}/${category}_${timestamp}.${ext}
-    const fileExt = file.name.split('.').pop() || 'bin';
-    const cleanFileName = `${category.toLowerCase()}_${Date.now()}.${fileExt}`;
-    const storagePath = `${realAppId}/${cleanFileName}`;
-
-    // 1. Upload to private Supabase bucket: candidate-documents
+    // 1. Upload to Supabase private storage
     const { error: uploadErr } = await supabase.storage
       .from('candidate-documents')
       .upload(storagePath, file, {
@@ -556,57 +550,23 @@ export async function uploadCandidateDocument(
       });
 
     if (uploadErr) {
-      return { success: false, error: `Upload failed: ${uploadErr.message}` };
+      return { success: false, error: uploadErr.message };
     }
 
-    // 2. Check if a document record already exists for this type/side
-    let query = supabase
-      .from('documents')
-      .select('id, storage_path')
-      .eq('application_id', realAppId)
-      .eq('document_type', docType as any);
-
-    if (docSide) {
-      query = query.eq('document_side', docSide as any);
-    }
-
-    const { data: existingDoc } = await (query.maybeSingle() as any);
-
-    // 3. Upsert into public.documents
-    if (existingDoc?.id) {
-      // Old file cleanup if storagePath changed
-      if (existingDoc.storage_path && existingDoc.storage_path !== storagePath) {
-        await supabase.storage.from('candidate-documents').remove([existingDoc.storage_path]);
-      }
-
+    // 2. If PHOTO or SIGNATURE, update joining_forms directly
+    if (category === 'PHOTO') {
       await (supabase
-        .from('documents')
-        .update({
-          file_name: cleanFileName,
-          original_file_name: file.name,
-          storage_path: storagePath,
-          mime_type: file.type || 'application/octet-stream',
-          file_size: file.size,
-          verification_status: 'PENDING'
-        } as any)
-        .eq('id', existingDoc.id) as any);
-    } else {
+        .from('joining_forms')
+        .update({ photo_storage_path: storagePath } as any)
+        .or(`id.eq.${identifier || candidateOwner},user_id.eq.${candidateOwner}`) as any);
+    } else if (category === 'SIGNATURE') {
       await (supabase
-        .from('documents')
-        .insert({
-          application_id: realAppId,
-          document_type: docType as any,
-          document_side: docSide as any,
-          file_name: cleanFileName,
-          original_file_name: file.name,
-          storage_path: storagePath,
-          mime_type: file.type || 'application/octet-stream',
-          file_size: file.size,
-          verification_status: 'PENDING'
-        } as any) as any);
+        .from('joining_forms')
+        .update({ signature_storage_path: storagePath } as any)
+        .or(`id.eq.${identifier || candidateOwner},user_id.eq.${candidateOwner}`) as any);
     }
 
-    // 4. Generate signed URL for preview
+    // 3. Generate signed URL for immediate preview
     const { data: signedData, error: signErr } = await supabase.storage
       .from('candidate-documents')
       .createSignedUrl(storagePath, 3600);
@@ -631,62 +591,30 @@ export async function uploadCandidateDocument(
 }
 
 /**
- * Removes a candidate statutory document from storage and database.
+ * Removes a candidate statutory document from private storage.
  */
 export async function removeCandidateDocument(
-  applicationId: string,
+  identifier: string | undefined,
   category: DocumentCategory
 ): Promise<JoiningServiceResult> {
-  if (!applicationId) {
-    return { success: false, error: 'Application ID is required.' };
-  }
-
   if (!isSupabaseConfigured) {
     return { success: true };
   }
 
   try {
-    const authRes = await getAuthorizedApplication(applicationId);
-    if (!authRes.success || !authRes.data) {
-      return { success: false, accessDenied: true, error: authRes.error || 'Unauthorized.' };
-    }
-    const realAppId = authRes.data.id;
+    const session = await getCandidateSession();
+    const candidateOwner = session?.user?.id || identifier;
 
-    let docType = 'OTHER';
-    let docSide: 'FRONT' | 'BACK' | null = null;
-
-    if (category === 'PHOTO') docType = 'PHOTO';
-    else if (category === 'SIGNATURE') docType = 'SIGNATURE';
-    else if (category === 'AADHAAR_FRONT') {
-      docType = 'AADHAAR';
-      docSide = 'FRONT';
-    } else if (category === 'AADHAAR_BACK') {
-      docType = 'AADHAAR';
-      docSide = 'BACK';
-    } else if (category === 'PAN') docType = 'PAN';
-    else if (category === 'BANK_PASSBOOK') docType = 'BANK_PASSBOOK';
-    else if (category === 'EDUCATION_CERTIFICATE') docType = 'EDUCATION_CERTIFICATE';
-    else if (category === 'ADDRESS_PROOF') docType = 'ADDRESS_PROOF';
-    else if (category === 'EXPERIENCE_CERTIFICATE') docType = 'EXPERIENCE_CERTIFICATE';
-    else if (category === 'OTHER') docType = 'OTHER';
-
-    let query = supabase
-      .from('documents')
-      .select('id, storage_path')
-      .eq('application_id', realAppId)
-      .eq('document_type', docType as any);
-
-    if (docSide) {
-      query = query.eq('document_side', docSide as any);
-    }
-
-    const { data: existingDoc } = await (query.maybeSingle() as any);
-
-    if (existingDoc) {
-      if (existingDoc.storage_path) {
-        await supabase.storage.from('candidate-documents').remove([existingDoc.storage_path]);
-      }
-      await (supabase.from('documents').delete().eq('id', existingDoc.id) as any);
+    if (category === 'PHOTO' && candidateOwner) {
+      await (supabase
+        .from('joining_forms')
+        .update({ photo_storage_path: null } as any)
+        .or(`id.eq.${candidateOwner},user_id.eq.${candidateOwner}`) as any);
+    } else if (category === 'SIGNATURE' && candidateOwner) {
+      await (supabase
+        .from('joining_forms')
+        .update({ signature_storage_path: null } as any)
+        .or(`id.eq.${candidateOwner},user_id.eq.${candidateOwner}`) as any);
     }
 
     return { success: true };
@@ -694,4 +622,3 @@ export async function removeCandidateDocument(
     return { success: false, error: err.message || 'Document removal failed.' };
   }
 }
-

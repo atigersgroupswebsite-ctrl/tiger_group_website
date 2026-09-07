@@ -115,7 +115,10 @@ export interface DeclarationsInfo {
 }
 
 export interface JoiningFormData {
-  applicationId: string;
+  applicationId?: string;
+  formId?: string;
+  joiningReference?: string;
+  userEmail?: string;
   currentStep: number;
   employment: EmploymentInfo;
   personal: PersonalInfo;

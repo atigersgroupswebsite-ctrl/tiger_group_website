@@ -294,7 +294,10 @@ export interface Database {
       joining_forms: {
         Row: {
           id: string;
-          application_id: string;
+          application_id: string | null;
+          user_id: string | null;
+          candidate_name: string | null;
+          joining_reference: string | null;
           company_id: string | null;
           unit: string | null;
           company_address: string | null;
@@ -346,7 +349,10 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          application_id: string;
+          application_id?: string | null;
+          user_id?: string | null;
+          candidate_name?: string | null;
+          joining_reference?: string | null;
           company_id?: string | null;
           unit?: string | null;
           company_address?: string | null;
@@ -398,7 +404,10 @@ export interface Database {
         };
         Update: {
           id?: string;
-          application_id?: string;
+          application_id?: string | null;
+          user_id?: string | null;
+          candidate_name?: string | null;
+          joining_reference?: string | null;
           company_id?: string | null;
           unit?: string | null;
           company_address?: string | null;

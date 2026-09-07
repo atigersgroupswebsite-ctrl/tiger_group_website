@@ -27,6 +27,9 @@ import { AdminApplicationsPage } from './pages/admin/AdminApplicationsPage';
 import { AdminApplicationDetailPage } from './pages/admin/AdminApplicationDetailPage';
 import { AdminEmployerEnquiriesPage } from './pages/admin/AdminEmployerEnquiriesPage';
 import { AdminExportsPage } from './pages/admin/AdminExportsPage';
+import { AdminJoiningListPage } from './pages/admin/AdminJoiningListPage';
+import { AdminJoiningDetailPage } from './pages/admin/AdminJoiningDetailPage';
+import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminPlaceholderPage } from './pages/admin/AdminPlaceholderPage';
 import { AdminNotFoundPage } from './pages/admin/AdminNotFoundPage';
 
@@ -43,6 +46,7 @@ import { Employers } from './pages/Employers';
 import { Contact } from './pages/Contact';
 import { Joining } from './pages/Joining';
 import { JoiningAccessPage } from './pages/JoiningAccessPage';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CandidatePaymentPage } from './pages/CandidatePaymentPage';
 import { TermsAndConditionsPage } from './pages/TermsAndConditionsPage';
 import { ConsultancyPolicyPage } from './pages/ConsultancyPolicyPage';
@@ -70,6 +74,10 @@ export const App: React.FC = () => {
               <Route path="applications/:id/payment" element={<AdminApplicationDetailPage defaultTab="payment" />} />
               <Route path="employer-enquiries" element={<AdminEmployerEnquiriesPage />} />
               <Route path="employer-enquiries/:id" element={<AdminEmployerEnquiriesPage />} />
+              <Route path="joining" element={<AdminJoiningListPage />} />
+              <Route path="joining/:id" element={<AdminJoiningDetailPage />} />
+              <Route path="admin-users" element={<AdminUsersPage />} />
+              <Route path="settings/admin-users" element={<AdminUsersPage />} />
               <Route path="exports" element={<AdminExportsPage />} />
 
               {/* Management Suite Modules */}
@@ -77,8 +85,6 @@ export const App: React.FC = () => {
               <Route path="jobs/:id" element={<AdminPlaceholderPage />} />
               <Route path="companies" element={<AdminPlaceholderPage />} />
               <Route path="companies/:id" element={<AdminPlaceholderPage />} />
-              <Route path="joining" element={<AdminPlaceholderPage />} />
-              <Route path="joining/:id" element={<AdminPlaceholderPage />} />
               <Route path="documents" element={<AdminPlaceholderPage />} />
               <Route path="documents/:id" element={<AdminPlaceholderPage />} />
               <Route path="payments" element={<AdminPlaceholderPage />} />
@@ -111,6 +117,7 @@ export const App: React.FC = () => {
             <Route path="/enquiry/employer" element={<EmployerEnquiryPage />} />
             <Route path="/employers" element={<Employers />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/joining/access" element={<JoiningAccessPage />} />
             <Route path="/joining/payment" element={<CandidatePaymentPage />} />
             <Route path="/joining" element={<Joining />} />

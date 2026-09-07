@@ -444,8 +444,8 @@ export const validateDeclarations = (
   }
 
   if (!hasSignature) {
-    errors.signature = 'Specimen Signature upload is required in Step 07';
-    missingFields.push('Specimen Signature (Step 07)');
+    errors.signature = 'Specimen Signature upload is required in Step 06';
+    missingFields.push('Specimen Signature (Step 06)');
   }
 
   return {
@@ -462,19 +462,18 @@ export const validateAllSteps = (
   const hasSignature = !!formData.documents.SIGNATURE?.file?.dataUrl;
 
   return {
-    1: validateEmployment(),
-    2: validatePersonal(formData.personal),
-    3: validateAddress(
+    1: validatePersonal(formData.personal),
+    2: validateAddress(
       formData.permanentAddress,
       formData.currentAddress,
       formData.sameAsPermanentAddress,
       formData.emergencyContacts
     ),
-    4: validateBank(formData.bank),
-    5: validateEducation(formData.education),
-    6: validateFamily(formData.family),
-    7: validateDocuments(formData.documents),
-    8: validateDeclarations(formData.declarations, hasSignature),
-    9: { isValid: true, errors: {}, missingFields: [] }
+    3: validateBank(formData.bank),
+    4: validateEducation(formData.education),
+    5: validateFamily(formData.family),
+    6: validateDocuments(formData.documents),
+    7: validateDeclarations(formData.declarations, hasSignature),
+    8: { isValid: true, errors: {}, missingFields: [] }
   };
 };

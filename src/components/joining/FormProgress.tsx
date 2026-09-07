@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Lock } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { JOINING_STEPS } from '../../data/mockJoiningData';
 
 interface FormProgressProps {
@@ -40,8 +40,8 @@ export const FormProgress: React.FC<FormProgressProps> = ({
       <aside className="joining-progress-sidebar">
         <div className="joining-progress-card">
           <div className="joining-app-info">
-            <span className="joining-app-label">Application Dossier</span>
-            <div className="joining-app-id">{applicationId}</div>
+            <span className="joining-app-label">Joining Dossier</span>
+            <div className="joining-app-id">{applicationId || 'Active Session'}</div>
           </div>
 
           <ol className="joining-step-list">
@@ -71,8 +71,6 @@ export const FormProgress: React.FC<FormProgressProps> = ({
                   <div className="joining-step-circle">
                     {isCompleted && !isCurrent ? (
                       <Check size={12} strokeWidth={3} />
-                    ) : stepItem.step === 1 ? (
-                      <Lock size={11} />
                     ) : (
                       stepItem.step
                     )}

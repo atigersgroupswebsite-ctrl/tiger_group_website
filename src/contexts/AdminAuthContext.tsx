@@ -25,7 +25,7 @@ export interface AdminAuthContextType {
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
 
-const ALLOWED_ADMIN_ROLES: AdminRole[] = ['SUPER_ADMIN', 'COORDINATOR'];
+const ALLOWED_ADMIN_ROLES: AdminRole[] = ['SUPER_ADMIN', 'COORDINATOR', 'DOCUMENT_VERIFIER', 'ACCOUNTANT'];
 
 export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -103,14 +103,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (initialSession?.user && mounted) {
           setSession(initialSession);
           setUser(initialSession.user);
-          const authorizedProfile = await authorizeUser(initialSession.user);
-          if (!authorizedProfile && mounted) {
-            // User is authenticated in Supabase Auth but has no valid active admin profile
-            await supabase.auth.signOut();
-            setSession(null);
-            setUser(null);
-            setProfile(null);
-          }
+          await authorizeUser(initialSession.user);
         }
       } catch (err) {
         console.error('[AdminAuth] Initialization error:', err);
@@ -130,13 +123,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (newSession?.user) {
         setSession(newSession);
         setUser(newSession.user);
-        const authorizedProfile = await authorizeUser(newSession.user);
-        if (!authorizedProfile) {
-          await supabase.auth.signOut();
-          setSession(null);
-          setUser(null);
-          setProfile(null);
-        }
+        await authorizeUser(newSession.user);
       } else {
         setSession(null);
         setUser(null);

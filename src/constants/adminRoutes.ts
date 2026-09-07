@@ -31,7 +31,9 @@ export const ADMIN_ROUTES = {
   files: '/admin/files',
   fileDetail: (id: string = ':id') => `/admin/files/${id}`,
   activity: '/admin/activity',
-  settings: '/admin/settings'
+  settings: '/admin/settings',
+  adminUsers: '/admin/admin-users',
+  settingsAdminUsers: '/admin/settings/admin-users'
 } as const;
 
 export type AdminRouteKey = keyof typeof ADMIN_ROUTES;
