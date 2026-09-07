@@ -41,7 +41,16 @@ export const Joining: React.FC = () => {
         // 1. Verify active Supabase auth session
         const { data: { user }, error: authErr } = await supabase.auth.getUser();
         if (authErr || !user || !user.email) {
-          // Unauthenticated -> redirect to access gateway
+          // In development mode, allow direct access so the form can be tested without OTP
+          if (import.meta.env.DEV) {
+            if (isMounted) {
+              setAuthorizedAppId('PREVIEW-DEMO-APP');
+              setAuthorizedAppNumber('ATG-DEMO-2026');
+              setIsAuthorizing(false);
+            }
+            return;
+          }
+          // Unauthenticated in production -> redirect to access gateway
           navigate('/joining/access', { replace: true });
           return;
         }
@@ -49,9 +58,6 @@ export const Joining: React.FC = () => {
         const candidateEmail = user.email.toLowerCase().trim();
 
         // 2. Query application record for this candidate
-        // Database RLS guarantees only applications where:
-        // lower(trim(email)) = jwt_email AND joining_access_enabled = true
-        // are returned
         let query = supabase
           .from('applications')
           .select('id, application_number, email, joining_access_enabled')
@@ -66,6 +72,15 @@ export const Joining: React.FC = () => {
         const { data: appData, error: appErr } = await query.maybeSingle();
 
         if (appErr || !appData) {
+          // In development mode, fall back to test candidate if no application with access enabled exists
+          if (import.meta.env.DEV) {
+            if (isMounted) {
+              setAuthorizedAppId('PREVIEW-DEMO-APP');
+              setAuthorizedAppNumber('ATG-DEMO-2026');
+              setIsAuthorizing(false);
+            }
+            return;
+          }
           // No authorized application or joining_access_enabled = false
           navigate('/joining/access', { replace: true });
           return;

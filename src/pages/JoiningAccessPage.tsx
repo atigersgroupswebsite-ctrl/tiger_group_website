@@ -422,22 +422,32 @@ export const JoiningAccessPage: React.FC = () => {
                   )}
                 </button>
 
-                <div style={{ textAlign: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #EAE8E4' }}>
+                <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #EAE8E4' }}>
                   <Link
-                    to="/joining?preview=true"
+                    to="/joining"
                     style={{
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      color: '#64748B',
-                      textDecoration: 'none',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '0.35rem'
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      width: '100%',
+                      minHeight: '44px',
+                      backgroundColor: '#F8FAFC',
+                      border: '1px dashed #94A3B8',
+                      borderRadius: '8px',
+                      color: '#192A56',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      transition: 'all 0.15s ease'
                     }}
                   >
-                    <span>Preview Joining Form (Review Mode)</span>
-                    <ArrowRight size={13} />
+                    <span>⚡ Test Joining Form (Direct Preview / No OTP Needed)</span>
+                    <ArrowRight size={14} />
                   </Link>
+                  <p style={{ fontSize: '0.75rem', color: '#64748B', margin: '0.5rem 0 0 0' }}>
+                    Opens the full 9-step Joining Dossier form directly for evaluation and testing.
+                  </p>
                 </div>
               </form>
             </div>
@@ -517,6 +527,25 @@ export const JoiningAccessPage: React.FC = () => {
                 >
                   TRY ANOTHER EMAIL
                 </button>
+
+                <Link
+                  to="/joining"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: '44px',
+                    backgroundColor: '#F8FAFC',
+                    border: '1px dashed #94A3B8',
+                    color: '#192A56',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    textDecoration: 'none'
+                  }}
+                >
+                  ⚡ Test Joining Form (Demo Mode) →
+                </Link>
               </div>
             </div>
           )}
@@ -596,7 +625,26 @@ export const JoiningAccessPage: React.FC = () => {
                   }}
                 >
                   <PhoneCall size={15} />
-                  <span>CONTACT US</span>
+                  <span>CONTACT SUPPORT</span>
+                </Link>
+
+                <Link
+                  to="/joining"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: '44px',
+                    backgroundColor: '#F8FAFC',
+                    border: '1px dashed #94A3B8',
+                    color: '#192A56',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    textDecoration: 'none'
+                  }}
+                >
+                  ⚡ Test Joining Form (Demo Mode) →
                 </Link>
 
                 <button
