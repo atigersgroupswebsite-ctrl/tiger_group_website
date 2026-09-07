@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabaseClient';
 import { normalizeIndianMobile } from '../utils/phoneUtils';
 
 export interface CreateJobSeekerInput {
+  jobId?: string | null;
   fullName: string;
   fatherName: string;
   mobile: string;
@@ -117,6 +118,7 @@ export async function createJobSeekerApplication(
     const { data, error } = await supabase
       .from('applications')
       .insert({
+        job_id: input.jobId || null,
         full_name: trimmedName,
         father_name: trimmedFatherName,
         mobile: mobileNorm.normalized,

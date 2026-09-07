@@ -30,6 +30,14 @@ import { AdminExportsPage } from './pages/admin/AdminExportsPage';
 import { AdminJoiningListPage } from './pages/admin/AdminJoiningListPage';
 import { AdminJoiningDetailPage } from './pages/admin/AdminJoiningDetailPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+import { AdminCompaniesPage } from './pages/admin/AdminCompaniesPage';
+import { AdminCompanyDetailPage } from './pages/admin/AdminCompanyDetailPage';
+import { AdminJobsPage } from './pages/admin/AdminJobsPage';
+import { AdminJobDetailPage } from './pages/admin/AdminJobDetailPage';
+import { AdminDocumentsPage } from './pages/admin/AdminDocumentsPage';
+import { AdminDocumentDetailPage } from './pages/admin/AdminDocumentDetailPage';
+import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage';
+import { AdminPaymentDetailPage } from './pages/admin/AdminPaymentDetailPage';
 import { AdminPlaceholderPage } from './pages/admin/AdminPlaceholderPage';
 import { AdminNotFoundPage } from './pages/admin/AdminNotFoundPage';
 
@@ -81,14 +89,14 @@ export const App: React.FC = () => {
               <Route path="exports" element={<AdminExportsPage />} />
 
               {/* Management Suite Modules */}
-              <Route path="jobs" element={<AdminPlaceholderPage />} />
-              <Route path="jobs/:id" element={<AdminPlaceholderPage />} />
-              <Route path="companies" element={<AdminPlaceholderPage />} />
-              <Route path="companies/:id" element={<AdminPlaceholderPage />} />
-              <Route path="documents" element={<AdminPlaceholderPage />} />
-              <Route path="documents/:id" element={<AdminPlaceholderPage />} />
-              <Route path="payments" element={<AdminPlaceholderPage />} />
-              <Route path="payments/:id" element={<AdminPlaceholderPage />} />
+              <Route path="jobs" element={<AdminJobsPage />} />
+              <Route path="jobs/:id" element={<AdminJobDetailPage />} />
+              <Route path="companies" element={<AdminCompaniesPage />} />
+              <Route path="companies/:id" element={<AdminCompanyDetailPage />} />
+              <Route path="documents" element={<AdminDocumentsPage />} />
+              <Route path="documents/:id" element={<AdminDocumentDetailPage />} />
+              <Route path="payments" element={<AdminPaymentsPage />} />
+              <Route path="payments/:id" element={<AdminPaymentDetailPage />} />
               <Route path="reference-slips" element={<AdminPlaceholderPage />} />
               <Route path="reference-slips/:id" element={<AdminPlaceholderPage />} />
               <Route path="employees" element={<AdminPlaceholderPage />} />

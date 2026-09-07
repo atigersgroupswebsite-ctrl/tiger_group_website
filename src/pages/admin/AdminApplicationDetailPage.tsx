@@ -28,7 +28,8 @@ import type {
   EducationRecordRow,
   FamilyDetailRow,
   EmergencyContactRow,
-  DeclarationRow
+  DeclarationRow,
+  JobRow
 } from '../../types/database';
 import {
   getApplicationJoiningBundle,
@@ -129,6 +130,7 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
   const [family, setFamily] = useState<FamilyDetailRow[]>([]);
   const [emergency, setEmergency] = useState<EmergencyContactRow[]>([]);
   const [declarations, setDeclarations] = useState<DeclarationRow | null>(null);
+  const [linkedJob, setLinkedJob] = useState<JobRow | null>(null);
 
   // Page States
   const [loading, setLoading] = useState<boolean>(true);
@@ -199,6 +201,22 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
       const app = appData as ApplicationRow;
       setApplication(app);
       setSelectedStatus(app.status);
+
+      // 1b. Fetch Linked Job if job_id is present
+      if (app.job_id) {
+        const { data: jData } = await supabase
+          .from('jobs')
+          .select('*, company:companies(*)')
+          .eq('id', app.job_id)
+          .maybeSingle();
+        if (jData) {
+          setLinkedJob(jData as JobRow);
+        } else {
+          setLinkedJob(null);
+        }
+      } else {
+        setLinkedJob(null);
+      }
 
       // 2. Fetch Active Companies
       const { data: compData } = await supabase
@@ -557,6 +575,30 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
               {application.designation ? ` • ${application.designation}` : ''}
               {application.desired_company ? ` • ${application.desired_company}` : ''}
             </p>
+            {linkedJob && (
+              <div style={{ marginTop: '0.35rem' }}>
+                <Link
+                  to={`/admin/jobs/${linkedJob.id}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    backgroundColor: '#EFF6FF',
+                    color: '#1E40AF',
+                    border: '1px solid #BFDBFE',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    textDecoration: 'none'
+                  }}
+                >
+                  <Briefcase size={12} />
+                  <span>Linked Job Opening: {linkedJob.title}</span>
+                  <span style={{ fontSize: '0.68rem', opacity: 0.8 }}>({linkedJob.location})</span>
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Application Status Selector */}

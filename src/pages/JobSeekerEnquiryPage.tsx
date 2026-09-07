@@ -14,14 +14,23 @@ import {
   SuccessState
 } from '../components/forms';
 import { KNOWN_EMPLOYERS, type JobSeekerEnquiry } from '../types/enquiry';
-import { SAMPLE_JOBS } from '../data/jobsData';
 import { createJobSeekerApplication } from '../services/enquiryService';
+import { getPublicJobBySlugOrId } from '../services/jobService';
+import type { Job } from '../types';
 import { normalizeIndianMobile } from '../utils/phoneUtils';
 
 export const JobSeekerEnquiryPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const jobSlug = searchParams.get('job');
-  const matchedJob = SAMPLE_JOBS.find((j) => j.slug === jobSlug);
+  const [matchedJob, setMatchedJob] = useState<Job | null>(null);
+
+  useEffect(() => {
+    if (jobSlug) {
+      getPublicJobBySlugOrId(jobSlug).then((job) => {
+        if (job) setMatchedJob(job);
+      });
+    }
+  }, [jobSlug]);
 
   useEffect(() => {
     document.title = "Job Seeker Enquiry | A TIGER GLOBAL";
@@ -125,6 +134,7 @@ export const JobSeekerEnquiryPage: React.FC = () => {
 
     try {
       const result = await createJobSeekerApplication({
+        jobId: matchedJob?.id || null,
         fullName: formData.fullName,
         fatherName: formData.fatherName,
         mobile: formData.mobileNumber,

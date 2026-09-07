@@ -249,9 +249,25 @@ export const CandidatePaymentPage: React.FC = () => {
         }
       };
 
-      // Check if running in simulated mode (e.g. without active Razorpay keys or in automated test)
-      if (keyId.includes('test_TigerGlobal') || !(window as any).Razorpay) {
-        // Provide clear testing fallback with real cryptographic server verification
+      // In production, NEVER permit mock or simulated payments. Real Razorpay checkout is strictly required.
+      if (import.meta.env.PROD) {
+        if (!(window as any).Razorpay) {
+          setError('Razorpay payment gateway script could not be loaded. Please verify your connection and refresh.');
+          setIsProcessing(false);
+          setProcessStep('');
+          return;
+        }
+        if (keyId.includes('test_TigerGlobal')) {
+          setError('Live payment gateway configuration is pending for this environment. Please contact support.');
+          setIsProcessing(false);
+          setProcessStep('');
+          return;
+        }
+      }
+
+      // Check if running in local development simulated mode (strictly DEV only)
+      if (import.meta.env.DEV && (keyId.includes('test_TigerGlobal') || !(window as any).Razorpay)) {
+        // Provide clear local testing fallback with server verification
         const simulatedPaymentId = `pay_sim_${Date.now()}`;
         const simulatedOrderId = orderId;
         const simulatedSignature = 'simulated_success';

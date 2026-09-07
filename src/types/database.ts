@@ -108,6 +108,7 @@ export interface Database {
         Row: {
           id: string;
           application_number: string;
+          job_id: string | null;
           full_name: string;
           father_name: string;
           mobile: string;
@@ -125,6 +126,7 @@ export interface Database {
         Insert: {
           id?: string;
           application_number?: string;
+          job_id?: string | null;
           full_name: string;
           father_name: string;
           mobile: string;
@@ -142,6 +144,7 @@ export interface Database {
         Update: {
           id?: string;
           application_number?: string;
+          job_id?: string | null;
           full_name?: string;
           father_name?: string;
           mobile?: string;
@@ -253,8 +256,12 @@ export interface Database {
           id: string;
           company_id: string | null;
           title: string;
+          department: string | null;
           location: string;
           employment_type: string;
+          salary_range: string | null;
+          vacancies: number;
+          experience_level: string | null;
           description: string | null;
           responsibilities: string | null;
           requirements: string | null;
@@ -266,8 +273,12 @@ export interface Database {
           id?: string;
           company_id?: string | null;
           title: string;
+          department?: string | null;
           location: string;
           employment_type: string;
+          salary_range?: string | null;
+          vacancies?: number;
+          experience_level?: string | null;
           description?: string | null;
           responsibilities?: string | null;
           requirements?: string | null;
@@ -279,8 +290,12 @@ export interface Database {
           id?: string;
           company_id?: string | null;
           title?: string;
+          department?: string | null;
           location?: string;
           employment_type?: string;
+          salary_range?: string | null;
+          vacancies?: number;
+          experience_level?: string | null;
           description?: string | null;
           responsibilities?: string | null;
           requirements?: string | null;
@@ -553,7 +568,8 @@ export interface Database {
       documents: {
         Row: {
           id: string;
-          application_id: string;
+          application_id: string | null;
+          joining_form_id: string | null;
           document_type: DocumentType;
           document_side: DocumentSide;
           storage_path: string | null;
@@ -568,7 +584,8 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          application_id: string;
+          application_id?: string | null;
+          joining_form_id?: string | null;
           document_type: DocumentType;
           document_side?: DocumentSide;
           storage_path?: string | null;
@@ -583,7 +600,8 @@ export interface Database {
         };
         Update: {
           id?: string;
-          application_id?: string;
+          application_id?: string | null;
+          joining_form_id?: string | null;
           document_type?: DocumentType;
           document_side?: DocumentSide;
           storage_path?: string | null;
@@ -639,7 +657,8 @@ export interface Database {
       payments: {
         Row: {
           id: string;
-          application_id: string;
+          application_id: string | null;
+          joining_form_id: string | null;
           payment_reference: string;
           amount: number;
           currency: string;
@@ -656,7 +675,8 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          application_id: string;
+          application_id?: string | null;
+          joining_form_id?: string | null;
           payment_reference: string;
           amount: number;
           currency?: string;
@@ -673,7 +693,8 @@ export interface Database {
         };
         Update: {
           id?: string;
-          application_id?: string;
+          application_id?: string | null;
+          joining_form_id?: string | null;
           payment_reference?: string;
           amount?: number;
           currency?: string;
@@ -798,9 +819,14 @@ export interface Database {
       employees: {
         Row: {
           id: string;
-          application_id: string;
+          application_id: string | null;
+          joining_form_id: string | null;
           company_id: string | null;
           employee_code: string;
+          candidate_name: string | null;
+          mobile: string | null;
+          email: string | null;
+          joining_reference: string | null;
           designation: string | null;
           department: string | null;
           location: string | null;
@@ -812,9 +838,14 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          application_id: string;
+          application_id?: string | null;
+          joining_form_id?: string | null;
           company_id?: string | null;
           employee_code: string;
+          candidate_name?: string | null;
+          mobile?: string | null;
+          email?: string | null;
+          joining_reference?: string | null;
           designation?: string | null;
           department?: string | null;
           location?: string | null;
@@ -826,9 +857,14 @@ export interface Database {
         };
         Update: {
           id?: string;
-          application_id?: string;
+          application_id?: string | null;
+          joining_form_id?: string | null;
           company_id?: string | null;
           employee_code?: string;
+          candidate_name?: string | null;
+          mobile?: string | null;
+          email?: string | null;
+          joining_reference?: string | null;
           designation?: string | null;
           department?: string | null;
           location?: string | null;
@@ -844,30 +880,39 @@ export interface Database {
       generated_files: {
         Row: {
           id: string;
-          application_id: string;
+          application_id: string | null;
+          joining_form_id: string | null;
           file_type: GeneratedFileType;
           storage_path: string;
           file_name: string;
+          file_size: number | null;
+          mime_type: string | null;
           version: number;
           generated_at: string;
           generated_by: string | null;
         };
         Insert: {
           id?: string;
-          application_id: string;
+          application_id?: string | null;
+          joining_form_id?: string | null;
           file_type: GeneratedFileType;
           storage_path: string;
           file_name: string;
+          file_size?: number | null;
+          mime_type?: string | null;
           version?: number;
           generated_at?: string;
           generated_by?: string | null;
         };
         Update: {
           id?: string;
-          application_id?: string;
+          application_id?: string | null;
+          joining_form_id?: string | null;
           file_type?: GeneratedFileType;
           storage_path?: string;
           file_name?: string;
+          file_size?: number | null;
+          mime_type?: string | null;
           version?: number;
           generated_at?: string;
           generated_by?: string | null;
@@ -879,6 +924,8 @@ export interface Database {
         Row: {
           id: string;
           application_id: string | null;
+          entity_type: string | null;
+          entity_id: string | null;
           admin_user_id: string | null;
           action: string;
           description: string | null;
@@ -888,6 +935,8 @@ export interface Database {
         Insert: {
           id?: string;
           application_id?: string | null;
+          entity_type?: string | null;
+          entity_id?: string | null;
           admin_user_id?: string | null;
           action: string;
           description?: string | null;
@@ -897,11 +946,47 @@ export interface Database {
         Update: {
           id?: string;
           application_id?: string | null;
+          entity_type?: string | null;
+          entity_id?: string | null;
           admin_user_id?: string | null;
           action?: string;
           description?: string | null;
           metadata?: Json | null;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      system_settings: {
+        Row: {
+          id: string;
+          key: string;
+          value: Json;
+          description: string | null;
+          category: string;
+          updated_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          key: string;
+          value: Json;
+          description?: string | null;
+          category?: string;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          key?: string;
+          value?: Json;
+          description?: string | null;
+          category?: string;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -1082,8 +1167,12 @@ export type AdminProfileUpdate = Database['public']['Tables']['admin_profiles'][
 
 export type CompanyRow = Database['public']['Tables']['companies']['Row'];
 export type CompanyInsert = Database['public']['Tables']['companies']['Insert'];
+export type CompanyUpdate = Database['public']['Tables']['companies']['Update'];
+
 
 export type JobRow = Database['public']['Tables']['jobs']['Row'];
+export type JobInsert = Database['public']['Tables']['jobs']['Insert'];
+export type JobUpdate = Database['public']['Tables']['jobs']['Update'];
 export type JoiningFormRow = Database['public']['Tables']['joining_forms']['Row'];
 export type JoiningFormInsert = Database['public']['Tables']['joining_forms']['Insert'];
 export type JoiningFormUpdate = Database['public']['Tables']['joining_forms']['Update'];
@@ -1104,3 +1193,13 @@ export type EducationRecordRow = Database['public']['Tables']['education_records
 export type FamilyDetailRow = Database['public']['Tables']['family_details']['Row'];
 export type EmergencyContactRow = Database['public']['Tables']['emergency_contacts']['Row'];
 export type DeclarationRow = Database['public']['Tables']['declarations']['Row'];
+
+export type GeneratedFileRow = Database['public']['Tables']['generated_files']['Row'];
+export type GeneratedFileInsert = Database['public']['Tables']['generated_files']['Insert'];
+export type GeneratedFileUpdate = Database['public']['Tables']['generated_files']['Update'];
+
+export type SystemSettingRow = Database['public']['Tables']['system_settings']['Row'];
+export type SystemSettingInsert = Database['public']['Tables']['system_settings']['Insert'];
+export type SystemSettingUpdate = Database['public']['Tables']['system_settings']['Update'];
+
+

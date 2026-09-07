@@ -5,14 +5,17 @@
 // Security: Requires active admin credentials, audited in activity_logs
 // ==============================================================================
 
-import React, { useState } from 'react';
-import { CreditCard, AlertCircle, Loader2, X, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CreditCard, AlertCircle, Loader2, X, Check, Search, UserCheck } from 'lucide-react';
 import { recordOfflinePayment } from '../../services/paymentService';
+import { searchCandidateSources, type CandidateSourceLookup } from '../../services/adminPaymentService';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 interface RecordOfflinePaymentModalProps {
-  applicationId: string;
-  applicationNumber: string;
-  candidateName: string;
+  applicationId?: string;
+  joiningFormId?: string;
+  applicationNumber?: string;
+  candidateName?: string;
   defaultAmount?: number;
   currentAdminName?: string;
   onSuccess: () => void;
@@ -20,23 +23,85 @@ interface RecordOfflinePaymentModalProps {
 }
 
 export const RecordOfflinePaymentModal: React.FC<RecordOfflinePaymentModalProps> = ({
-  applicationId,
-  applicationNumber,
-  candidateName,
+  applicationId: initialAppId,
+  joiningFormId: initialJoiningId,
+  applicationNumber: initialRef,
+  candidateName: initialName,
   defaultAmount = 500,
   currentAdminName = 'Admin',
   onSuccess,
   onClose
 }) => {
+  const { role, profile } = useAdminAuth();
+  const isVerifier = role === 'DOCUMENT_VERIFIER';
+
+  const [selectedAppId, setSelectedAppId] = useState<string | undefined>(initialAppId);
+  const [selectedJoiningId, setSelectedJoiningId] = useState<string | undefined>(initialJoiningId);
+  const [displayRef, setDisplayRef] = useState<string>(initialRef || '');
+  const [displayName, setDisplayName] = useState<string>(initialName || '');
+
+  // Candidate Search State for global modal use
+  const hasFixedTarget = Boolean(initialAppId || initialJoiningId);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<CandidateSourceLookup[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
   const [purpose, setPurpose] = useState<'REGISTRATION' | 'CONSULTANCY' | 'OTHER'>('REGISTRATION');
   const [amount, setAmount] = useState<number>(defaultAmount);
-  const [receivedBy, setReceivedBy] = useState<string>(currentAdminName);
+  const [receivedBy, setReceivedBy] = useState<string>(profile?.full_name || currentAdminName);
   const [notes, setNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Debounced candidate search if not fixed
+  useEffect(() => {
+    if (hasFixedTarget || searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchCandidateSources(searchQuery);
+        setSearchResults(results);
+      } catch (err) {
+        console.error('Search failed:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, hasFixedTarget]);
+
+  const handleSelectCandidate = (cand: CandidateSourceLookup) => {
+    if (cand.type === 'APPLICATION') {
+      setSelectedAppId(cand.id);
+      setSelectedJoiningId(undefined);
+    } else {
+      setSelectedJoiningId(cand.id);
+      setSelectedAppId(undefined);
+    }
+    setDisplayRef(cand.reference);
+    setDisplayName(cand.name);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isVerifier) {
+      setError('Unauthorized: Document Verifiers are not permitted to record offline payments.');
+      return;
+    }
+
+    if (!selectedAppId && !selectedJoiningId) {
+      setError('Please search and select a candidate or application first.');
+      return;
+    }
+
     if (!amount || amount <= 0) {
       setError('Please specify a valid payment amount.');
       return;
@@ -51,7 +116,8 @@ export const RecordOfflinePaymentModal: React.FC<RecordOfflinePaymentModalProps>
 
     try {
       const res = await recordOfflinePayment({
-        applicationId,
+        applicationId: selectedAppId,
+        joiningFormId: selectedJoiningId,
         purpose,
         amount,
         receivedBy: receivedBy.trim(),
@@ -133,18 +199,123 @@ export const RecordOfflinePaymentModal: React.FC<RecordOfflinePaymentModalProps>
           </button>
         </div>
 
-        {/* Candidate Context Pill */}
-        <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
-          <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Application:</div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
-            <span style={{ fontFamily: 'monospace', fontSize: '0.95rem', fontWeight: 800, color: '#192A56' }}>
-              {applicationNumber}
-            </span>
-            <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#334155' }}>
-              {candidateName}
-            </span>
+        {/* Document Verifier Role Warning */}
+        {isVerifier && (
+          <div style={{ backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#92400E', fontSize: '0.8rem' }}>
+            <AlertCircle size={16} style={{ flexShrink: 0 }} />
+            <span>Document Verifiers have read-only access and cannot record offline payments.</span>
           </div>
-        </div>
+        )}
+
+        {/* Candidate Context or Live Search */}
+        {hasFixedTarget || (selectedAppId || selectedJoiningId) ? (
+          <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
+                {selectedJoiningId && !selectedAppId ? 'Joining Dossier:' : 'Application:'}
+              </span>
+              {!hasFixedTarget && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedAppId(undefined);
+                    setSelectedJoiningId(undefined);
+                    setDisplayRef('');
+                    setDisplayName('');
+                  }}
+                  style={{ border: 'none', background: 'transparent', color: '#1D4ED8', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  Change Candidate
+                </button>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+              <span style={{ fontFamily: 'monospace', fontSize: '0.95rem', fontWeight: 800, color: '#192A56' }}>
+                {displayRef}
+              </span>
+              <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#334155' }}>
+                {displayName}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginBottom: '1.25rem', position: 'relative' }}>
+            <label style={{ display: 'block', fontSize: '0.775rem', fontWeight: 700, color: '#192A56', marginBottom: '0.35rem' }}>
+              Select Candidate / Reference *
+            </label>
+            <div style={{ position: 'relative' }}>
+              <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+              <input
+                type="text"
+                placeholder="Search by INQ-..., JOIN-..., name, or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                disabled={isSubmitting || isVerifier}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '0.65rem 0.85rem 0.65rem 2.25rem',
+                  backgroundColor: '#FCFBFB',
+                  border: '1px solid #D2CECE',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  color: '#192A56',
+                  outline: 'none'
+                }}
+              />
+              {isSearching && (
+                <Loader2 size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', animation: 'spin 1s linear infinite', color: '#94A3B8' }} />
+              )}
+            </div>
+
+            {/* Live Search Results Dropdown */}
+            {searchResults.length > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: '4px',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '8px',
+                  border: '1px solid #CBD5E1',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
+                  maxHeight: '180px',
+                  overflowY: 'auto',
+                  zIndex: 20
+                }}
+              >
+                {searchResults.map((item) => (
+                  <div
+                    key={`${item.type}-${item.id}`}
+                    onClick={() => handleSelectCandidate(item)}
+                    style={{
+                      padding: '0.6rem 0.85rem',
+                      borderBottom: '1px solid #F1F5F9',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
+                  >
+                    <div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#192A56' }}>
+                        {item.name}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748B', fontFamily: 'monospace' }}>
+                        {item.reference} • {item.company}
+                      </div>
+                    </div>
+                    <UserCheck size={16} color="#047857" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {error && (
           <div style={{ backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#991B1B', fontSize: '0.8rem' }}>
@@ -274,19 +445,19 @@ export const RecordOfflinePaymentModal: React.FC<RecordOfflinePaymentModalProps>
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isVerifier}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                backgroundColor: '#192A56',
+                backgroundColor: isVerifier ? '#94A3B8' : '#192A56',
                 color: '#FFFFFF',
                 border: 'none',
                 borderRadius: '6px',
                 padding: '0.65rem 1.25rem',
                 fontSize: '0.825rem',
                 fontWeight: 800,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer'
+                cursor: isSubmitting || isVerifier ? 'not-allowed' : 'pointer'
               }}
             >
               {isSubmitting ? (

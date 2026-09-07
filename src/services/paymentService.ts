@@ -155,7 +155,8 @@ export async function verifyPaymentWithServer(payload: {
  * Admin action to record an offline payment.
  */
 export async function recordOfflinePayment(payload: {
-  applicationId: string;
+  applicationId?: string;
+  joiningFormId?: string;
   purpose: string;
   amount: number;
   receivedBy: string;

@@ -1,18 +1,40 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Briefcase, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Search, Briefcase, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { Container } from '../components/common/Container';
 import { JobCard } from '../components/common/JobCard';
 import { Button } from '../components/common/Button';
-import { SAMPLE_JOBS } from '../data/jobsData';
+import { getPublicJobs } from '../services/jobService';
+import type { Job } from '../types';
 
 export const Jobs: React.FC = () => {
+  const [jobsList, setJobsList] = useState<Job[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedState, setSelectedState] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedType, setSelectedType] = useState('All');
 
+  const fetchJobs = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const jobs = await getPublicJobs();
+      setJobsList(jobs || []);
+    } catch (err: any) {
+      console.error('Error retrieving active vacancies:', err);
+      setError(err?.message || 'Unable to retrieve active vacancies at this time. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
+
   const filteredJobs = useMemo(() => {
-    return SAMPLE_JOBS.filter((job) => {
+    return jobsList.filter((job) => {
       const matchesSearch =
         job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         job.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -25,7 +47,7 @@ export const Jobs: React.FC = () => {
 
       return matchesSearch && matchesState && matchesCategory && matchesType;
     });
-  }, [searchTerm, selectedState, selectedCategory, selectedType]);
+  }, [jobsList, searchTerm, selectedState, selectedCategory, selectedType]);
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -76,9 +98,6 @@ export const Jobs: React.FC = () => {
             <p style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-secondary)', lineHeight: 1.65 }}>
               Browse genuine industrial, warehousing, security, and technical job openings across Maharashtra, Madhya Pradesh, and Chhattisgarh.
             </p>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: '0.5rem', fontStyle: 'italic' }}>
-              Note: Sample listings represent verified employer roles configured for Phase 1 demonstration.
-            </div>
           </div>
         </Container>
       </section>
@@ -86,6 +105,46 @@ export const Jobs: React.FC = () => {
       {/* Filter Bar & Job Listings */}
       <section className="section" style={{ minHeight: '60vh' }}>
         <Container size="xl">
+          {/* Error Alert */}
+          {error && (
+            <div style={{
+              backgroundColor: '#FEF2F2',
+              border: '1px solid #FCA5A5',
+              borderRadius: 'var(--radius-lg)',
+              padding: '1rem 1.5rem',
+              marginBottom: 'var(--space-6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#991B1B', fontSize: 'var(--text-sm)' }}>
+                <AlertCircle size={20} />
+                <span>{error}</span>
+              </div>
+              <button
+                type="button"
+                onClick={fetchJobs}
+                className="btn-admin-primary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.4rem 0.85rem',
+                  backgroundColor: '#DC2626',
+                  color: '#FFFFFF',
+                  borderRadius: '6px',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <RefreshCw size={12} /> Retry
+              </button>
+            </div>
+          )}
+
           {/* Filters */}
           <div className="jobs-filter-bar">
             {/* Search Input */}
@@ -144,29 +203,71 @@ export const Jobs: React.FC = () => {
           {/* Results Count & Reset */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-midnight-navy)', fontWeight: 600 }}>
-              Showing {filteredJobs.length} {filteredJobs.length === 1 ? 'Opportunity' : 'Opportunities'}
+              Showing {filteredJobs.length} {filteredJobs.length === 1 ? 'Opportunity' : 'Opportunities'}{isLoading ? ' (Loading live openings...)' : ''}
             </span>
 
             {(searchTerm || selectedState !== 'All' || selectedCategory !== 'All' || selectedType !== 'All') && (
               <button
                 type="button"
                 onClick={resetFilters}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: 'var(--text-xs)', color: 'var(--color-dusty-rose-dark)', fontWeight: 600 }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: 'var(--text-xs)', color: 'var(--color-dusty-rose-dark)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
               >
                 <RefreshCw size={12} /> Reset Filters
               </button>
             )}
           </div>
 
+          {/* Loading state */}
+          {isLoading && jobsList.length === 0 && (
+            <div style={{
+              textAlign: 'center',
+              padding: 'var(--space-16) var(--space-8)',
+              color: 'var(--color-text-secondary)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '1rem'
+            }}>
+              <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-midnight-navy)' }} />
+              <p style={{ fontSize: 'var(--text-sm)' }}>Fetching current job openings from employer network...</p>
+            </div>
+          )}
+
           {/* Job Cards List */}
-          {filteredJobs.length > 0 ? (
+          {!isLoading && filteredJobs.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               {filteredJobs.map((job) => (
                 <JobCard key={job.id} job={job} />
               ))}
             </div>
-          ) : (
-            /* Empty State */
+          )}
+
+          {/* Empty State: Zero Openings in Database */}
+          {!isLoading && !error && jobsList.length === 0 && (
+            <div style={{
+              background: 'var(--color-pearl-surface)',
+              borderRadius: 'var(--radius-xl)',
+              padding: 'var(--space-16) var(--space-8)',
+              textAlign: 'center',
+              border: '1px dashed var(--color-border)'
+            }}>
+              <Briefcase size={48} style={{ color: 'var(--color-text-muted)', margin: '0 auto var(--space-4)' }} />
+              <h3 style={{ color: 'var(--color-midnight-navy)', marginBottom: 'var(--space-2)' }}>
+                No Current Openings
+              </h3>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', maxWidth: '480px', margin: '0 auto var(--space-6)' }}>
+                There are currently no active job vacancies available in this cycle. New employer requirements are published regularly. You can submit a candidate enquiry for future placement.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-4)' }}>
+                <Button to="/enquiry/job-seeker" variant="primary" size="sm">
+                  Submit Candidate Enquiry
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Empty State: Filter mismatch */}
+          {!isLoading && !error && jobsList.length > 0 && filteredJobs.length === 0 && (
             <div style={{
               background: 'var(--color-pearl-surface)',
               borderRadius: 'var(--radius-xl)',
@@ -185,7 +286,7 @@ export const Jobs: React.FC = () => {
                 <Button onClick={resetFilters} variant="outline" size="sm">
                   Clear Filters
                 </Button>
-                <Button to="/enquiry" variant="primary" size="sm">
+                <Button to="/enquiry/job-seeker" variant="primary" size="sm">
                   Submit Candidate Enquiry
                 </Button>
               </div>

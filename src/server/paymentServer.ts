@@ -327,9 +327,18 @@ export async function verifyPaymentHandler(
     .update(signaturePayload)
     .digest('hex');
 
+  const isProd = process.env.NODE_ENV === 'production';
+
+  // In production, reject simulated signatures unconditionally
+  if (isProd && razorpay_signature === 'simulated_success') {
+    console.error(`[PAYMENT_VERIFY] Blocked simulated payment attempt in production for payment ${paymentId}`);
+    return { status: 400, data: { success: false, error: 'Simulated payment verification is strictly disabled in production.' } };
+  }
+
   const isSimulation =
-    razorpay_signature === 'simulated_success' ||
-    RAZORPAY_KEY_SECRET === 'test_secret_TigerGlobal2026';
+    !isProd &&
+    (razorpay_signature === 'simulated_success' ||
+      RAZORPAY_KEY_SECRET === 'test_secret_TigerGlobal2026');
 
   const isSignatureValid = isSimulation || crypto.timingSafeEqual(
     Buffer.from(expectedSignature, 'utf8'),
@@ -508,7 +517,8 @@ export async function webhookHandler(rawBody: string, signatureHeader?: string |
  */
 export async function recordOfflinePaymentHandler(
   body: {
-    applicationId: string;
+    applicationId?: string;
+    joiningFormId?: string;
     purpose: string;
     amount: number;
     receivedBy: string;
@@ -516,10 +526,10 @@ export async function recordOfflinePaymentHandler(
   },
   authHeader?: string
 ) {
-  const { applicationId, purpose, amount, receivedBy, notes } = body;
+  const { applicationId, joiningFormId, purpose, amount, receivedBy, notes } = body;
 
-  if (!applicationId || !purpose || !amount || !receivedBy) {
-    return { status: 400, data: { success: false, error: 'Missing required offline payment fields' } };
+  if ((!applicationId && !joiningFormId) || !purpose || !amount || !receivedBy) {
+    return { status: 400, data: { success: false, error: 'Missing required offline payment fields (source reference, purpose, amount, or receivedBy)' } };
   }
 
   const auth = await authenticateRequest(authHeader);
@@ -527,7 +537,7 @@ export async function recordOfflinePaymentHandler(
     return { status: 401, data: { success: false, error: auth.error || 'Unauthorized' } };
   }
 
-  // Verify admin authorization
+  // Verify admin authorization & hardened role checks
   const { data: adminProfile } = await getSupabaseServer()
     .from('admin_profiles')
     .select('role, active')
@@ -536,15 +546,27 @@ export async function recordOfflinePaymentHandler(
     .maybeSingle();
 
   if (!adminProfile) {
-    return { status: 403, data: { success: false, error: 'Only authorized administrators can record offline payments' } };
+    return { status: 403, data: { success: false, error: 'Only authorized administrators can record offline payments.' } };
+  }
+
+  const allowedRoles = ['SUPER_ADMIN', 'COORDINATOR', 'ACCOUNTANT'];
+  if (!allowedRoles.includes(adminProfile.role)) {
+    return {
+      status: 403,
+      data: {
+        success: false,
+        error: `Role '${adminProfile.role}' is not authorized to record offline payments. Document Verifiers have read-only access.`
+      }
+    };
   }
 
   const { data: rpcRes, error: rpcErr } = await getSupabaseServer().rpc('record_offline_payment', {
-    p_app_id: applicationId,
+    p_app_id: applicationId || null,
     p_purpose: purpose,
     p_amount: amount,
     p_received_by: receivedBy,
-    p_notes: notes || undefined
+    p_notes: notes || undefined,
+    p_joining_form_id: joiningFormId || null
   });
 
   if (rpcErr || !rpcRes) {
