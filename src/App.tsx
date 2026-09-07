@@ -116,6 +116,7 @@ export const App: React.FC = () => {
             <Route path="/enquiry/job-seeker" element={<JobSeekerEnquiryPage />} />
             <Route path="/enquiry/employer" element={<EmployerEnquiryPage />} />
             <Route path="/employers" element={<Employers />} />
+            <Route path="/for-employers" element={<Employers />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/joining/access" element={<JoiningAccessPage />} />

@@ -27,7 +27,7 @@ import {
 type LoginMethod = 'PASSWORD' | 'EMAIL_OTP';
 
 export const AdminLoginPage: React.FC = () => {
-  const { signIn, isAdmin, authLoading, profileLoading, error: authError } = useAdminAuth();
+  const { signIn, refreshProfile, isAdmin, authLoading, profileLoading, error: authError } = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -148,6 +148,9 @@ export const AdminLoginPage: React.FC = () => {
       if (error || !data.user) {
         throw new Error(error?.message || 'Invalid or expired access code.');
       }
+
+      // Ensure admin profile verification completes before navigating
+      await refreshProfile();
 
       const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/admin';
       navigate(from, { replace: true });

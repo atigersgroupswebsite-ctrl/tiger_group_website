@@ -9,7 +9,7 @@
 // ==============================================================================
 
 import nodemailer from 'nodemailer';
-import { getPaymentReceiptPdfBuffer, type PaymentReceiptData } from '../utils/paymentReceiptGenerator';
+import { getPaymentReceiptPdfBuffer, type PaymentReceiptData } from '../utils/paymentReceiptGenerator.ts';
 
 export interface SendReceiptEmailResult {
   success: boolean;

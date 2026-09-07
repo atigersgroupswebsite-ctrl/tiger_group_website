@@ -62,7 +62,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<AdminAuthErrorCode | null>(null);
 
-  // Fetch admin profile for a given user ID with detailed error tracking
+  // Fetch admin profile for a given user ID with detailed error tracking and transient retry
   const fetchAdminProfile = useCallback(async (userId: string): Promise<ProfileFetchResult> => {
     try {
       const { data, error: queryError } = await supabase
@@ -71,12 +71,26 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .eq('id', userId)
         .maybeSingle();
 
-      if (queryError) {
-        console.error('[AdminAuth] Error querying admin_profiles:', queryError.message, queryError.code);
-        return { profile: null, error: { message: queryError.message, code: queryError.code } };
+      if (!queryError) {
+        return { profile: data as AdminProfileRow | null };
       }
 
-      return { profile: data as AdminProfileRow | null };
+      // If initial attempt failed, perform a brief fallback retry (500ms) for transient connection/token latency
+      console.warn('[AdminAuth] Retrying admin profile fetch after initial failure:', queryError.message);
+      await new Promise((res) => setTimeout(res, 500));
+
+      const { data: retryData, error: retryError } = await supabase
+        .from('admin_profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (retryError) {
+        console.error('[AdminAuth] Error querying admin_profiles after retry:', retryError.message, retryError.code);
+        return { profile: null, error: { message: retryError.message, code: retryError.code } };
+      }
+
+      return { profile: retryData as AdminProfileRow | null };
     } catch (err: any) {
       console.error('[AdminAuth] Unexpected error querying admin_profiles:', err);
       return { profile: null, error: { message: err?.message || 'Unexpected query error' } };
