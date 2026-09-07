@@ -44,8 +44,10 @@ import { Contact } from './pages/Contact';
 import { Joining } from './pages/Joining';
 import { JoiningAccessPage } from './pages/JoiningAccessPage';
 import { CandidatePaymentPage } from './pages/CandidatePaymentPage';
-import { Policy } from './pages/Policy';
+import { TermsAndConditionsPage } from './pages/TermsAndConditionsPage';
+import { ConsultancyPolicyPage } from './pages/ConsultancyPolicyPage';
 import { LegalDocumentsPage } from './pages/LegalDocumentsPage';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 
 export const App: React.FC = () => {
   return (
@@ -112,8 +114,11 @@ export const App: React.FC = () => {
             <Route path="/joining/access" element={<JoiningAccessPage />} />
             <Route path="/joining/payment" element={<CandidatePaymentPage />} />
             <Route path="/joining" element={<Joining />} />
-            <Route path="/policy" element={<Policy />} />
+            <Route path="/terms-and-conditions" element={<TermsAndConditionsPage />} />
+            <Route path="/consultancy-policy" element={<ConsultancyPolicyPage />} />
             <Route path="/legal-documents" element={<LegalDocumentsPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/policy" element={<TermsAndConditionsPage />} />
 
             {/* Public 404 Fallback - Only catches non-admin URLs */}
             <Route path="*" element={<Home />} />

@@ -93,10 +93,10 @@ export const Footer: React.FC = () => {
           <div>
             <h5 className="footer-title">Legal / Compliance</h5>
             <ul className="footer-links">
-              <li><Link to="/policy#terms" className="footer-link"><ArrowRight size={12} /> Terms & Conditions</Link></li>
-              <li><Link to="/policy#consultancy" className="footer-link"><ArrowRight size={12} /> Consultancy Policy</Link></li>
+              <li><Link to="/terms-and-conditions" className="footer-link"><ArrowRight size={12} /> Terms & Conditions</Link></li>
+              <li><Link to="/consultancy-policy" className="footer-link"><ArrowRight size={12} /> Consultancy Policy</Link></li>
               <li><Link to="/legal-documents" className="footer-link"><ArrowRight size={12} /> Legal Documents</Link></li>
-              <li><Link to="/policy#privacy" className="footer-link"><ArrowRight size={12} /> Privacy Policy</Link></li>
+              <li><Link to="/privacy-policy" className="footer-link"><ArrowRight size={12} /> Privacy Policy</Link></li>
             </ul>
           </div>
 
@@ -139,7 +139,7 @@ export const Footer: React.FC = () => {
             © {new Date().getFullYear()} A TIGER GLOBAL Career Solution & Consultancy. All rights reserved.
           </div>
           <div style={{ display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap' }}>
-            <Link to="/policy" style={{ color: 'inherit' }}>Policy & Terms</Link>
+            <Link to="/terms-and-conditions" style={{ color: 'inherit' }}>Policy & Terms</Link>
             <Link to="/joining" style={{ color: 'inherit' }}>Joining Guidelines</Link>
             <span>Proprietorship Enterprise</span>
           </div>

@@ -11,7 +11,13 @@ export const Container: React.FC<ContainerProps> = ({
   className = '',
   size = 'xl'
 }) => {
-  const sizeClass = size === 'wide' ? 'container-wide' : size === 'sm' ? 'container-sm' : size === 'md' ? 'container-md' : 'container';
+  const sizeClass = size === 'wide'
+    ? 'container container-wide'
+    : size === 'sm'
+    ? 'container container-sm'
+    : size === 'md'
+    ? 'container container-md'
+    : 'container';
   return (
     <div className={`${sizeClass} ${className}`}>
       {children}

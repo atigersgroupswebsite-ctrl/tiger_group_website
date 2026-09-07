@@ -147,7 +147,7 @@ export const Navbar: React.FC = () => {
                   </Link>
                 );
               })}
-              <Link to="/policy" className="mobile-nav-link">
+              <Link to="/terms-and-conditions" className="mobile-nav-link">
                 Policy & Terms
               </Link>
             </nav>

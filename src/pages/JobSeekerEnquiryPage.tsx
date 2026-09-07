@@ -462,7 +462,7 @@ export const JobSeekerEnquiryPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <Link to="/policy" className="form-terms-link" target="_blank" rel="noopener noreferrer">
+                      <Link to="/terms-and-conditions" className="form-terms-link" target="_blank" rel="noopener noreferrer">
                         <span>View Consultancy Terms & Conditions →</span>
                       </Link>
                     </div>
