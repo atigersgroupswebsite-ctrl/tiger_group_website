@@ -65,11 +65,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseM
       <div className="admin-sidebar-brand">
         <img
           src="/assets/tiger-logo.jpeg"
-          alt="A TIGER GROUPS"
+          alt="TIGER GROUPS"
           className="admin-sidebar-logo"
         />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="admin-sidebar-title">A TIGER GROUPS</div>
+          <div className="admin-sidebar-title">TIGER GROUPS</div>
           <div className="admin-sidebar-subtitle">Internal Administration</div>
         </div>
 

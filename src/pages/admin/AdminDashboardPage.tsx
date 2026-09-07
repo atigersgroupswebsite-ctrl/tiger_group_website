@@ -159,7 +159,7 @@ export const AdminDashboardPage: React.FC = () => {
             Operational Overview
           </h1>
           <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
-            Real-time telemetry and candidate tracking across A TIGER GROUPS business units
+            Real-time telemetry and candidate tracking across TIGER GROUPS business units
           </p>
         </div>
 

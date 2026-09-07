@@ -34,7 +34,7 @@ export const Enquiry: React.FC = () => {
               color: 'var(--color-midnight-navy)'
             }}
           >
-            <span>A TIGER GROUPS</span>
+            <span>TIGER GROUPS</span>
             <span style={{ color: 'var(--color-champagne-dark)' }}>→</span>
             <span style={{ color: 'var(--color-champagne-dark)' }}>CAREER SOLUTION VERTICAL</span>
           </motion.div>

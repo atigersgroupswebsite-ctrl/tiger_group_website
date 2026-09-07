@@ -45,6 +45,7 @@ import { Joining } from './pages/Joining';
 import { JoiningAccessPage } from './pages/JoiningAccessPage';
 import { CandidatePaymentPage } from './pages/CandidatePaymentPage';
 import { Policy } from './pages/Policy';
+import { LegalDocumentsPage } from './pages/LegalDocumentsPage';
 
 export const App: React.FC = () => {
   return (
@@ -112,6 +113,7 @@ export const App: React.FC = () => {
             <Route path="/joining/payment" element={<CandidatePaymentPage />} />
             <Route path="/joining" element={<Joining />} />
             <Route path="/policy" element={<Policy />} />
+            <Route path="/legal-documents" element={<LegalDocumentsPage />} />
 
             {/* Public 404 Fallback - Only catches non-admin URLs */}
             <Route path="*" element={<Home />} />

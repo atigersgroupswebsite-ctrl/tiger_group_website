@@ -59,6 +59,18 @@ export const RegistrationCard: React.FC<RegistrationCardProps> = ({
 
         <h3 className="compliance-card-title">{item.title}</h3>
         <span className="compliance-card-authority">{item.authority}</span>
+
+        {/* Prominent Registration / Reference Display */}
+        <div className="compliance-card-reg-block">
+          <span className="compliance-card-reg-label">{item.referenceLabel}</span>
+          <span className="compliance-card-reg-number">{item.registrationReference}</span>
+        </div>
+
+        <div className="compliance-card-entity">
+          <span className="compliance-card-entity-label">{item.entityLabel}:</span>
+          <span className="compliance-card-entity-name">{item.entityName}</span>
+        </div>
+
         <p className="compliance-card-desc">{item.description}</p>
       </div>
 
@@ -66,9 +78,9 @@ export const RegistrationCard: React.FC<RegistrationCardProps> = ({
         type="button"
         className="compliance-card-action"
         onClick={() => onSelect(item)}
-        aria-label={`View details for ${item.title}`}
+        aria-label={`View verified record details for ${item.title}`}
       >
-        <span>VIEW DETAILS</span>
+        <span>VIEW RECORD DETAILS</span>
         <ArrowRight size={14} className="compliance-card-action-icon" />
       </button>
     </motion.div>

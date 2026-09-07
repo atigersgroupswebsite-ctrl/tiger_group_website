@@ -226,13 +226,61 @@
   line-height: 1.5;
 }
 
-.compliance-modal-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-6);
-  padding-top: var(--space-6);
-  border-top: 1px solid rgba(25, 42, 86, 0.08);
+.compliance-card-reg-block {
+  background-color: rgba(25, 42, 86, 0.03);
+  border: 1px solid rgba(25, 42, 86, 0.08);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.compliance-card-reg-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 0.2rem;
+}
+
+.compliance-card-reg-number {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-midnight-navy);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+}
+
+.compliance-card-entity {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-4);
+  line-height: 1.4;
+}
+
+.compliance-card-entity-label {
+  font-weight: 600;
+  color: var(--color-midnight-navy);
+  margin-right: 0.25rem;
+}
+
+.compliance-card-entity-name {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.compliance-code-pill {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+  background: rgba(25, 42, 86, 0.04);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  display: inline-block;
+  width: fit-content;
 }
 
 .compliance-notice-pill {

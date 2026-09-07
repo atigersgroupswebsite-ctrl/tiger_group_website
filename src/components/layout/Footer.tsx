@@ -13,12 +13,12 @@ export const Footer: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: 'var(--space-4)' }}>
               <img
                 src="/assets/tiger-logo.jpeg"
-                alt="A TIGER GROUPS Logo"
+                alt="TIGER GROUPS Logo"
                 className="footer-brand-logo"
               />
               <div>
                 <h4 style={{ color: 'var(--color-pearl-white)', fontSize: '1.15rem', fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>
-                  A TIGER GROUPS
+                  TIGER GROUPS
                 </h4>
                 <span style={{ color: 'var(--color-champagne)', fontSize: '0.75rem', letterSpacing: '0.05em' }}>
                   Enterprise & Business Ecosystem
@@ -95,6 +95,7 @@ export const Footer: React.FC = () => {
             <ul className="footer-links">
               <li><Link to="/policy#terms" className="footer-link"><ArrowRight size={12} /> Terms & Conditions</Link></li>
               <li><Link to="/policy#consultancy" className="footer-link"><ArrowRight size={12} /> Consultancy Policy</Link></li>
+              <li><Link to="/legal-documents" className="footer-link"><ArrowRight size={12} /> Legal Documents</Link></li>
               <li><Link to="/policy#privacy" className="footer-link"><ArrowRight size={12} /> Privacy Policy</Link></li>
             </ul>
           </div>

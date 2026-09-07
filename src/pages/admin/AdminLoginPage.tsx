@@ -96,7 +96,7 @@ export const AdminLoginPage: React.FC = () => {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <img
             src="/assets/tiger-logo.jpeg"
-            alt="A TIGER GROUPS"
+            alt="TIGER GROUPS"
             style={{
               width: '64px',
               height: '64px',
@@ -121,7 +121,7 @@ export const AdminLoginPage: React.FC = () => {
               margin: '0 0 0.35rem 0'
             }}
           >
-            A TIGER GROUPS
+            TIGER GROUPS
           </h1>
           <p
             style={{
@@ -323,7 +323,7 @@ export const AdminLoginPage: React.FC = () => {
             lineHeight: 1.5
           }}
         >
-          Confidential System. A TIGER GROUPS authorized personnel only. All access attempts and
+          Confidential System. TIGER GROUPS authorized personnel only. All access attempts and
           administrative operations are monitored and recorded.
         </div>
       </div>

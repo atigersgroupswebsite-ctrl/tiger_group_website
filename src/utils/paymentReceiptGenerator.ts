@@ -80,7 +80,7 @@ export function buildPaymentReceiptPdf(data: PaymentReceiptData): jsPDF {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...slate);
-  doc.text('Unit of A TIGER GROUPS • Certified Industrial Workforce & Placement Consultancy', margin, y);
+  doc.text('Unit of TIGER GROUPS • Certified Industrial Workforce & Placement Consultancy', margin, y);
   doc.text('Official Email: info@atigergroup.com  •  Website: www.atigergroup.com', margin, y + 4);
 
   y += 8;

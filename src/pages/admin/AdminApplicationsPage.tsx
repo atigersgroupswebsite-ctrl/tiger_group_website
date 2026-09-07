@@ -193,7 +193,7 @@ export const AdminApplicationsPage: React.FC = () => {
             Candidate Applications
           </h1>
           <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
-            Operational recruitment directory for A TIGER GROUPS registered candidates
+            Operational recruitment directory for TIGER GROUPS registered candidates
           </p>
         </div>
 

@@ -607,7 +607,7 @@ export const AdminExportsPage: React.FC = () => {
           Confidential Business Data Protection:
         </strong>
         Enquiry export files contain candidate contact details and business requirements. Only authorized
-        personnel of A TIGER GROUPS are permitted to download and process these files. Candidate KYC documents,
+        personnel of TIGER GROUPS are permitted to download and process these files. Candidate KYC documents,
         Aadhaar, PAN, and banking information are strictly excluded from basic enquiry exports.
       </div>
     </div>
