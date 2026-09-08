@@ -619,3 +619,31 @@ export async function getJobApplications(
     return { success: false, error: err?.message || 'Failed to fetch job applications.' };
   }
 }
+
+/**
+ * Permanently deletes a job posting from the database.
+ * Restricted to SUPER_ADMIN. Safely decouples applications (setting applications.job_id = NULL)
+ * and records an operational audit log in public.activity_logs.
+ */
+export async function deleteJobPermanently(
+  jobId: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  if (!isSupabaseConfigured) {
+    return { success: false, error: 'Database is not configured.' };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('delete_job_permanently', {
+      target_job_id: jobId
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to delete job permanently.' };
+  }
+}
+

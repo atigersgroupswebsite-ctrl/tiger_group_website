@@ -367,7 +367,6 @@ export const AdminReferenceSlipsPage: React.FC = () => {
 
       {/* Filter / Search Bar */}
       <div
-        className="admin-card"
         style={{
           padding: '1rem 1.25rem',
           marginBottom: '1.5rem',
@@ -375,53 +374,32 @@ export const AdminReferenceSlipsPage: React.FC = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '1rem'
+          gap: '1rem',
+          backgroundColor: '#FFFFFF',
+          border: '1px solid #E2E8F0',
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '280px' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              backgroundColor: '#F8FAFC',
-              padding: '0.55rem 0.85rem',
-              borderRadius: '8px',
-              border: '1px solid #CBD5E1',
-              flex: 1
-            }}
-          >
-            <Search size={16} color="#64748B" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search reference no., candidate name, INQ-... or JOIN-..."
-              style={{
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                width: '100%',
-                fontSize: '0.85rem',
-                color: '#0F172A'
-              }}
-            />
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '280px', position: 'relative' }}>
+          <Search size={16} color="#64748B" style={{ position: 'absolute', left: '0.85rem' }} />
+          <input
+            type="text"
+            className="form-control"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search reference no., candidate name, INQ-... or JOIN-..."
+            style={{ paddingLeft: '2.5rem' }}
+          />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           {/* Result Filter */}
           <select
+            className="form-control form-select"
             value={resultFilter}
             onChange={(e) => setResultFilter(e.target.value)}
-            style={{
-              padding: '0.55rem 0.75rem',
-              borderRadius: '8px',
-              border: '1px solid #CBD5E1',
-              backgroundColor: '#FFFFFF',
-              fontSize: '0.85rem',
-              color: '#334155'
-            }}
+            style={{ width: 'auto', minWidth: '150px' }}
           >
             <option value="ALL">All Outcomes</option>
             <option value="SELECTED">Selected</option>
@@ -433,28 +411,20 @@ export const AdminReferenceSlipsPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <input
               type="date"
+              className="form-control"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               title="Filter from date"
-              style={{
-                padding: '0.5rem 0.65rem',
-                borderRadius: '8px',
-                border: '1px solid #CBD5E1',
-                fontSize: '0.825rem'
-              }}
+              style={{ width: 'auto', padding: '0.45rem 0.65rem' }}
             />
             <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>to</span>
             <input
               type="date"
+              className="form-control"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               title="Filter to date"
-              style={{
-                padding: '0.5rem 0.65rem',
-                borderRadius: '8px',
-                border: '1px solid #CBD5E1',
-                fontSize: '0.825rem'
-              }}
+              style={{ width: 'auto', padding: '0.45rem 0.65rem' }}
             />
           </div>
 
@@ -462,17 +432,8 @@ export const AdminReferenceSlipsPage: React.FC = () => {
             type="button"
             onClick={loadSlips}
             title="Refresh Directory"
-            style={{
-              padding: '0.55rem',
-              borderRadius: '8px',
-              border: '1px solid #CBD5E1',
-              backgroundColor: '#FFFFFF',
-              color: '#475569',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
+            className="btn btn-outline"
+            style={{ padding: '0.55rem 0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -500,18 +461,51 @@ export const AdminReferenceSlipsPage: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={9} style={{ padding: '3rem', textAlign: 'center' }}>
-                    <Loader2 size={28} className="animate-spin" color="#4F46E5" style={{ margin: '0 auto 0.5rem' }} />
+                    <Loader2 size={28} className="animate-spin" color="var(--color-champagne-dark)" style={{ margin: '0 auto 0.5rem' }} />
                     <span style={{ fontSize: '0.825rem', color: '#64748B' }}>Loading reference slips...</span>
                   </td>
                 </tr>
               ) : slips.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: '3rem', textAlign: 'center' }}>
-                    <FileCheck size={32} color="#94A3B8" style={{ margin: '0 auto 0.75rem' }} />
-                    <p style={{ margin: 0, fontWeight: 700, color: '#334155' }}>No Reference Slips Found</p>
-                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: '#64748B' }}>
-                      Click "Create Reference Slip" to issue an official slip for a candidate.
+                  <td colSpan={9} style={{ padding: '3.5rem 1.5rem', textAlign: 'center' }}>
+                    <div
+                      style={{
+                        width: '4rem',
+                        height: '4rem',
+                        borderRadius: '50%',
+                        backgroundColor: '#F8FAFC',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 1.25rem'
+                      }}
+                    >
+                      <FileCheck size={32} color="#94A3B8" />
+                    </div>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: '1.125rem', color: 'var(--color-midnight-navy)' }}>
+                      No Reference Slips Found
                     </p>
+                    <p style={{ margin: '0.35rem 0 1.5rem', fontSize: '0.85rem', color: '#64748B' }}>
+                      Click "Create Reference Slip" to issue an official 2-page reference slip for a candidate.
+                    </p>
+                    {canCreate && (
+                      <button
+                        type="button"
+                        onClick={() => setIsCandidateModalOpen(true)}
+                        className="btn btn-primary"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.625rem 1.25rem',
+                          fontSize: '0.875rem',
+                          fontWeight: 700
+                        }}
+                      >
+                        <Plus size={16} />
+                        <span>CREATE REFERENCE SLIP</span>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -743,15 +737,15 @@ export const AdminReferenceSlipsPage: React.FC = () => {
           candidateInfo={
             selectedCandidateForNewSlip
               ? {
-                  sourceType: selectedCandidateForNewSlip.type,
-                  sourceId: selectedCandidateForNewSlip.id,
-                  sourceReference: selectedCandidateForNewSlip.reference,
-                  fullName: selectedCandidateForNewSlip.candidateName,
-                  fatherName: '',
-                  mobile: '',
-                  email: '',
-                  address: ''
-                }
+                sourceType: selectedCandidateForNewSlip.type,
+                sourceId: selectedCandidateForNewSlip.id,
+                sourceReference: selectedCandidateForNewSlip.reference,
+                fullName: selectedCandidateForNewSlip.candidateName,
+                fatherName: '',
+                mobile: '',
+                email: '',
+                address: ''
+              }
               : null
           }
         />

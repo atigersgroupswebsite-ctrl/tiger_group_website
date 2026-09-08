@@ -9,13 +9,14 @@
 // ==============================================================================
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import {
   getAllJobs,
   createJob,
   updateJob,
   setJobStatus,
+  deleteJobPermanently,
   type JobWithCompany,
   type CreateJobInput,
   type UpdateJobInput
@@ -28,6 +29,7 @@ import {
   Search,
   RefreshCw,
   Edit2,
+  Trash2,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -70,14 +72,30 @@ const JOB_STATUS_CONFIG: Record<JobStatus, { label: string; color: string; bg: s
 };
 
 export const AdminJobsPage: React.FC = () => {
+  const location = useLocation();
   const { role } = useAdminAuth();
   const canManage = role === 'SUPER_ADMIN' || role === 'COORDINATOR';
+  const isSuperAdmin = role === 'SUPER_ADMIN';
 
   const [jobs, setJobs] = useState<JobWithCompany[]>([]);
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Deletion Modal State
+  const [deleteTargetJob, setDeleteTargetJob] = useState<JobWithCompany | null>(null);
+  const [confirmTitleInput, setConfirmTitleInput] = useState<string>('');
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Notification from detail page
+  useEffect(() => {
+    if (location.state && (location.state as any).deletedNotification) {
+      setSuccessMessage((location.state as any).deletedNotification);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -109,6 +127,33 @@ export const AdminJobsPage: React.FC = () => {
   // Status Change Confirmation
   const [statusChangeTarget, setStatusChangeTarget] = useState<{ job: JobWithCompany; newStatus: JobStatus } | null>(null);
   const [statusChanging, setStatusChanging] = useState<boolean>(false);
+
+  // Execute Permanent Job Deletion
+  const handleExecuteDelete = async () => {
+    if (!deleteTargetJob || !isSuperAdmin) return;
+    if (confirmTitleInput !== deleteTargetJob.title) {
+      setDeleteError(`Please type exact job title "${deleteTargetJob.title}" to confirm.`);
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const res = await deleteJobPermanently(deleteTargetJob.id);
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to delete job.');
+      }
+
+      setJobs((prev) => prev.filter((j) => j.id !== deleteTargetJob.id));
+      setSuccessMessage(`Job posting "${deleteTargetJob.title}" was permanently deleted.`);
+      setDeleteTargetJob(null);
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete job.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Load Companies for Dropdowns
   useEffect(() => {
@@ -919,6 +964,29 @@ export const AdminJobsPage: React.FC = () => {
                                   <PlayCircle size={14} />
                                 </button>
                               )}
+
+                              {isSuperAdmin && (
+                                <button
+                                  onClick={() => {
+                                    setDeleteTargetJob(job);
+                                    setConfirmTitleInput('');
+                                    setDeleteError(null);
+                                  }}
+                                  title="Permanently Delete Job (Super Admin)"
+                                  style={{
+                                    padding: '5px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #FECACA',
+                                    color: '#DC2626',
+                                    backgroundColor: '#FEF2F2',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
@@ -1727,6 +1795,195 @@ export const AdminJobsPage: React.FC = () => {
               >
                 {statusChanging && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
                 <span>Confirm</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteTargetJob && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(25, 42, 86, 0.7)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 160,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+          onClick={() => !isDeleting && setDeleteTargetJob(null)}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E2DFD8',
+              borderRadius: '12px',
+              maxWidth: '520px',
+              width: '100%',
+              padding: '2rem',
+              boxShadow: '0 20px 40px -10px rgba(25, 42, 86, 0.3)',
+              position: 'relative'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  backgroundColor: '#FEE2E2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#DC2626',
+                  flexShrink: 0
+                }}
+              >
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h2
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: '1.25rem',
+                    fontWeight: 800,
+                    color: '#192A56',
+                    margin: 0
+                  }}
+                >
+                  Delete Job Opening
+                </h2>
+                <div style={{ fontSize: '0.75rem', color: '#DC2626', fontWeight: 600, marginTop: '2px' }}>
+                  Irreversible Destructive Action
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: '#4A5568', lineHeight: 1.5, marginBottom: '1rem' }}>
+              This will permanently delete the job opening from the operational database and remove it immediately from all public job listings.
+            </p>
+
+            <div
+              style={{
+                backgroundColor: '#F8F9FA',
+                border: '1px solid #E2DFD8',
+                borderRadius: '8px',
+                padding: '0.85rem 1rem',
+                marginBottom: '1.25rem'
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Job Title:</div>
+              <div
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: '1.05rem',
+                  fontWeight: 800,
+                  color: '#192A56',
+                  marginTop: '2px'
+                }}
+              >
+                {deleteTargetJob.title}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#4A5568', marginTop: '4px' }}>
+                Company: <strong>{deleteTargetJob.company?.name || 'Unassigned'}</strong> • Location: <strong>{deleteTargetJob.location}</strong>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 600, marginTop: '6px' }}>
+                Protected History: Candidate applications will remain preserved and safely decoupled.
+              </div>
+            </div>
+
+            {deleteError && (
+              <div
+                style={{
+                  backgroundColor: '#FBF0EF',
+                  border: '1px solid #EDA6A3',
+                  borderRadius: '8px',
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem'
+                }}
+              >
+                <AlertCircle size={18} color="#C9726F" />
+                <span style={{ fontSize: '0.825rem', color: '#C9726F', fontWeight: 600 }}>
+                  {deleteError}
+                </span>
+              </div>
+            )}
+
+            <p style={{ fontSize: '0.825rem', color: '#192A56', fontWeight: 600, marginBottom: '0.5rem' }}>
+              Please type <code style={{ backgroundColor: '#F1F5F9', padding: '2px 5px', borderRadius: '4px', color: '#DC2626' }}>{deleteTargetJob.title}</code> to confirm:
+            </p>
+
+            <input
+              type="text"
+              value={confirmTitleInput}
+              onChange={(e) => setConfirmTitleInput(e.target.value)}
+              placeholder={deleteTargetJob.title}
+              disabled={isDeleting}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '0.65rem 0.85rem',
+                backgroundColor: '#FCFBFB',
+                border: '1px solid',
+                borderColor: confirmTitleInput === deleteTargetJob.title ? '#10B981' : '#D2CECE',
+                borderRadius: '6px',
+                fontFamily: 'inherit',
+                fontSize: '0.9rem',
+                color: '#192A56',
+                outline: 'none',
+                marginBottom: '1.5rem'
+              }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTargetJob(null);
+                  setConfirmTitleInput('');
+                  setDeleteError(null);
+                }}
+                disabled={isDeleting}
+                className="btn-admin-secondary"
+              >
+                CANCEL
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteDelete}
+                disabled={isDeleting || confirmTitleInput !== deleteTargetJob.title}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: confirmTitleInput === deleteTargetJob.title ? '#DC2626' : '#FCA5A5',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '0.6rem 1.25rem',
+                  fontSize: '0.825rem',
+                  fontWeight: 800,
+                  cursor: confirmTitleInput === deleteTargetJob.title && !isDeleting ? 'pointer' : 'not-allowed',
+                  transition: 'background-color 0.15s ease'
+                }}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                    <span>DELETING...</span>
+                  </>
+                ) : (
+                  <span>DELETE PERMANENTLY</span>
+                )}
               </button>
             </div>
           </div>

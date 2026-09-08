@@ -40,7 +40,12 @@ import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage';
 import { AdminPaymentDetailPage } from './pages/admin/AdminPaymentDetailPage';
 import { AdminReferenceSlipsPage } from './pages/admin/AdminReferenceSlipsPage';
 import { AdminReferenceSlipDetailPage } from './pages/admin/AdminReferenceSlipDetailPage';
-import { AdminPlaceholderPage } from './pages/admin/AdminPlaceholderPage';
+import { AdminEmployeesPage } from './pages/admin/AdminEmployeesPage';
+import { AdminEmployeeDetailPage } from './pages/admin/AdminEmployeeDetailPage';
+import { AdminFilesPage } from './pages/admin/AdminFilesPage';
+import { AdminFileDetailPage } from './pages/admin/AdminFileDetailPage';
+import { AdminActivityPage } from './pages/admin/AdminActivityPage';
+import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { AdminNotFoundPage } from './pages/admin/AdminNotFoundPage';
 
 // Public Pages
@@ -101,12 +106,12 @@ export const App: React.FC = () => {
               <Route path="payments/:id" element={<AdminPaymentDetailPage />} />
               <Route path="reference-slips" element={<AdminReferenceSlipsPage />} />
               <Route path="reference-slips/:id" element={<AdminReferenceSlipDetailPage />} />
-              <Route path="employees" element={<AdminPlaceholderPage />} />
-              <Route path="employees/:id" element={<AdminPlaceholderPage />} />
-              <Route path="files" element={<AdminPlaceholderPage />} />
-              <Route path="files/:id" element={<AdminPlaceholderPage />} />
-              <Route path="activity" element={<AdminPlaceholderPage />} />
-              <Route path="settings" element={<AdminPlaceholderPage />} />
+              <Route path="employees" element={<AdminEmployeesPage />} />
+              <Route path="employees/:id" element={<AdminEmployeeDetailPage />} />
+              <Route path="files" element={<AdminFilesPage />} />
+              <Route path="files/:id" element={<AdminFileDetailPage />} />
+              <Route path="activity" element={<AdminActivityPage />} />
+              <Route path="settings" element={<AdminSettingsPage />} />
 
               {/* Admin 404 Fallback - Keeps all unknown /admin/* paths strictly inside AdminLayout */}
               <Route path="*" element={<AdminNotFoundPage />} />

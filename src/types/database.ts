@@ -1083,6 +1083,18 @@ export interface Database {
         };
         Returns: Json;
       };
+      delete_job_permanently: {
+        Args: {
+          target_job_id: string;
+        };
+        Returns: Json;
+      };
+      delete_company_permanently: {
+        Args: {
+          target_company_id: string;
+        };
+        Returns: Json;
+      };
       check_joining_access_status: {
         Args: {
           candidate_email: string;

@@ -14,6 +14,7 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { JOINING_PDF_MAPPINGS } from '../constants/joiningPdfCoordinates';
 import { persistGeneratedDocument } from './filePersistenceService';
 import { logActivity } from './activityService';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 export interface EmployeeIdCardData {
   employeeId?: string;
@@ -218,13 +219,42 @@ export async function generateAndPersistEmployeeIdCard(
 ): Promise<GeneratedIdCardResult> {
   const { blob, pdfBytes, fileName } = await generateEmployeeIdCardPdf(data);
 
-  // Persist using existing file persistence architecture
+  // Check version history for this entity
+  let nextVersion = 1;
+  let isRegeneration = false;
+  if (isSupabaseConfigured && (data.joiningFormId || data.applicationId)) {
+    try {
+      let q = supabase
+        .from('generated_files')
+        .select('version')
+        .eq('file_type', 'ID_CARD_PDF')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (data.joiningFormId) {
+        q = q.eq('joining_form_id', data.joiningFormId);
+      } else if (data.applicationId) {
+        q = q.eq('application_id', data.applicationId);
+      }
+
+      const { data: prev } = await q.maybeSingle();
+      if (prev) {
+        isRegeneration = true;
+        nextVersion = (prev.version || 1) + 1;
+      }
+    } catch (verErr) {
+      console.warn('[generateAndPersistEmployeeIdCard] Error checking previous version:', verErr);
+    }
+  }
+
+  // Persist using existing file persistence architecture with version increment
   const persistResult = await persistGeneratedDocument({
     applicationId: data.applicationId || null,
     joiningFormId: data.joiningFormId || null,
     fileType: 'ID_CARD_PDF',
     fileName,
     blob,
+    version: nextVersion,
     generatedBy: currentAdminId || null
   });
 
@@ -234,13 +264,15 @@ export async function generateAndPersistEmployeeIdCard(
       entityType: 'EMPLOYEE',
       entityId: data.employeeId,
       applicationId: data.applicationId || null,
-      action: 'EMPLOYEE_ID_CARD_GENERATED',
-      description: `Generated official Employee Identity Card for ${data.employeeCode} (${data.employeeName})`,
+      action: isRegeneration ? 'EMPLOYEE_ID_CARD_REGENERATED' : 'EMPLOYEE_ID_CARD_GENERATED',
+      description: `${isRegeneration ? 'Regenerated' : 'Generated'} official Employee Identity Card (v${nextVersion}) for ${data.employeeCode} (${data.employeeName})`,
       metadata: {
         employeeId: data.employeeId,
         employeeCode: data.employeeCode,
         fileId: persistResult.fileId || null,
         storagePath: persistResult.storagePath || null,
+        version: nextVersion,
+        isRegeneration,
         timestamp: new Date().toISOString()
       }
     });

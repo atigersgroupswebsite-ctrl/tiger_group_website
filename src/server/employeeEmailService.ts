@@ -277,12 +277,23 @@ export async function sendEmployeeIdCardServerHandler(
     };
   }
 
-  const { data: blob, error: dlErr } = await supabase
-    .storage
-    .from('documents')
-    .download(existingFile.storage_path);
+  let blob: Blob | null = null;
+  let dlErr: any = null;
 
-  if (dlErr || !blob) {
+  // Try 'generated-documents' bucket first, then fallback to 'documents'
+  const genDocRes = await supabase.storage.from('generated-documents').download(existingFile.storage_path);
+  if (genDocRes.data) {
+    blob = genDocRes.data;
+  } else {
+    const docRes = await supabase.storage.from('documents').download(existingFile.storage_path);
+    if (docRes.data) {
+      blob = docRes.data;
+    } else {
+      dlErr = genDocRes.error || docRes.error;
+    }
+  }
+
+  if (!blob) {
     return {
       status: 500,
       data: {

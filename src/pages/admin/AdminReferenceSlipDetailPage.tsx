@@ -326,18 +326,13 @@ export const AdminReferenceSlipDetailPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsFormOpen(true)}
+                className="btn btn-outline"
                 style={{
-                  padding: '0.6rem 1rem',
-                  borderRadius: '8px',
-                  border: '1px solid #CBD5E1',
-                  backgroundColor: '#FFFFFF',
-                  color: '#334155',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '0.4rem'
+                  gap: '0.4rem',
+                  padding: '0.6rem 1rem',
+                  fontSize: '0.85rem'
                 }}
               >
                 <Edit3 size={15} />
@@ -350,18 +345,13 @@ export const AdminReferenceSlipDetailPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleViewPdf}
+                  className="btn btn-primary"
                   style={{
-                    padding: '0.6rem 1.15rem',
-                    borderRadius: '8px',
-                    border: 'none',
-                    backgroundColor: '#1E293B',
-                    color: '#FFFFFF',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '0.4rem'
+                    gap: '0.4rem',
+                    padding: '0.6rem 1.15rem',
+                    fontSize: '0.85rem'
                   }}
                 >
                   <Printer size={15} />
@@ -373,18 +363,13 @@ export const AdminReferenceSlipDetailPage: React.FC = () => {
                     type="button"
                     onClick={handleGeneratePdf}
                     disabled={isGenerating}
+                    className="btn btn-outline"
                     style={{
-                      padding: '0.6rem 1rem',
-                      borderRadius: '8px',
-                      border: '1px solid #CBD5E1',
-                      backgroundColor: '#FFFFFF',
-                      color: '#4F46E5',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                      cursor: isGenerating ? 'not-allowed' : 'pointer',
-                      display: 'flex',
+                      display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '0.4rem'
+                      gap: '0.4rem',
+                      padding: '0.6rem 1rem',
+                      fontSize: '0.85rem'
                     }}
                   >
                     <RotateCw size={15} className={isGenerating ? 'animate-spin' : ''} />
@@ -398,19 +383,13 @@ export const AdminReferenceSlipDetailPage: React.FC = () => {
                   type="button"
                   onClick={handleGeneratePdf}
                   disabled={isGenerating}
+                  className="btn btn-primary"
                   style={{
-                    padding: '0.65rem 1.25rem',
-                    borderRadius: '8px',
-                    border: 'none',
-                    backgroundColor: '#4F46E5',
-                    color: '#FFFFFF',
-                    fontSize: '0.875rem',
-                    fontWeight: 700,
-                    cursor: isGenerating ? 'not-allowed' : 'pointer',
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '0.4rem',
-                    boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.25)'
+                    gap: '0.5rem',
+                    padding: '0.65rem 1.25rem',
+                    fontSize: '0.875rem'
                   }}
                 >
                   {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <FileCheck size={16} />}

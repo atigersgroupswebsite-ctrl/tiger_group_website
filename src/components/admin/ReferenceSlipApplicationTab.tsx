@@ -31,12 +31,14 @@ import { ReferenceSlipFormModal } from './ReferenceSlipFormModal';
 import { ReferenceSlipPreviewModal } from './ReferenceSlipPreviewModal';
 
 interface ReferenceSlipApplicationTabProps {
-  applicationId: string;
+  applicationId?: string;
+  joiningFormId?: string;
   onRefreshParent?: () => void;
 }
 
 export const ReferenceSlipApplicationTab: React.FC<ReferenceSlipApplicationTabProps> = ({
   applicationId,
+  joiningFormId,
   onRefreshParent
 }) => {
   const { role, user } = useAdminAuth();
@@ -58,18 +60,18 @@ export const ReferenceSlipApplicationTab: React.FC<ReferenceSlipApplicationTabPr
     setLoading(true);
     setError(null);
     try {
-      const res = await getReferenceSlipForEntity({ applicationId });
+      const res = await getReferenceSlipForEntity({ applicationId, joiningFormId });
       if (res.success) {
         setDetail(res.data || null);
       } else {
-        setError(res.error || 'Failed to load reference slip for application.');
+        setError(res.error || 'Failed to load reference slip for candidate.');
       }
     } catch (err: any) {
       setError(err?.message || 'Error loading reference slip.');
     } finally {
       setLoading(false);
     }
-  }, [applicationId]);
+  }, [applicationId, joiningFormId]);
 
   useEffect(() => {
     loadData();
@@ -80,7 +82,8 @@ export const ReferenceSlipApplicationTab: React.FC<ReferenceSlipApplicationTabPr
     setIsSaving(true);
     try {
       const res = await saveReferenceSlip({
-        applicationId,
+        applicationId: applicationId || detail?.slip?.application_id,
+        joiningFormId: joiningFormId || detail?.slip?.joining_form_id,
         slipId: detail?.slip?.id,
         formData,
         adminUser: { id: user?.id || 'admin', name: user?.email || 'Admin', role: role || undefined }

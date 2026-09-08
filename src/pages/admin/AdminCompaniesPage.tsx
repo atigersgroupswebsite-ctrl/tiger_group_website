@@ -9,13 +9,14 @@
 // ==============================================================================
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import {
   getAllCompanies,
   createCompany,
   updateCompany,
   setCompanyActive,
+  deleteCompanyPermanently,
   type CompanyRow,
   type CreateCompanyInput,
   type UpdateCompanyInput
@@ -27,6 +28,7 @@ import {
   Search,
   RefreshCw,
   Edit2,
+  Trash2,
   Power,
   ExternalLink,
   CheckCircle2,
@@ -62,13 +64,29 @@ const COMPANY_TYPE_CONFIG: Record<CompanyType, { label: string; color: string; b
 };
 
 export const AdminCompaniesPage: React.FC = () => {
+  const location = useLocation();
   const { role } = useAdminAuth();
   const canManage = role === 'SUPER_ADMIN' || role === 'COORDINATOR';
+  const isSuperAdmin = role === 'SUPER_ADMIN';
 
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Deletion Modal State
+  const [deleteTargetCompany, setDeleteTargetCompany] = useState<CompanyRow | null>(null);
+  const [confirmNameInput, setConfirmNameInput] = useState<string>('');
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Notification from detail page
+  useEffect(() => {
+    if (location.state && (location.state as any).deletedNotification) {
+      setSuccessMessage((location.state as any).deletedNotification);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -93,6 +111,33 @@ export const AdminCompaniesPage: React.FC = () => {
   // Deactivate/Activate target
   const [toggleStatusCompany, setToggleStatusCompany] = useState<CompanyRow | null>(null);
   const [toggling, setToggling] = useState<boolean>(false);
+
+  // Handle Permanent Company Deletion
+  const handleExecuteDelete = async () => {
+    if (!deleteTargetCompany || !isSuperAdmin) return;
+    if (confirmNameInput !== deleteTargetCompany.name) {
+      setDeleteError(`Please type exact company name "${deleteTargetCompany.name}" to confirm.`);
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const res = await deleteCompanyPermanently(deleteTargetCompany.id);
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to delete company.');
+      }
+
+      setCompanies((prev) => prev.filter((c) => c.id !== deleteTargetCompany.id));
+      setSuccessMessage(`Company "${deleteTargetCompany.name}" was permanently deleted.`);
+      setDeleteTargetCompany(null);
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete company.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Data Fetching
   const fetchCompanies = useCallback(async () => {
@@ -749,6 +794,33 @@ export const AdminCompaniesPage: React.FC = () => {
                                 <Power size={13} />
                                 <span>{company.active ? 'Deactivate' : 'Activate'}</span>
                               </button>
+
+                              {isSuperAdmin && (
+                                <button
+                                  onClick={() => {
+                                    setDeleteTargetCompany(company);
+                                    setConfirmNameInput('');
+                                    setDeleteError(null);
+                                  }}
+                                  style={{
+                                    padding: '0.35rem 0.65rem',
+                                    fontSize: '0.75rem',
+                                    borderRadius: '6px',
+                                    border: '1px solid #FECACA',
+                                    backgroundColor: '#FEF2F2',
+                                    color: '#DC2626',
+                                    cursor: 'pointer',
+                                    fontWeight: 600,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem'
+                                  }}
+                                  title="Permanently Delete Company (Super Admin)"
+                                >
+                                  <Trash2 size={13} />
+                                  <span>Delete</span>
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
@@ -1185,6 +1257,195 @@ export const AdminCompaniesPage: React.FC = () => {
               >
                 {toggling && <Loader2 size={16} className="animate-spin" />}
                 <span>{toggleStatusCompany.active ? 'Deactivate Now' : 'Activate Now'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteTargetCompany && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(25, 42, 86, 0.7)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 160,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+          onClick={() => !isDeleting && setDeleteTargetCompany(null)}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E2DFD8',
+              borderRadius: '12px',
+              maxWidth: '520px',
+              width: '100%',
+              padding: '2rem',
+              boxShadow: '0 20px 40px -10px rgba(25, 42, 86, 0.3)',
+              position: 'relative'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  backgroundColor: '#FEE2E2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#DC2626',
+                  flexShrink: 0
+                }}
+              >
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h2
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: '1.25rem',
+                    fontWeight: 800,
+                    color: '#192A56',
+                    margin: 0
+                  }}
+                >
+                  Delete Corporate Facility
+                </h2>
+                <div style={{ fontSize: '0.75rem', color: '#DC2626', fontWeight: 600, marginTop: '2px' }}>
+                  Irreversible Destructive Action
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: '#4A5568', lineHeight: 1.5, marginBottom: '1rem' }}>
+              This will permanently delete this company record from the operational database.
+            </p>
+
+            <div
+              style={{
+                backgroundColor: '#F8F9FA',
+                border: '1px solid #E2DFD8',
+                borderRadius: '8px',
+                padding: '0.85rem 1rem',
+                marginBottom: '1.25rem'
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Company Name:</div>
+              <div
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: '1.05rem',
+                  fontWeight: 800,
+                  color: '#192A56',
+                  marginTop: '2px'
+                }}
+              >
+                {deleteTargetCompany.name}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#4A5568', marginTop: '4px' }}>
+                Status: <strong>{deleteTargetCompany.active ? 'Active' : 'Inactive'}</strong> • ID: <code>{deleteTargetCompany.id.slice(0, 8)}...</code>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#B45309', fontWeight: 600, marginTop: '6px' }}>
+                Operational Dependency Check: Deletion will be safely blocked if jobs, employees, joining forms, or reference slips reference this corporate facility.
+              </div>
+            </div>
+
+            {deleteError && (
+              <div
+                style={{
+                  backgroundColor: '#FBF0EF',
+                  border: '1px solid #EDA6A3',
+                  borderRadius: '8px',
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.65rem'
+                }}
+              >
+                <AlertCircle size={18} color="#C9726F" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span style={{ fontSize: '0.825rem', color: '#C9726F', fontWeight: 600, lineHeight: 1.4 }}>
+                  {deleteError}
+                </span>
+              </div>
+            )}
+
+            <p style={{ fontSize: '0.825rem', color: '#192A56', fontWeight: 600, marginBottom: '0.5rem' }}>
+              Please type <code style={{ backgroundColor: '#F1F5F9', padding: '2px 5px', borderRadius: '4px', color: '#DC2626' }}>{deleteTargetCompany.name}</code> to confirm:
+            </p>
+
+            <input
+              type="text"
+              value={confirmNameInput}
+              onChange={(e) => setConfirmNameInput(e.target.value)}
+              placeholder={deleteTargetCompany.name}
+              disabled={isDeleting}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '0.65rem 0.85rem',
+                backgroundColor: '#FCFBFB',
+                border: '1px solid',
+                borderColor: confirmNameInput === deleteTargetCompany.name ? '#10B981' : '#D2CECE',
+                borderRadius: '6px',
+                fontFamily: 'inherit',
+                fontSize: '0.9rem',
+                color: '#192A56',
+                outline: 'none',
+                marginBottom: '1.5rem'
+              }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTargetCompany(null);
+                  setConfirmNameInput('');
+                  setDeleteError(null);
+                }}
+                disabled={isDeleting}
+                className="btn-admin-secondary"
+              >
+                CANCEL
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteDelete}
+                disabled={isDeleting || confirmNameInput !== deleteTargetCompany.name}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: confirmNameInput === deleteTargetCompany.name ? '#DC2626' : '#FCA5A5',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '0.6rem 1.25rem',
+                  fontSize: '0.825rem',
+                  fontWeight: 800,
+                  cursor: confirmNameInput === deleteTargetCompany.name && !isDeleting ? 'pointer' : 'not-allowed',
+                  transition: 'background-color 0.15s ease'
+                }}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                    <span>DELETING...</span>
+                  </>
+                ) : (
+                  <span>DELETE PERMANENTLY</span>
+                )}
               </button>
             </div>
           </div>

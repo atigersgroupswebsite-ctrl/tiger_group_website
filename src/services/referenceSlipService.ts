@@ -142,22 +142,7 @@ export async function resolveCandidateSource(
   joiningFormId?: string | null
 ): Promise<CandidateSourceInfo | null> {
   if (!isSupabaseConfigured) {
-    return {
-      sourceType: applicationId ? 'APPLICATION' : 'JOINING_FORM',
-      sourceId: applicationId || joiningFormId || 'mock-id',
-      sourceReference: applicationId ? 'INQ-2026-000101' : 'JOIN-2026-000201',
-      fullName: 'Rahul Sharma',
-      fatherName: 'Ramesh Sharma',
-      mobile: '+91 9876543210',
-      email: 'rahul.sharma@example.com',
-      address: 'Plot 42, Somalwada, Nagpur, MH 440015',
-      dob: '1998-08-15',
-      gender: 'Male',
-      aadhaarNumber: 'XXXX-XXXX-1234',
-      panNumber: 'ABCDE1234F',
-      positionApplied: 'Production Supervisor',
-      expectedJoiningDate: '2026-09-15'
-    };
+    return null;
   }
 
   try {
@@ -259,44 +244,14 @@ export async function getReferenceSlips(
   filters: ReferenceSlipFilters = {}
 ): Promise<{ data: ReferenceSlipListItem[]; kpis: ReferenceSlipKPIs }> {
   if (!isSupabaseConfigured) {
-    const mockList: ReferenceSlipListItem[] = [
-      {
-        id: 'demo-ref-1',
-        referenceNumber: 'ATG/REF/2026/000101',
-        date: new Date().toISOString().split('T')[0],
-        applicationId: 'mock-app-1',
-        joiningFormId: null,
-        sourceType: 'APPLICATION',
-        sourceReference: 'INQ-2026-000101',
-        candidateName: 'Rahul Sharma',
-        candidateMobile: '+91 9876543210',
-        candidateEmail: 'rahul.sharma@example.com',
-        companyId: null,
-        companyName: 'Adani Power Maharashtra Ltd',
-        interviewDate: '2026-09-10',
-        reportingDate: '2026-09-15',
-        reportingTime: '09:30 AM',
-        department: 'Operations',
-        designation: 'Field Supervisor',
-        salaryCtc: 24000,
-        interviewResult: 'SELECTED',
-        selectedDesignation: 'Field Supervisor Grade 1',
-        joiningDate: '2026-09-15',
-        remarks: 'Candidate selected during campus drive',
-        consultancyAccepted: true,
-        consultancyAcceptedAt: '2026-09-08T10:00:00Z',
-        createdAt: '2026-09-08T09:00:00Z',
-        updatedAt: '2026-09-08T10:00:00Z'
-      }
-    ];
     return {
-      data: mockList,
+      data: [],
       kpis: {
-        totalSlips: 1,
-        selectedCount: 1,
+        totalSlips: 0,
+        selectedCount: 0,
         holdCount: 0,
         rejectedCount: 0,
-        generatedPackets: 1
+        generatedPackets: 0
       }
     };
   }
@@ -466,58 +421,7 @@ export async function getReferenceSlipById(
   id: string
 ): Promise<{ success: boolean; data?: ReferenceSlipDetailData; error?: string }> {
   if (!isSupabaseConfigured) {
-    const mockCandidate: CandidateSourceInfo = {
-      sourceType: 'APPLICATION',
-      sourceId: 'mock-app-1',
-      sourceReference: 'INQ-2026-000101',
-      fullName: 'Rahul Sharma',
-      fatherName: 'Ramesh Sharma',
-      mobile: '+91 9876543210',
-      email: 'rahul.sharma@example.com',
-      address: 'Plot 42, Somalwada, Nagpur, MH 440015',
-      dob: '1998-08-15',
-      gender: 'Male',
-      aadhaarNumber: 'XXXX-XXXX-1234',
-      panNumber: 'ABCDE1234F',
-      positionApplied: 'Production Supervisor',
-      expectedJoiningDate: '2026-09-15'
-    };
-    const mockSlip: ReferenceSlipRow = {
-      id,
-      application_id: 'mock-app-1',
-      joining_form_id: null,
-      company_id: null,
-      company_name: 'Adani Power Maharashtra Ltd',
-      reference_number: 'ATG/REF/2026/000101',
-      date: new Date().toISOString().split('T')[0],
-      interview_date: '2026-09-10',
-      reporting_date: '2026-09-15',
-      reporting_time: '09:30 AM',
-      department: 'Operations',
-      designation: 'Supervisor',
-      salary_ctc: 24000,
-      interview_conducted_by: 'Amit Verma (HR Head)',
-      interview_result: 'SELECTED',
-      selected_designation: 'Supervisor Grade 1',
-      joining_date: '2026-09-15',
-      remarks: 'Selected with distinction in technical assessment',
-      candidate_signature_path: null,
-      authorized_signature_path: null,
-      company_signature_path: null,
-      company_seal_path: null,
-      created_at: '2026-09-08T09:00:00Z',
-      updated_at: '2026-09-08T10:00:00Z'
-    };
-    return {
-      success: true,
-      data: {
-        slip: mockSlip,
-        candidate: mockCandidate,
-        consultancyReturn: null,
-        generatedFiles: [],
-        company: null
-      }
-    };
+    return { success: false, error: 'Database connection is not configured.' };
   }
 
   try {

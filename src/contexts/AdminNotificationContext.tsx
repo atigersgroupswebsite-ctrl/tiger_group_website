@@ -18,6 +18,7 @@ import React, {
 import { supabase } from '../lib/supabaseClient';
 import type { NotificationRow, NotificationType } from '../types/database';
 import { useAdminAuth } from './AdminAuthContext';
+import { getSystemSettingValue } from '../services/settingsService';
 
 const SOUND_PREF_KEY = 'tiger_admin_notification_sound';
 
@@ -129,6 +130,20 @@ export const AdminNotificationProvider: React.FC<{ children: React.ReactNode }> 
   useEffect(() => {
     soundEnabledRef.current = soundEnabled;
   }, [soundEnabled]);
+
+  // Synchronize with database system_settings on initial admin session
+  useEffect(() => {
+    if (!isAdmin) return;
+    let mounted = true;
+    getSystemSettingValue<boolean>('notification_sound_enabled', true).then((val) => {
+      if (mounted && typeof val === 'boolean') {
+        setSoundEnabledState(val);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [isAdmin]);
 
   const setSoundEnabled = useCallback((enabled: boolean) => {
     setSoundEnabledState(enabled);

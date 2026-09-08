@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 
 import { EmployeeIdCardPanel } from '../../components/admin/EmployeeIdCardPanel';
+import { ReferenceSlipApplicationTab } from '../../components/admin/ReferenceSlipApplicationTab';
 import { getEmployeeByJoiningFormId } from '../../services/employeeService';
 import type { EmployeeRow } from '../../types/database';
 import { formatIndianPhoneNumber } from '../../utils/phoneUtils';
@@ -604,7 +605,17 @@ export const AdminJoiningDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 6. EMPLOYEE IDENTITY CARD & ADMINISTRATION */}
+        {/* 6. REFERENCE SLIP & CONSULTANCY RETURN */}
+        {form && (
+          <div style={{ marginTop: '2rem' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-midnight-navy)', marginBottom: '1rem' }}>
+              Reference Slip & Consultancy Return
+            </h2>
+            <ReferenceSlipApplicationTab joiningFormId={form.id} />
+          </div>
+        )}
+
+        {/* 7. EMPLOYEE IDENTITY CARD & ADMINISTRATION */}
         {form && (
           <EmployeeIdCardPanel
             joiningFormId={form.id}

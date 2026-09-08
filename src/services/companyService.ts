@@ -414,3 +414,33 @@ export async function getActiveJobs(): Promise<JobWithCompany[]> {
 
   return (data as any) || [];
 }
+
+/**
+ * Permanently deletes a corporate facility from the database.
+ * Restricted to SUPER_ADMIN.
+ * Prevents deletion and returns a descriptive error if operational dependencies
+ * (jobs, employees, joining forms, reference slips) exist.
+ * Records an operational audit log in public.activity_logs upon successful deletion.
+ */
+export async function deleteCompanyPermanently(
+  companyId: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  if (!isSupabaseConfigured) {
+    return { success: false, error: 'Database is not configured.' };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('delete_company_permanently', {
+      target_company_id: companyId
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to delete company permanently.' };
+  }
+}
+
