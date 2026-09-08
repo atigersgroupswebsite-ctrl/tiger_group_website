@@ -1198,3 +1198,120 @@
   margin-bottom: 1rem;
 }
 
+/* ==========================================================================
+   OFFICIAL JOINING FORM PRINT ISOLATION RULES
+   Ensures ONLY the canonical Joining Paperwork sheets print.
+   Hides all admin navigation, sidebars, headers, action bars, and wrappers.
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm 8mm 10mm;
+  }
+
+  html, body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    font-size: 10pt !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Hide website and candidate app chrome */
+  header,
+  footer,
+  nav,
+  .navbar,
+  .site-header,
+  .site-footer,
+  .joining-header,
+  .joining-progress-sidebar,
+  .joining-mobile-progress,
+  .joining-navigation,
+  .pdf-edit-bar,
+  .review-alert-banner,
+  .submission-banner-action,
+  .review-actions-toolbar,
+  .confirm-submit-card,
+
+  /* Hide admin panel chrome */
+  .admin-sidebar,
+  .admin-navbar,
+  .admin-header,
+  .admin-topbar,
+  .admin-tabs-nav,
+  .admin-action-bar,
+  .admin-subnav,
+  aside,
+  button,
+  .btn,
+  .btn-admin-primary,
+  .btn-admin-secondary,
+  .btn-admin-danger,
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Reset outer layout wrappers */
+  .admin-layout,
+  .admin-content,
+  .admin-main,
+  .admin-page-body,
+  .admin-card,
+  .joining-page-container,
+  .joining-layout,
+  .joining-main-content,
+  .print-review-wrapper {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Isolate canonical form print preview */
+  .joining-form-print-preview {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  .pdf-page-sheet {
+    display: block !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: 1px solid #000000 !important;
+    margin: 0 0 0 0 !important;
+    padding: 12mm 10mm !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    box-sizing: border-box !important;
+    background: #FFFFFF !important;
+  }
+
+  .pdf-page-sheet:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  /* Prevent table rows and blocks from splitting awkwardly across pages */
+  .pdf-table,
+  .pdf-verification-row,
+  .pdf-header-box {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+

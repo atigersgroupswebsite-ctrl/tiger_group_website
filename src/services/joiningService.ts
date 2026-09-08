@@ -71,6 +71,7 @@ type EducationRecordRow = Database['public']['Tables']['education_records']['Row
 type FamilyDetailRow = Database['public']['Tables']['family_details']['Row'];
 type DocumentRow = Database['public']['Tables']['documents']['Row'];
 type DeclarationRow = Database['public']['Tables']['declarations']['Row'];
+type JoiningFormRow = Database['public']['Tables']['joining_forms']['Row'];
 
 export interface JoiningServiceResult<T = any> {
   success: boolean;
@@ -324,135 +325,399 @@ export async function getJoiningForm(
       };
     }
 
-    const resolvedStatus = (formRecord.submission_status === 'SUBMITTED' ? 'SUBMITTED' : 'DRAFT') as 'DRAFT' | 'SUBMITTED';
-
-    const result: JoiningFormData = {
-      applicationId: formRecord.application_id || undefined,
-      formId: formRecord.id,
-      joiningReference: formRecord.joining_reference || 'JOIN-2026-PENDING',
-      userEmail: candidateEmail,
-      currentStep: resolvedStatus === 'SUBMITTED' ? 8 : 1,
-      status: resolvedStatus,
-      submissionStatus: resolvedStatus,
-      submittedAt: formRecord.submitted_at || undefined,
-
-      employment: {
-        companyName: formRecord.company_address ? 'Designated Employer Partner' : 'To Be Allocated by A Tiger Global',
-        unit: formRecord.unit || 'Assigned Operations Unit',
-        address: formRecord.company_address || 'Nagpur Industrial Cluster, MH',
-        employeeCode: formRecord.employee_code || formRecord.joining_reference || 'Assigned on Deployment',
-        designation: formRecord.designation || 'Staff / Trainee Associate',
-        department: formRecord.department || 'Operations',
-        subDepartment: formRecord.sub_department || 'General Operations',
-        location: formRecord.location || 'Nagpur, Maharashtra',
-        dateOfJoining: formRecord.date_of_joining || '',
-        grossSalaryCTC: formRecord.gross_salary ? `₹${formRecord.gross_salary.toLocaleString()} / Month` : 'As per Client Offer Letter',
-        ownership: INITIAL_JOINING_FORM_DATA.employment.ownership
-      },
-
-      personal: {
-        employeeName: formRecord.candidate_name || '',
-        dateOfBirth: formRecord.date_of_birth || '',
-        gender: (formRecord.gender as any) || '',
-        fatherName: formRecord.father_name || '',
-        motherOrHusbandName: formRecord.mother_or_husband_name || '',
-        maritalStatus: (formRecord.marital_status as any) || '',
-        spouseName: formRecord.spouse_name || '',
-        bloodGroup: formRecord.blood_group || '',
-        aadhaarNumber: formRecord.aadhaar_number || '',
-        panNumber: formRecord.pan_number || '',
-        employeeContactNumber: formRecord.employee_contact_number ? getIndianPhoneDisplayDigits(formRecord.employee_contact_number) : '',
-        otherContactNumber: formRecord.other_contact_number ? getIndianPhoneDisplayDigits(formRecord.other_contact_number) : '',
-        emailId: formRecord.email || candidateEmail
-      },
-
-      permanentAddress: {
-        address: formRecord.permanent_address || '',
-        city: formRecord.permanent_city || '',
-        district: formRecord.permanent_district || '',
-        state: formRecord.permanent_state || 'Maharashtra',
-        country: formRecord.permanent_country || 'India',
-        pinCode: formRecord.permanent_pin_code || ''
-      },
-
-      currentAddress: {
-        address: formRecord.current_address || '',
-        city: formRecord.current_city || '',
-        district: formRecord.current_district || '',
-        state: formRecord.current_state || 'Maharashtra',
-        country: formRecord.current_country || 'India',
-        pinCode: formRecord.current_pin_code || ''
-      },
-
-      sameAsPermanentAddress: formRecord.same_as_permanent ?? false,
-
-      emergencyContacts: emergencyRows.length > 0
-        ? emergencyRows.map((em) => ({
-            id: em.id,
-            name: em.name,
-            contactNumber: em.contact_number ? getIndianPhoneDisplayDigits(em.contact_number) : '',
-            relation: em.relation,
-            address: em.address || ''
-          }))
-        : INITIAL_JOINING_FORM_DATA.emergencyContacts,
-
-      bank: {
-        accountHolderName: formRecord.bank_account_holder || formRecord.candidate_name || '',
-        bankAccountNumber: formRecord.bank_account_number || '',
-        confirmBankAccountNumber: formRecord.bank_account_number || '',
-        ifscCode: formRecord.ifsc_code || '',
-        bankName: formRecord.bank_name || '',
-        branchName: formRecord.branch_name || '',
-        uanNumber: formRecord.uan || '',
-        esicNumber: formRecord.esic_number || '',
-        ptNumber: formRecord.pt_number || ''
-      },
-
-      education: educationRows.length > 0
-        ? sanitizeEducationRecords(
-            educationRows.map((edu) => ({
-              id: edu.id,
-              qualification: edu.qualification,
-              boardOrUniversity: edu.board_university || '',
-              yearOfPassing: edu.year ? String(edu.year) : '',
-              percentageOrGrade: edu.percentage_or_grade || ''
-            }))
-          )
-        : [],
-
-      family: familyRows.length > 0
-        ? familyRows.map((fam) => ({
-            id: fam.id,
-            name: fam.name,
-            dateOfBirthOrAge: fam.age_or_date_of_birth || '',
-            relation: fam.relation
-          }))
-        : INITIAL_JOINING_FORM_DATA.family,
-
-      documents: normalizedDocs,
-
-      declarations: {
-        candidateDeclarationAcknowledged: declarationRow?.candidate_acceptance ?? false,
-        backgroundVerificationConsent: declarationRow?.background_check_consent ?? false,
-        rulesAndConductAccepted: declarationRow?.code_of_conduct_acceptance ?? false,
-        selfDeclarationAcknowledged: Boolean((declarationRow as any)?.self_declaration_acknowledged ?? false),
-        previousEmployerName: (declarationRow as any)?.previous_employer_name || '',
-        previousEmployerLastWorkingDay: (declarationRow as any)?.previous_employer_last_day || '',
-        relativeDeclarationAcknowledged: Boolean((declarationRow as any)?.relative_declaration_acknowledged ?? false),
-        hasRelativeInOrganization: Boolean((declarationRow as any)?.has_relative_in_org ?? false),
-        relativeName: (declarationRow as any)?.relative_name || '',
-        relativeDepartment: (declarationRow as any)?.relative_dept || '',
-        relativeRelationship: (declarationRow as any)?.relative_relation || '',
-        womenNightShiftConsent: Boolean((declarationRow as any)?.women_night_shift_consent ?? false),
-        womenNightShiftPlace: (declarationRow as any)?.women_night_shift_place || '',
-        signatoryName: declarationRow?.signatory_name || formRecord.candidate_name || '',
-        declarationDate: declarationRow?.declaration_date || new Date().toISOString().split('T')[0]
-      }
-    };
+    const result = buildJoiningFormDataFromDb({
+      formRecord,
+      emergencyRows,
+      educationRows,
+      familyRows,
+      declarationRow,
+      docRows,
+      signedPhotoUrl,
+      signedSigUrl
+    });
 
     return { success: true, data: result };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to load joining form.' };
+  }
+}
+
+export interface BuildJoiningFormDataParams {
+  formRecord?: any | null;
+  applicationRecord?: ApplicationRow | null;
+  emergencyRows?: EmergencyContactRow[];
+  educationRows?: EducationRecordRow[];
+  familyRows?: FamilyDetailRow[];
+  declarationRow?: DeclarationRow | null;
+  docRows?: DocumentRow[];
+  signedPhotoUrl?: string | null;
+  signedSigUrl?: string | null;
+}
+
+/**
+ * Shared canonical adapter that transforms database rows into the unified JoiningFormData view model.
+ * Single source of truth used across Candidate Review, Admin Review, and PDF Generation.
+ */
+export function buildJoiningFormDataFromDb(params: BuildJoiningFormDataParams): JoiningFormData {
+  const {
+    formRecord,
+    applicationRecord,
+    emergencyRows = [],
+    educationRows = [],
+    familyRows = [],
+    declarationRow = null,
+    docRows = [],
+    signedPhotoUrl,
+    signedSigUrl
+  } = params;
+
+  // Normalized documents map
+  const normalizedDocs: Record<DocumentCategory, UploadedDocument> = {
+    ...INITIAL_JOINING_FORM_DATA.documents
+  };
+
+  for (const doc of docRows) {
+    const cat = doc.document_type as DocumentCategory;
+    if (normalizedDocs[cat]) {
+      normalizedDocs[cat] = {
+        ...normalizedDocs[cat],
+        verificationStatus: doc.verification_status as any,
+        rejectionReason: doc.rejection_reason || undefined,
+        file: {
+          name: doc.original_file_name || (doc as any).file_name || 'Document',
+          size: doc.file_size || 0,
+          type: doc.mime_type || 'application/octet-stream',
+          dataUrl: undefined
+        }
+      };
+    }
+  }
+
+  // Embed signed photo & signature into normalized documents
+  if (signedPhotoUrl && normalizedDocs.PHOTO) {
+    normalizedDocs.PHOTO.file = {
+      name: 'Passport Photo',
+      size: 0,
+      type: 'image/jpeg',
+      dataUrl: signedPhotoUrl
+    };
+  }
+
+  if (signedSigUrl && normalizedDocs.SIGNATURE) {
+    normalizedDocs.SIGNATURE.file = {
+      name: 'Candidate Signature',
+      size: 0,
+      type: 'image/png',
+      dataUrl: signedSigUrl
+    };
+  }
+
+  const resolvedStatus = (formRecord?.submission_status === 'SUBMITTED' ? 'SUBMITTED' : 'DRAFT') as 'DRAFT' | 'SUBMITTED';
+  const candidateName = formRecord?.candidate_name || applicationRecord?.full_name || '';
+  const candidateEmail = formRecord?.email || applicationRecord?.email || '';
+
+  return {
+    applicationId: formRecord?.application_id || applicationRecord?.id || undefined,
+    formId: formRecord?.id || undefined,
+    joiningReference: formRecord?.joining_reference || (applicationRecord ? `APP-${applicationRecord.application_number}` : 'JOIN-PENDING'),
+    userEmail: candidateEmail,
+    currentStep: resolvedStatus === 'SUBMITTED' ? 8 : 1,
+    status: resolvedStatus,
+    submissionStatus: resolvedStatus,
+    submittedAt: formRecord?.submitted_at || undefined,
+
+    employment: {
+      companyName: formRecord?.company_address
+        ? 'Designated Employer Partner'
+        : (applicationRecord?.desired_company || 'To Be Allocated by A Tiger Global'),
+      unit: formRecord?.unit || 'Assigned Operations Unit',
+      address: formRecord?.company_address || 'Nagpur Industrial Cluster, MH',
+      employeeCode: formRecord?.employee_code || formRecord?.joining_reference || (applicationRecord ? applicationRecord.application_number : 'Assigned on Deployment'),
+      designation: formRecord?.designation || applicationRecord?.designation || 'Staff / Trainee Associate',
+      department: formRecord?.department || 'Operations',
+      subDepartment: formRecord?.sub_department || 'General Operations',
+      location: formRecord?.location || 'Nagpur, Maharashtra',
+      dateOfJoining: formRecord?.date_of_joining || '',
+      grossSalaryCTC: formRecord?.gross_salary ? `₹${formRecord.gross_salary.toLocaleString()} / Month` : 'As per Client Offer Letter',
+      ownership: INITIAL_JOINING_FORM_DATA.employment.ownership
+    },
+
+    personal: {
+      employeeName: candidateName,
+      dateOfBirth: formRecord?.date_of_birth || '',
+      gender: (formRecord?.gender as any) || '',
+      fatherName: formRecord?.father_name || applicationRecord?.father_name || '',
+      motherOrHusbandName: formRecord?.mother_or_husband_name || '',
+      maritalStatus: (formRecord?.marital_status as any) || '',
+      spouseName: formRecord?.spouse_name || '',
+      bloodGroup: formRecord?.blood_group || '',
+      aadhaarNumber: formRecord?.aadhaar_number || '',
+      panNumber: formRecord?.pan_number || '',
+      employeeContactNumber: formRecord?.employee_contact_number
+        ? getIndianPhoneDisplayDigits(formRecord.employee_contact_number)
+        : (applicationRecord?.mobile ? getIndianPhoneDisplayDigits(applicationRecord.mobile) : ''),
+      otherContactNumber: formRecord?.other_contact_number ? getIndianPhoneDisplayDigits(formRecord.other_contact_number) : '',
+      emailId: candidateEmail
+    },
+
+    permanentAddress: {
+      address: formRecord?.permanent_address || applicationRecord?.address || '',
+      city: formRecord?.permanent_city || '',
+      district: formRecord?.permanent_district || '',
+      state: formRecord?.permanent_state || 'Maharashtra',
+      country: formRecord?.permanent_country || 'India',
+      pinCode: formRecord?.permanent_pin_code || ''
+    },
+
+    currentAddress: {
+      address: formRecord?.current_address || (formRecord?.same_as_permanent ? (formRecord?.permanent_address || applicationRecord?.address || '') : ''),
+      city: formRecord?.current_city || (formRecord?.same_as_permanent ? (formRecord?.permanent_city || '') : ''),
+      district: formRecord?.current_district || (formRecord?.same_as_permanent ? (formRecord?.permanent_district || '') : ''),
+      state: formRecord?.current_state || (formRecord?.same_as_permanent ? (formRecord?.permanent_state || 'Maharashtra') : 'Maharashtra'),
+      country: formRecord?.current_country || 'India',
+      pinCode: formRecord?.current_pin_code || (formRecord?.same_as_permanent ? (formRecord?.permanent_pin_code || '') : '')
+    },
+
+    sameAsPermanentAddress: formRecord?.same_as_permanent ?? false,
+
+    emergencyContacts: emergencyRows.length > 0
+      ? emergencyRows.map((em) => ({
+          id: em.id,
+          name: em.name,
+          contactNumber: em.contact_number ? getIndianPhoneDisplayDigits(em.contact_number) : '',
+          relation: em.relation,
+          address: em.address || ''
+        }))
+      : INITIAL_JOINING_FORM_DATA.emergencyContacts,
+
+    bank: {
+      accountHolderName: formRecord?.bank_account_holder || candidateName || '',
+      bankAccountNumber: formRecord?.bank_account_number || '',
+      confirmBankAccountNumber: formRecord?.bank_account_number || '',
+      ifscCode: formRecord?.ifsc_code || '',
+      bankName: formRecord?.bank_name || '',
+      branchName: formRecord?.branch_name || '',
+      uanNumber: formRecord?.uan || '',
+      esicNumber: formRecord?.esic_number || '',
+      ptNumber: formRecord?.pt_number || ''
+    },
+
+    education: educationRows.length > 0
+      ? sanitizeEducationRecords(
+          educationRows.map((edu) => ({
+            id: edu.id,
+            qualification: edu.qualification,
+            boardOrUniversity: edu.board_university || '',
+            yearOfPassing: edu.year ? String(edu.year) : '',
+            percentageOrGrade: edu.percentage_or_grade || ''
+          }))
+        )
+      : [],
+
+    family: familyRows.length > 0
+      ? familyRows.map((fam) => ({
+          id: fam.id,
+          name: fam.name,
+          dateOfBirthOrAge: fam.age_or_date_of_birth || '',
+          relation: fam.relation
+        }))
+      : INITIAL_JOINING_FORM_DATA.family,
+
+    documents: normalizedDocs,
+
+    declarations: {
+      candidateDeclarationAcknowledged: declarationRow?.candidate_acceptance ?? false,
+      backgroundVerificationConsent: declarationRow?.background_check_consent ?? false,
+      rulesAndConductAccepted: declarationRow?.code_of_conduct_acceptance ?? false,
+      selfDeclarationAcknowledged: Boolean((declarationRow as any)?.self_declaration_acknowledged ?? false),
+      previousEmployerName: (declarationRow as any)?.previous_employer_name || '',
+      previousEmployerLastWorkingDay: (declarationRow as any)?.previous_employer_last_day || '',
+      relativeDeclarationAcknowledged: Boolean((declarationRow as any)?.relative_declaration_acknowledged ?? false),
+      hasRelativeInOrganization: Boolean((declarationRow as any)?.has_relative_in_org ?? false),
+      relativeName: (declarationRow as any)?.relative_name || '',
+      relativeDepartment: (declarationRow as any)?.relative_dept || '',
+      relativeRelationship: (declarationRow as any)?.relative_relation || '',
+      womenNightShiftConsent: Boolean((declarationRow as any)?.women_night_shift_consent ?? false),
+      womenNightShiftPlace: (declarationRow as any)?.women_night_shift_place || '',
+      signatoryName: declarationRow?.signatory_name || candidateName,
+      declarationDate: declarationRow?.declaration_date || (formRecord?.submitted_at ? new Date(formRecord.submitted_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
+    }
+  };
+}
+
+export interface AdminJoiningDossierResult {
+  formData: JoiningFormData;
+  raw: {
+    joiningForm: JoiningFormRow | null;
+    application: ApplicationRow | null;
+    emergency: EmergencyContactRow[];
+    education: EducationRecordRow[];
+    family: FamilyDetailRow[];
+    declarations: DeclarationRow | null;
+    documents: DocumentRow[];
+    signedPhotoUrl: string | null;
+    signedSigUrl: string | null;
+  };
+}
+
+/**
+ * Admin helper to retrieve a candidate's complete joining dossier without candidate session dependency.
+ * Supports both standalone Joining Forms and Linked Applications.
+ */
+export async function getAdminJoiningDossier(
+  identifier: string
+): Promise<JoiningServiceResult<AdminJoiningDossierResult>> {
+  if (!identifier) {
+    return { success: false, notFound: true, error: 'Identifier is required.' };
+  }
+
+  if (!isSupabaseConfigured) {
+    const formData: JoiningFormData = {
+      ...INITIAL_JOINING_FORM_DATA,
+      applicationId: identifier,
+      joiningReference: 'JOIN-DEMO-001',
+      status: 'SUBMITTED',
+      submissionStatus: 'SUBMITTED'
+    };
+    return {
+      success: true,
+      data: {
+        formData,
+        raw: {
+          joiningForm: null,
+          application: null,
+          emergency: [],
+          education: [],
+          family: [],
+          declarations: null,
+          documents: [],
+          signedPhotoUrl: null,
+          signedSigUrl: null
+        }
+      }
+    };
+  }
+
+  try {
+    // 1. Try finding in joining_forms by id, application_id, or joining_reference
+    let formRecord: any = null;
+    const { data: formData } = await (supabase
+      .from('joining_forms')
+      .select('*')
+      .or(`id.eq.${identifier},application_id.eq.${identifier},joining_reference.eq.${identifier}`)
+      .maybeSingle() as any);
+
+    if (formData) {
+      formRecord = formData;
+    }
+
+    let applicationRecord: ApplicationRow | null = null;
+    let emergencyRows: EmergencyContactRow[] = [];
+    let educationRows: EducationRecordRow[] = [];
+    let familyRows: FamilyDetailRow[] = [];
+    let declarationRow: DeclarationRow | null = null;
+    let docRows: DocumentRow[] = [];
+    let signedPhotoUrl: string | null = null;
+    let signedSigUrl: string | null = null;
+
+    if (formRecord) {
+      const formId = formRecord.id;
+      const appId = formRecord.application_id;
+
+      // Parallel queries for all child details
+      const [appRes, emRes, eduRes, famRes, declRes, docRes] = await Promise.all([
+        appId ? supabase.from('applications').select('*').eq('id', appId).maybeSingle() : Promise.resolve({ data: null }),
+        supabase.from('emergency_contacts').select('*').eq('joining_form_id', formId).order('sort_order', { ascending: true }),
+        supabase.from('education_records').select('*').eq('joining_form_id', formId).order('sort_order', { ascending: true }),
+        supabase.from('family_details').select('*').eq('joining_form_id', formId).order('sort_order', { ascending: true }),
+        supabase.from('declarations').select('*').eq('joining_form_id', formId).maybeSingle(),
+        appId
+          ? supabase.from('documents').select('*').or(`application_id.eq.${appId},joining_form_id.eq.${formId}`)
+          : supabase.from('documents').select('*').eq('joining_form_id', formId)
+      ]);
+
+      if (appRes.data) applicationRecord = appRes.data as ApplicationRow;
+      if (emRes.data) emergencyRows = emRes.data as EmergencyContactRow[];
+      if (eduRes.data) educationRows = eduRes.data as EducationRecordRow[];
+      if (famRes.data) familyRows = famRes.data as FamilyDetailRow[];
+      if (declRes.data) declarationRow = declRes.data as DeclarationRow;
+      if (docRes.data) docRows = docRes.data as DocumentRow[];
+
+      // Resolve Photo signed URL
+      const photoPath = formRecord.photo_storage_path || formRecord.photo_path || docRows.find((d) => d.document_type === 'PHOTO')?.storage_path;
+      if (photoPath) {
+        const { data: pUrl } = await supabase.storage.from('candidate-documents').createSignedUrl(photoPath, 3600);
+        if (pUrl?.signedUrl) signedPhotoUrl = pUrl.signedUrl;
+      }
+
+      // Resolve Signature signed URL
+      const sigPath = formRecord.signature_storage_path || formRecord.candidate_signature_path || declarationRow?.candidate_signature_path || docRows.find((d) => d.document_type === 'SIGNATURE')?.storage_path;
+      if (sigPath) {
+        const { data: sUrl } = await supabase.storage.from('candidate-documents').createSignedUrl(sigPath, 3600);
+        if (sUrl?.signedUrl) signedSigUrl = sUrl.signedUrl;
+      }
+    } else {
+      // 2. Form record not found; check applications table
+      const { data: appData } = await (supabase
+        .from('applications')
+        .select('*')
+        .or(`id.eq.${identifier},application_number.eq.${identifier}`)
+        .maybeSingle() as any);
+
+      if (!appData) {
+        return { success: false, notFound: true, error: 'No joining or application record found.' };
+      }
+
+      applicationRecord = appData as ApplicationRow;
+
+      // Check documents for this application
+      const { data: docs } = await supabase.from('documents').select('*').eq('application_id', applicationRecord.id);
+      if (docs) docRows = docs as DocumentRow[];
+
+      const photoPath = docRows.find((d) => d.document_type === 'PHOTO')?.storage_path;
+      if (photoPath) {
+        const { data: pUrl } = await supabase.storage.from('candidate-documents').createSignedUrl(photoPath, 3600);
+        if (pUrl?.signedUrl) signedPhotoUrl = pUrl.signedUrl;
+      }
+
+      const sigPath = docRows.find((d) => d.document_type === 'SIGNATURE')?.storage_path;
+      if (sigPath) {
+        const { data: sUrl } = await supabase.storage.from('candidate-documents').createSignedUrl(sigPath, 3600);
+        if (sUrl?.signedUrl) signedSigUrl = sUrl.signedUrl;
+      }
+    }
+
+    const fullFormData = buildJoiningFormDataFromDb({
+      formRecord,
+      applicationRecord,
+      emergencyRows,
+      educationRows,
+      familyRows,
+      declarationRow,
+      docRows,
+      signedPhotoUrl,
+      signedSigUrl
+    });
+
+    return {
+      success: true,
+      data: {
+        formData: fullFormData,
+        raw: {
+          joiningForm: formRecord,
+          application: applicationRecord,
+          emergency: emergencyRows,
+          education: educationRows,
+          family: familyRows,
+          declarations: declarationRow,
+          documents: docRows,
+          signedPhotoUrl,
+          signedSigUrl
+        }
+      }
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to retrieve admin joining dossier.' };
   }
 }
 
