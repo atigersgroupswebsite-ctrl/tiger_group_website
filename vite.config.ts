@@ -18,12 +18,21 @@ export default defineConfig(({ mode }) => {
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     ''
 
+  const siteUrl =
+    env.VITE_SITE_URL ||
+    env.SITE_URL ||
+    env.NEXT_PUBLIC_SITE_URL ||
+    (env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : '') ||
+    (env.VERCEL_URL ? `https://${env.VERCEL_URL}` : '') ||
+    ''
+
   return {
     plugins: [react(), paymentApiPlugin()],
     envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
+      'import.meta.env.VITE_SITE_URL': JSON.stringify(siteUrl),
     }
   }
 })

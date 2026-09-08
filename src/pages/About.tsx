@@ -9,7 +9,7 @@ import { PARTNER_ORGANIZATIONS } from '../data/partnersData';
 
 export const About: React.FC = () => {
   useEffect(() => {
-    document.title = "About Us | A Tiger Group's";
+    document.title = "About Us | A TIGER GROUP'S";
   }, []);
 
   return (
@@ -20,7 +20,7 @@ export const About: React.FC = () => {
           <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
             <span className="eyebrow">Enterprise Overview</span>
             <h1 style={{ marginBottom: 'var(--space-4)' }}>
-              ABOUT A Tiger Group's
+              ABOUT A TIGER GROUP'S
             </h1>
             <p style={{ fontSize: 'var(--text-lg)', color: 'var(--color-text-secondary)', lineHeight: 1.65 }}>
               A diversified parent enterprise headquartered in Nagpur, operating across Central India encompassing Career Solutions & Consultancy, Manpower Supply & Security Services, InfraBuild Properties, Footwear, and Fashion.
@@ -65,7 +65,7 @@ export const About: React.FC = () => {
                   A Diversified Commercial Ecosystem in Central India.
                 </h2>
                 <p style={{ fontSize: 'var(--text-base)', lineHeight: 1.7, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>
-                  <strong>A Tiger Group's</strong> operates as a registered enterprise headquartered in Nagpur, Maharashtra. The group manages five specialized commercial verticals spanning recruitment consultancy, industrial manpower contracting, real estate brokerage, and lifestyle retail.
+                  <strong>A TIGER GROUP'S</strong> operates as a registered enterprise headquartered in Nagpur, Maharashtra. The group manages five specialized commercial verticals spanning recruitment consultancy, industrial manpower contracting, real estate brokerage, and lifestyle retail.
                 </p>
                 <p style={{ fontSize: 'var(--text-base)', lineHeight: 1.7, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-6)' }}>
                   Anchored by its cornerstone consultancy — <strong>A Tiger Global Career Solution & Consultancy</strong> — the group enforces formal operating standards: thorough document screening, child labour prevention, statutory PF/ESIC compliance, transparent terms, and direct coordination with leading industrial employers.
@@ -174,7 +174,7 @@ export const About: React.FC = () => {
         <Container size="xl">
           <SectionHeading
             eyebrow="Dual Commitment"
-            title="A Tiger Group's ADVANTAGE"
+            title="A TIGER GROUP'S ADVANTAGE"
             subtitle="Built on structured accountability for both employers and prospective employees."
           />
 

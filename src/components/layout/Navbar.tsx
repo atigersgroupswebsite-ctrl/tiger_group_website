@@ -49,14 +49,14 @@ export const Navbar: React.FC = () => {
         <Container size="xl">
           <div className="navbar-inner">
             {/* Logo */}
-            <Link to="/" className="navbar-brand" aria-label="A Tiger Group's Homepage">
+            <Link to="/" className="navbar-brand" aria-label="A TIGER GROUP'S Homepage">
               <img
                 src="/assets/tiger-logo.jpeg"
-                alt="A Tiger Group's Logo"
+                alt="A TIGER GROUP'S Logo"
                 className="navbar-logo"
               />
               <div className="navbar-brand-text">
-                <span className="navbar-brand-title">A Tiger Group's</span>
+                <span className="navbar-brand-title">A TIGER GROUP'S</span>
               </div>
             </Link>
 
@@ -125,7 +125,7 @@ export const Navbar: React.FC = () => {
           <div className="mobile-drawer">
             <div className="mobile-drawer-header">
               <div className="navbar-brand-text">
-                <span className="navbar-brand-title">A Tiger Group's</span>
+                <span className="navbar-brand-title">A TIGER GROUP'S</span>
               </div>
               <button
                 type="button"

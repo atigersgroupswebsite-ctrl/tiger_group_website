@@ -6,7 +6,7 @@ import { ScrollReveal } from '../components/common/ScrollReveal';
 
 export const Businesses: React.FC = () => {
   useEffect(() => {
-    document.title = "Business Verticals | A Tiger Group's";
+    document.title = "Business Verticals | A TIGER GROUP'S";
   }, []);
 
   return (
@@ -17,7 +17,7 @@ export const Businesses: React.FC = () => {
           <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
             <span className="eyebrow">Enterprise Ecosystem</span>
             <h1 style={{ marginBottom: 'var(--space-4)' }}>
-              A Tiger Group's BUSINESS VERTICALS
+              A TIGER GROUP'S BUSINESS VERTICALS
             </h1>
             <p style={{ fontSize: 'var(--text-lg)', color: 'var(--color-text-secondary)', lineHeight: 1.65 }}>
               A diversified portfolio of five specialized commercial ventures operating across career placement, industrial contracting, real estate development, and consumer retail.

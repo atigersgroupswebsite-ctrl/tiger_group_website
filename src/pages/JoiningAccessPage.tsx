@@ -12,6 +12,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container } from '../components/common/Container';
 import { supabase } from '../lib/supabaseClient';
+import { getAuthRedirectUrl } from '../utils/authRedirect';
 import {
   ShieldCheck,
   Mail,
@@ -69,9 +70,8 @@ export const JoiningAccessPage: React.FC = () => {
     setErrorMsg(null);
 
     try {
-      // Dynamic site origin (respects VITE_SITE_URL or browser origin)
-      const siteUrl = (import.meta.env.VITE_SITE_URL || window.location.origin).replace(/\/$/, '');
-      const redirectUrl = `${siteUrl}/auth/callback?next=/joining`;
+      // Canonical callback target (strictly derives from VITE_SITE_URL in production, never localhost)
+      const redirectUrl = getAuthRedirectUrl('/joining');
 
       // Dispatch Supabase Magic Link passwordless authentication
       const { error: otpError } = await supabase.auth.signInWithOtp({

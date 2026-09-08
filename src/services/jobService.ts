@@ -148,7 +148,7 @@ export function mapDatabaseJobToFrontend(row: JobWithCompany): Job {
     salaryRange: row.salary_range || undefined,
     overview:
       row.description ||
-      `${row.title} role at ${row.company?.name || "A Tiger Group's client facility"}.`,
+      `${row.title} role at ${row.company?.name || "A TIGER GROUP'S client facility"}.`,
     responsibilities:
       responsibilities.length > 0
         ? responsibilities

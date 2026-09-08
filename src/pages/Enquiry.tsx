@@ -13,7 +13,7 @@ export const Enquiry: React.FC = () => {
     <div className="enquiry-landing-hero">
       <Container>
         <div className="enquiry-header-center">
-          {/* Transition Pill from A TIGER GROUPS to Career Vertical */}
+          {/* Transition Pill from A TIGER GROUP'S to Career Vertical */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -34,7 +34,7 @@ export const Enquiry: React.FC = () => {
               color: 'var(--color-midnight-navy)'
             }}
           >
-            <span>TIGER GROUPS</span>
+            <span>A TIGER GROUP'S</span>
             <span style={{ color: 'var(--color-champagne-dark)' }}>→</span>
             <span style={{ color: 'var(--color-champagne-dark)' }}>CAREER SOLUTION VERTICAL</span>
           </motion.div>

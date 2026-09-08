@@ -30,7 +30,7 @@ export const Hero: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
             >
-              A Tiger Group's is a diversified enterprise ecosystem delivering trusted career placement, industrial workforce contracting, infrastructure properties, and retail ventures across Central India.
+              A TIGER GROUP'S is a diversified enterprise ecosystem delivering trusted career placement, industrial workforce contracting, infrastructure properties, and retail ventures across Central India.
             </motion.p>
 
             <motion.div

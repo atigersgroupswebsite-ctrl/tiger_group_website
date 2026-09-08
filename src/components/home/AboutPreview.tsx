@@ -77,7 +77,7 @@ export const AboutPreview: React.FC = () => {
                 </h2>
 
                 <p style={{ fontSize: 'var(--text-lg)', lineHeight: 1.65, color: 'var(--color-midnight-navy)', fontWeight: 500, marginBottom: 'var(--space-6)' }}>
-                  A Tiger Group's operates a multi-industry ecosystem across Central India, anchored by our flagship recruitment vertical — A Tiger Global Career Solution & Consultancy.
+                  A TIGER GROUP'S operates a multi-industry ecosystem across Central India, anchored by our flagship recruitment vertical — A Tiger Global Career Solution & Consultancy.
                 </p>
 
                 <p style={{ fontSize: 'var(--text-sm)', lineHeight: 1.7, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-8)' }}>
@@ -105,7 +105,7 @@ export const AboutPreview: React.FC = () => {
 
                 <div>
                   <Button to="/about" variant="navy" size="lg" icon={<ArrowRight size={18} />}>
-                    ABOUT A Tiger Group's
+                    ABOUT A TIGER GROUP'S
                   </Button>
                 </div>
               </div>

@@ -13,12 +13,12 @@ export const Footer: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: 'var(--space-4)' }}>
               <img
                 src="/assets/tiger-logo.jpeg"
-                alt="A Tiger Group's Logo"
+                alt="A TIGER GROUP'S Logo"
                 className="footer-brand-logo"
               />
               <div>
                 <h4 style={{ color: 'var(--color-pearl-white)', fontSize: '1.15rem', fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>
-                  A Tiger Group's
+                  A TIGER GROUP'S
                 </h4>
                 <span style={{ color: 'var(--color-champagne)', fontSize: '0.75rem', letterSpacing: '0.05em' }}>
                   Enterprise & Business Ecosystem
