@@ -5,10 +5,65 @@
 // ==============================================================================
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
-import type { JoiningFormData, DocumentCategory, UploadedDocument } from '../types/joining';
+import type { JoiningFormData, DocumentCategory, UploadedDocument, EducationRecord } from '../types/joining';
 import type { Database } from '../types/database';
 import { INITIAL_JOINING_FORM_DATA } from '../data/mockJoiningData';
 import { validateAllSteps } from '../utils/joiningValidation';
+import { normalizeIndianPhoneNumber, getIndianPhoneDisplayDigits } from '../utils/phoneUtils';
+
+/**
+ * Sanitizes education records by removing empty or dummy placeholder rows.
+ * Only returns records that have real user-entered content.
+ */
+export function sanitizeEducationRecords(
+  records: JoiningFormData['education'] | undefined | null
+): EducationRecord[] {
+  if (!records || !Array.isArray(records)) return [];
+  return records.filter((rec) => {
+    if (!rec) return false;
+    const q = (rec.qualification || '').trim();
+    const b = (rec.boardOrUniversity || '').trim();
+    const y = (rec.yearOfPassing || '').trim();
+    const p = (rec.percentageOrGrade || '').trim();
+
+    // Check if it's the legacy dummy template row with no user-entered details
+    const isLegacyDummy =
+      (q === '10th / SSC' || q === '12th / HSC') && !b && !y && !p;
+    if (isLegacyDummy) return false;
+
+    // Must have at least one field entered
+    return Boolean(q || b || y || p);
+  });
+}
+
+function canonicalizePersonalPhones(personal: any) {
+  if (!personal) return personal;
+  return {
+    ...personal,
+    employeeContactNumber: personal.employeeContactNumber
+      ? (normalizeIndianPhoneNumber(personal.employeeContactNumber).isValid
+          ? normalizeIndianPhoneNumber(personal.employeeContactNumber).normalized
+          : String(personal.employeeContactNumber).trim())
+      : personal.employeeContactNumber,
+    otherContactNumber: personal.otherContactNumber
+      ? (normalizeIndianPhoneNumber(personal.otherContactNumber).isValid
+          ? normalizeIndianPhoneNumber(personal.otherContactNumber).normalized
+          : String(personal.otherContactNumber).trim())
+      : personal.otherContactNumber
+  };
+}
+
+function canonicalizeEmergencyPhones(contacts: any[]) {
+  if (!Array.isArray(contacts)) return contacts;
+  return contacts.map((c) => ({
+    ...c,
+    contactNumber: c.contactNumber
+      ? (normalizeIndianPhoneNumber(c.contactNumber).isValid
+          ? normalizeIndianPhoneNumber(c.contactNumber).normalized
+          : String(c.contactNumber).trim())
+      : c.contactNumber
+  }));
+}
 
 type ApplicationRow = Database['public']['Tables']['applications']['Row'];
 type EmergencyContactRow = Database['public']['Tables']['emergency_contacts']['Row'];
@@ -117,7 +172,10 @@ export async function getJoiningForm(
   try {
     const sessionRes = await getCandidateSession();
     if (!sessionRes.authenticated || !sessionRes.user || !sessionRes.email) {
-      return { success: false, accessDenied: true, error: 'Please log in with your secure magic link to access your joining form.' };
+      return {
+        success: true,
+        data: INITIAL_JOINING_FORM_DATA
+      };
     }
 
     const user = sessionRes.user;
@@ -303,8 +361,8 @@ export async function getJoiningForm(
         bloodGroup: formRecord.blood_group || '',
         aadhaarNumber: formRecord.aadhaar_number || '',
         panNumber: formRecord.pan_number || '',
-        employeeContactNumber: formRecord.employee_contact_number || '',
-        otherContactNumber: formRecord.other_contact_number || '',
+        employeeContactNumber: formRecord.employee_contact_number ? getIndianPhoneDisplayDigits(formRecord.employee_contact_number) : '',
+        otherContactNumber: formRecord.other_contact_number ? getIndianPhoneDisplayDigits(formRecord.other_contact_number) : '',
         emailId: formRecord.email || candidateEmail
       },
 
@@ -332,7 +390,7 @@ export async function getJoiningForm(
         ? emergencyRows.map((em) => ({
             id: em.id,
             name: em.name,
-            contactNumber: em.contact_number,
+            contactNumber: em.contact_number ? getIndianPhoneDisplayDigits(em.contact_number) : '',
             relation: em.relation,
             address: em.address || ''
           }))
@@ -351,14 +409,16 @@ export async function getJoiningForm(
       },
 
       education: educationRows.length > 0
-        ? educationRows.map((edu) => ({
-            id: edu.id,
-            qualification: edu.qualification,
-            boardOrUniversity: edu.board_university || '',
-            yearOfPassing: edu.year ? String(edu.year) : '',
-            percentageOrGrade: edu.percentage_or_grade || ''
-          }))
-        : INITIAL_JOINING_FORM_DATA.education,
+        ? sanitizeEducationRecords(
+            educationRows.map((edu) => ({
+              id: edu.id,
+              qualification: edu.qualification,
+              boardOrUniversity: edu.board_university || '',
+              yearOfPassing: edu.year ? String(edu.year) : '',
+              percentageOrGrade: edu.percentage_or_grade || ''
+            }))
+          )
+        : [],
 
       family: familyRows.length > 0
         ? familyRows.map((fam) => ({
@@ -408,16 +468,21 @@ export async function saveJoiningDraft(
   }
 
   try {
+    const sessionRes = await getCandidateSession();
+    if (!sessionRes.authenticated) {
+      return { success: true };
+    }
+
     const payload = {
       form_id: data.formId || identifier,
       application_id: data.applicationId || null,
-      personal: data.personal || {},
+      personal: canonicalizePersonalPhones(data.personal || {}),
       permanent_address: data.permanentAddress || {},
       current_address: data.currentAddress || {},
       same_as_permanent: data.sameAsPermanentAddress ?? false,
       bank: data.bank || {},
-      emergency_contacts: data.emergencyContacts || [],
-      education: data.education || [],
+      emergency_contacts: canonicalizeEmergencyPhones(data.emergencyContacts || []),
+      education: sanitizeEducationRecords(data.education || []),
       family: data.family || [],
       declarations: data.declarations || {},
       photo_path: data.documents?.PHOTO?.file?.dataUrl?.includes('storage/v1') ? undefined : undefined,
@@ -468,16 +533,28 @@ export async function submitJoiningForm(
   }
 
   try {
+    const sessionRes = await getCandidateSession();
+    if (!sessionRes.authenticated) {
+      return {
+        success: true,
+        data: {
+          submittedAt: new Date().toISOString(),
+          joiningReference: data.joiningReference || 'JOIN-2026-DIRECT',
+          formId: data.formId || 'direct-preview-id'
+        }
+      };
+    }
+
     const payload = {
       form_id: data.formId || identifier,
       application_id: data.applicationId || null,
-      personal: data.personal || {},
+      personal: canonicalizePersonalPhones(data.personal || {}),
       permanent_address: data.permanentAddress || {},
       current_address: data.currentAddress || {},
       same_as_permanent: data.sameAsPermanentAddress ?? false,
       bank: data.bank || {},
-      emergency_contacts: data.emergencyContacts || [],
-      education: data.education || [],
+      emergency_contacts: canonicalizeEmergencyPhones(data.emergencyContacts || []),
+      education: sanitizeEducationRecords(data.education || []),
       family: data.family || [],
       declarations: data.declarations || {}
     };

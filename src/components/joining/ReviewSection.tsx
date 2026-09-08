@@ -64,9 +64,12 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
   };
 
   for (let s = 1; s <= 7; s++) {
-    // Step 4 is education - if education array is empty, it's valid
-    if (s === 4 && (!formData.education || formData.education.length === 0)) {
-      continue;
+    // Step 4 is education - it is completely optional. It only flags if a candidate entered a partial/invalid row.
+    if (s === 4) {
+      const eduVal = stepValidation[4];
+      if (!eduVal || eduVal.isValid || !formData.education || formData.education.length === 0) {
+        continue;
+      }
     }
 
     const val = stepValidation[s];

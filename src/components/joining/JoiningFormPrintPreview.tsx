@@ -25,13 +25,27 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
   const curr = formData.currentAddress;
   const bank = formData.bank;
   const decl = formData.declarations;
-  const ec = formData.emergencyContacts?.[0];
 
   const photoUrl = formData.documents?.PHOTO?.file?.dataUrl;
   const signatureUrl = formData.documents?.SIGNATURE?.file?.dataUrl;
 
   const isFemale = p.gender?.toLowerCase() === 'female';
   const showWomenConsent = isFemale && Boolean(decl.womenNightShiftConsent);
+
+  const activeEducation = (formData.education || []).filter(
+    (edu) =>
+      edu &&
+      !((edu.qualification === '10th / SSC' || edu.qualification === '12th / HSC') &&
+        !edu.boardOrUniversity?.trim() &&
+        !edu.yearOfPassing?.trim() &&
+        !edu.percentageOrGrade?.trim()) &&
+      Boolean(
+        edu.qualification?.trim() ||
+        edu.boardOrUniversity?.trim() ||
+        edu.yearOfPassing?.trim() ||
+        edu.percentageOrGrade?.trim()
+      )
+  );
 
   return (
     <div className="joining-form-print-preview">
@@ -127,26 +141,21 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
               </tr>
               <tr>
                 <td style={{ textAlign: 'center' }}>6</td>
-                <td>ID Card Format (Page 04)</td>
-                <td className="pdf-status-cell">✓ GENERATED</td>
-              </tr>
-              <tr>
-                <td style={{ textAlign: 'center' }}>7</td>
                 <td>Appointment / Joining Letter Terms</td>
                 <td className="pdf-status-cell">✓ ACCEPTED</td>
               </tr>
               <tr>
-                <td style={{ textAlign: 'center' }}>8</td>
+                <td style={{ textAlign: 'center' }}>7</td>
                 <td>EPFO Statutory Enrolment (Form 2 / Form 11)</td>
                 <td className="pdf-status-cell">✓ APPLICABLE</td>
               </tr>
               <tr>
-                <td style={{ textAlign: 'center' }}>9</td>
+                <td style={{ textAlign: 'center' }}>8</td>
                 <td>ESIC Registration (Form 1)</td>
                 <td className="pdf-status-cell">✓ APPLICABLE</td>
               </tr>
               <tr>
-                <td style={{ textAlign: 'center' }}>10</td>
+                <td style={{ textAlign: 'center' }}>9</td>
                 <td>Consent Form of Women Worker (Form 'L' Rule 13)</td>
                 <td className="pdf-status-cell">
                   {isFemale
@@ -155,37 +164,37 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
                 </td>
               </tr>
               <tr>
-                <td style={{ textAlign: 'center' }}>11</td>
+                <td style={{ textAlign: 'center' }}>10</td>
                 <td>Academic Qualification Marksheets / Certificates</td>
                 <td className="pdf-status-cell">
-                  {formData.education && formData.education.length > 0
+                  {activeEducation.length > 0
                     ? '✓ PROVIDED'
                     : 'OPTIONAL — NOT PROVIDED'}
                 </td>
               </tr>
               <tr>
-                <td style={{ textAlign: 'center' }}>12</td>
+                <td style={{ textAlign: 'center' }}>11</td>
                 <td>Experience / Relieving Certificates (if applicable)</td>
                 <td className="pdf-status-cell">
                   {formData.documents?.EXPERIENCE_CERTIFICATE?.file ? '✓ ATTACHED' : 'OPTIONAL'}
                 </td>
               </tr>
               <tr>
-                <td style={{ textAlign: 'center' }}>13</td>
+                <td style={{ textAlign: 'center' }}>12</td>
                 <td>Identity & Address Proof (Aadhaar Card, PAN Card)</td>
                 <td className="pdf-status-cell">
                   {p.aadhaarNumber && p.panNumber ? '✓ VERIFIED ON RECORD' : 'PENDING'}
                 </td>
               </tr>
               <tr>
-                <td style={{ textAlign: 'center' }}>14</td>
+                <td style={{ textAlign: 'center' }}>13</td>
                 <td>Bank Passbook / Payment Information</td>
                 <td className="pdf-status-cell">
                   {bank.bankAccountNumber ? '✓ VERIFIED' : 'PENDING'}
                 </td>
               </tr>
               <tr>
-                <td style={{ textAlign: 'center' }}>15</td>
+                <td style={{ textAlign: 'center' }}>14</td>
                 <td>Photographs (Passport Size Specimen)</td>
                 <td className="pdf-status-cell">{photoUrl ? '✓ UPLOADED' : 'PENDING'}</td>
               </tr>
@@ -420,8 +429,8 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
               </tr>
             </thead>
             <tbody>
-              {formData.education && formData.education.length > 0 ? (
-                formData.education.map((edu, i) => (
+              {activeEducation.length > 0 ? (
+                activeEducation.map((edu, i) => (
                   <tr key={edu.id || i}>
                     <td className="pdf-bold">{edu.qualification || '—'}</td>
                     <td>{edu.boardOrUniversity || '—'}</td>
@@ -472,98 +481,7 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
       </div>
 
       {/* ---------------------------------------------------------------------- */}
-      {/* PAGE 4: IDENTITY CARD                                                */}
-      {/* ---------------------------------------------------------------------- */}
-      <div className="pdf-page-sheet">
-        <div className="pdf-page-inner">
-          <div className="pdf-subpage-header">
-            <span className="pdf-subpage-brand">A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY</span>
-            <span className="pdf-subpage-title">IDENTITY CARD FORMAT (PAGE 04)</span>
-          </div>
-
-          <div className="pdf-idcard-card">
-            <div className="pdf-idcard-header">
-              <div className="pdf-idcard-brand-top">A TIGER GROUPS ENTERPRISE</div>
-              <div className="pdf-idcard-company">A TIGER GLOBAL CAREER SOLUTION & CONSULTANCY</div>
-              <div className="pdf-idcard-badge">OFFICIAL EMPLOYEE IDENTITY CARD</div>
-            </div>
-
-            <div className="pdf-idcard-body">
-              {/* Photo Area with real uploaded photo */}
-              <div className="pdf-idcard-photo-col">
-                <div className="pdf-idcard-photo-frame">
-                  {photoUrl ? (
-                    <img src={photoUrl} alt="Employee Photo" className="pdf-rendered-photo" />
-                  ) : (
-                    <div className="pdf-photo-placeholder">
-                      <span>AFFIX PASSPORT SIZE PHOTO</span>
-                    </div>
-                  )}
-                </div>
-                <div className="pdf-blood-badge">BLOOD: {p.bloodGroup || '—'}</div>
-              </div>
-
-              {/* ID Card Fields */}
-              <div className="pdf-idcard-info-col">
-                <div className="pdf-id-row">
-                  <span className="pdf-id-label">EMPLOYEE NAME:</span>
-                  <span className="pdf-id-val pdf-bold">{p.employeeName || '—'}</span>
-                </div>
-                <div className="pdf-id-row">
-                  <span className="pdf-id-label">EMPLOYEE CODE:</span>
-                  <span className="pdf-id-val">{emp.employeeCode || 'ON JOINING'}</span>
-                </div>
-                <div className="pdf-id-row">
-                  <span className="pdf-id-label">DESIGNATION:</span>
-                  <span className="pdf-id-val">{emp.designation || 'Associate'}</span>
-                </div>
-                <div className="pdf-id-row">
-                  <span className="pdf-id-label">DEPARTMENT:</span>
-                  <span className="pdf-id-val">{emp.department || 'Operations'}</span>
-                </div>
-                <div className="pdf-id-row">
-                  <span className="pdf-id-label">LOCATION:</span>
-                  <span className="pdf-id-val">{emp.location || 'Nagpur, Maharashtra'}</span>
-                </div>
-                <div className="pdf-id-row">
-                  <span className="pdf-id-label">EMERGENCY CONTACT:</span>
-                  <span className="pdf-id-val">
-                    {ec ? `${ec.name} (${ec.contactNumber} - ${ec.relation})` : 'On file'}
-                  </span>
-                </div>
-                <div className="pdf-id-row">
-                  <span className="pdf-id-label">ISSUANCE DATE:</span>
-                  <span className="pdf-id-val">{decl.declarationDate}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Signature Area on ID Card */}
-            <div className="pdf-idcard-signatures">
-              <div className="pdf-id-sign-item">
-                <div className="pdf-id-sig-frame">
-                  {signatureUrl ? (
-                    <img src={signatureUrl} alt="Employee Signature" className="pdf-rendered-signature" />
-                  ) : (
-                    <span className="pdf-sign-placeholder">Employee Signature</span>
-                  )}
-                </div>
-                <span className="pdf-id-sign-tag">EMPLOYEE SIGNATURE</span>
-              </div>
-
-              <div className="pdf-id-sign-item">
-                <div className="pdf-id-sig-frame">
-                  <span className="pdf-sign-placeholder">Authorized Signatory</span>
-                </div>
-                <span className="pdf-id-sign-tag">EMPLOYER / COMPANY SIGNATURE</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ---------------------------------------------------------------------- */}
-      {/* PAGE 5: JOINING REPORT                                                */}
+      {/* PAGE 4: JOINING REPORT                                                */}
       {/* ---------------------------------------------------------------------- */}
       <div className="pdf-page-sheet">
         <div className="pdf-page-inner">

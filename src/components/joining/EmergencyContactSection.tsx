@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, Trash2, PhoneCall } from 'lucide-react';
 import type { EmergencyContact } from '../../types/joining';
+import { normalizeIndianPhoneNumber } from '../../utils/phoneUtils';
 
 interface EmergencyContactSectionProps {
   contacts: EmergencyContact[];
@@ -19,6 +20,34 @@ export const EmergencyContactSection: React.FC<EmergencyContactSectionProps> = (
   errors,
   readOnly = false
 }) => {
+  const handlePhoneChange = (id: string, val: string) => {
+    const norm = normalizeIndianPhoneNumber(val);
+    if (norm.isValid) {
+      onContactChange(id, 'contactNumber', norm.displayDigits);
+      return;
+    }
+    const digits = val.replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('91')) {
+      const local = digits.slice(2);
+      if (/^[6-9]\d{9}$/.test(local)) {
+        onContactChange(id, 'contactNumber', local);
+        return;
+      }
+    }
+    onContactChange(id, 'contactNumber', digits.slice(0, 10));
+  };
+
+  const handlePhonePaste = (id: string, e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text');
+    if (pasted) {
+      const norm = normalizeIndianPhoneNumber(pasted);
+      if (norm.isValid) {
+        e.preventDefault();
+        onContactChange(id, 'contactNumber', norm.displayDigits);
+      }
+    }
+  };
+
   return (
     <div style={{ marginTop: 'var(--space-8)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
@@ -111,13 +140,14 @@ export const EmergencyContactSection: React.FC<EmergencyContactSectionProps> = (
               </label>
               <input
                 type="tel"
-                maxLength={10}
+                maxLength={16}
                 className={`field-input ${errors[`emergency_${contact.id}_phone`] ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
                 placeholder="10-digit mobile"
                 value={contact.contactNumber}
                 readOnly={readOnly}
                 disabled={readOnly}
-                onChange={(e) => onContactChange(contact.id, 'contactNumber', e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => handlePhoneChange(contact.id, e.target.value)}
+                onPaste={(e) => handlePhonePaste(contact.id, e)}
               />
               {errors[`emergency_${contact.id}_phone`] && (
                 <span className="field-error-msg">{errors[`emergency_${contact.id}_phone`]}</span>

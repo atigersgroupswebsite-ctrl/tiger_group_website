@@ -21,12 +21,20 @@ export type AdminAuthErrorCode =
   | 'SESSION_ERROR'
   | 'NETWORK_ERROR';
 
+export type AdminAuthState =
+  | 'AUTH_LOADING'
+  | 'NOT_AUTHENTICATED'
+  | 'AUTHENTICATED_NON_ADMIN'
+  | 'AUTHENTICATED_INACTIVE_ADMIN'
+  | 'AUTHORIZED_ADMIN';
+
 export interface AdminAuthContextType {
   user: User | null;
   session: Session | null;
   profile: AdminProfileRow | null;
   role: AdminRole | null;
   isAdmin: boolean;
+  adminState: AdminAuthState;
   loading: boolean;
   authLoading: boolean;
   profileLoading: boolean;
@@ -304,7 +312,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setProfileLoading(false);
         setAuthLoading(false);
 
-        const deniedMsg = authResult.errorReason || 'Access Denied: You do not have an active administrator profile.';
+        const deniedMsg = 'Invalid administrator credentials or unauthorized account.';
         const code = authResult.errorCode || 'PROFILE_MISSING';
         setError(deniedMsg);
         setErrorCode(code);
@@ -323,7 +331,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const isNetwork = rawMsg.includes('fetch') || rawMsg.includes('Network');
       const errorMsg = isNetwork
         ? `Network connection error: Unable to communicate with Supabase (${supabaseDiagnostics.urlHost}).`
-        : rawMsg;
+        : 'Authentication failed. Please check your credentials.';
       const code: AdminAuthErrorCode = isNetwork ? 'NETWORK_ERROR' : 'AUTH_ERROR';
 
       setError(errorMsg);
@@ -358,14 +366,34 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const isAdmin = useMemo(() => {
-    return Boolean(profile && profile.active && ALLOWED_ADMIN_ROLES.includes(profile.role));
-  }, [profile]);
+  // Compute discrete 5-stage authorization state
+  const adminState = useMemo<AdminAuthState>(() => {
+    if (authLoading || (Boolean(user) && profileLoading)) {
+      return 'AUTH_LOADING';
+    }
+    if (!user) {
+      return 'NOT_AUTHENTICATED';
+    }
+    if (!profile) {
+      return 'AUTHENTICATED_NON_ADMIN';
+    }
+    if (!profile.active) {
+      return 'AUTHENTICATED_INACTIVE_ADMIN';
+    }
+    if (!ALLOWED_ADMIN_ROLES.includes(profile.role)) {
+      return 'AUTHENTICATED_NON_ADMIN';
+    }
+    return 'AUTHORIZED_ADMIN';
+  }, [authLoading, user, profileLoading, profile]);
 
-  // Overall loading state is true if auth is loading, or if an authenticated user's profile is still being verified
+  const isAdmin = useMemo(() => {
+    return adminState === 'AUTHORIZED_ADMIN';
+  }, [adminState]);
+
+  // Overall loading state is true only while authorization is still resolving
   const loading = useMemo(() => {
-    return authLoading || (Boolean(user) && profileLoading);
-  }, [authLoading, user, profileLoading]);
+    return adminState === 'AUTH_LOADING';
+  }, [adminState]);
 
   const value = useMemo<AdminAuthContextType>(() => ({
     user,
@@ -373,6 +401,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     profile,
     role: profile?.role ?? null,
     isAdmin,
+    adminState,
     loading,
     authLoading,
     profileLoading,
@@ -381,7 +410,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     signIn,
     signOut,
     refreshProfile
-  }), [user, session, profile, isAdmin, loading, authLoading, profileLoading, error, errorCode, signIn, fetchAdminProfile, authorizeUser]);
+  }), [user, session, profile, isAdmin, adminState, loading, authLoading, profileLoading, error, errorCode, signIn, fetchAdminProfile, authorizeUser]);
 
   return (
     <AdminAuthContext.Provider value={value}>

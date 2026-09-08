@@ -1,5 +1,6 @@
 import React from 'react';
 import type { PersonalInfo } from '../../types/joining';
+import { normalizeIndianPhoneNumber } from '../../utils/phoneUtils';
 
 interface PersonalSectionProps {
   data: PersonalInfo;
@@ -21,6 +22,52 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
     return d.toISOString().split('T')[0];
   })();
   const minDobDate = '1950-01-01';
+
+  const handlePhoneInputChange = (
+    field: 'employeeContactNumber' | 'otherContactNumber',
+    val: string
+  ) => {
+    const norm = normalizeIndianPhoneNumber(val);
+    if (norm.isValid) {
+      onChange(field, norm.displayDigits);
+      return;
+    }
+    const digits = val.replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('91')) {
+      const local = digits.slice(2);
+      if (/^[6-9]\d{9}$/.test(local)) {
+        onChange(field, local);
+        return;
+      }
+    }
+    onChange(field, digits.slice(0, 10));
+  };
+
+  const handlePhonePaste = (
+    field: 'employeeContactNumber' | 'otherContactNumber',
+    e: React.ClipboardEvent<HTMLInputElement>
+  ) => {
+    const pasted = e.clipboardData.getData('text');
+    if (pasted) {
+      const norm = normalizeIndianPhoneNumber(pasted);
+      if (norm.isValid) {
+        e.preventDefault();
+        onChange(field, norm.displayDigits);
+      }
+    }
+  };
+
+  const handlePhoneBlur = (
+    field: 'employeeContactNumber' | 'otherContactNumber'
+  ) => {
+    const currentVal = data[field];
+    if (currentVal) {
+      const norm = normalizeIndianPhoneNumber(currentVal);
+      if (norm.isValid) {
+        onChange(field, norm.displayDigits);
+      }
+    }
+  };
 
   return (
     <div>
@@ -246,11 +293,13 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
             <input
               id="employeeContactNumber"
               type="tel"
-              maxLength={10}
+              maxLength={16}
               className={`field-phone-input ${errors.employeeContactNumber ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
               placeholder="10-digit mobile"
               value={data.employeeContactNumber}
-              onChange={(e) => onChange('employeeContactNumber', e.target.value)}
+              onChange={(e) => handlePhoneInputChange('employeeContactNumber', e.target.value)}
+              onPaste={(e) => handlePhonePaste('employeeContactNumber', e)}
+              onBlur={() => handlePhoneBlur('employeeContactNumber')}
               readOnly={readOnly}
               disabled={readOnly}
             />
@@ -268,11 +317,13 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
             <input
               id="otherContactNumber"
               type="tel"
-              maxLength={10}
+              maxLength={16}
               className={`field-phone-input ${readOnly ? 'read-only-field' : ''}`}
               placeholder="Alternative phone"
               value={data.otherContactNumber || ''}
-              onChange={(e) => onChange('otherContactNumber', e.target.value)}
+              onChange={(e) => handlePhoneInputChange('otherContactNumber', e.target.value)}
+              onPaste={(e) => handlePhonePaste('otherContactNumber', e)}
+              onBlur={() => handlePhoneBlur('otherContactNumber')}
               readOnly={readOnly}
               disabled={readOnly}
             />

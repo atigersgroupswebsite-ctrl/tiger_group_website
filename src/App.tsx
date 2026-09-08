@@ -38,6 +38,8 @@ import { AdminDocumentsPage } from './pages/admin/AdminDocumentsPage';
 import { AdminDocumentDetailPage } from './pages/admin/AdminDocumentDetailPage';
 import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage';
 import { AdminPaymentDetailPage } from './pages/admin/AdminPaymentDetailPage';
+import { AdminReferenceSlipsPage } from './pages/admin/AdminReferenceSlipsPage';
+import { AdminReferenceSlipDetailPage } from './pages/admin/AdminReferenceSlipDetailPage';
 import { AdminPlaceholderPage } from './pages/admin/AdminPlaceholderPage';
 import { AdminNotFoundPage } from './pages/admin/AdminNotFoundPage';
 
@@ -97,8 +99,8 @@ export const App: React.FC = () => {
               <Route path="documents/:id" element={<AdminDocumentDetailPage />} />
               <Route path="payments" element={<AdminPaymentsPage />} />
               <Route path="payments/:id" element={<AdminPaymentDetailPage />} />
-              <Route path="reference-slips" element={<AdminPlaceholderPage />} />
-              <Route path="reference-slips/:id" element={<AdminPlaceholderPage />} />
+              <Route path="reference-slips" element={<AdminReferenceSlipsPage />} />
+              <Route path="reference-slips/:id" element={<AdminReferenceSlipDetailPage />} />
               <Route path="employees" element={<AdminPlaceholderPage />} />
               <Route path="employees/:id" element={<AdminPlaceholderPage />} />
               <Route path="files" element={<AdminPlaceholderPage />} />

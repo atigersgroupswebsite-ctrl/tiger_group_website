@@ -45,6 +45,7 @@ import {
   Phone,
   Mail
 } from 'lucide-react';
+import { formatIndianPhoneNumber } from '../../utils/phoneUtils';
 
 const JOB_STATUS_CONFIG: Record<JobStatus, { label: string; color: string; bg: string; border: string }> = {
   ACTIVE: {
@@ -701,7 +702,7 @@ export const AdminJobDetailPage: React.FC = () => {
                 {job.company.contact_phone && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#475569' }}>
                     <Phone size={13} style={{ color: '#94A3B8' }} />
-                    <span>{job.company.contact_phone}</span>
+                    <span>{formatIndianPhoneNumber(job.company.contact_phone)}</span>
                   </div>
                 )}
               </div>

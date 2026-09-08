@@ -21,6 +21,7 @@ import {
   Clock,
   AlertCircle
 } from 'lucide-react';
+import { formatIndianPhoneNumber } from '../../utils/phoneUtils';
 
 interface JoiningListItem {
   id: string;
@@ -77,7 +78,7 @@ export const AdminJoiningListPage: React.FC = () => {
         joiningReference: row.joining_reference || 'PENDING',
         candidateName: row.candidate_name || 'Candidate',
         email: row.email || 'N/A',
-        mobile: row.employee_contact_number || 'N/A',
+        mobile: row.employee_contact_number ? formatIndianPhoneNumber(row.employee_contact_number) : 'N/A',
         submissionStatus: row.submission_status || 'DRAFT',
         submittedAt: row.submitted_at,
         createdAt: row.created_at

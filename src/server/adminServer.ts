@@ -231,6 +231,20 @@ export async function inviteAdminUserHandler(
       };
     }
 
+    // 4. Log governance security event to activity_logs
+    try {
+      await supabase.from('activity_logs').insert({
+        admin_user_id: authCheck.user!.id,
+        action: 'ADMIN_CREATED',
+        entity_type: 'ADMIN_USER',
+        entity_id: targetUserId,
+        description: `Admin profile created for ${normalizedEmail} with role ${role}`,
+        metadata: { email: normalizedEmail, role, active: true }
+      });
+    } catch (logErr) {
+      console.warn('[AdminServer] Failed to write activity log:', logErr);
+    }
+
     return {
       status: 200,
       data: {
@@ -294,6 +308,20 @@ export async function toggleAdminStatusHandler(
 
     if (updateErr) {
       return { status: 500, data: { success: false, error: updateErr.message } };
+    }
+
+    // Log governance event
+    try {
+      await supabase.from('activity_logs').insert({
+        admin_user_id: authCheck.user!.id,
+        action: active ? 'ADMIN_ACTIVATED' : 'ADMIN_DEACTIVATED',
+        entity_type: 'ADMIN_USER',
+        entity_id: adminId,
+        description: `Admin profile ${adminId} status changed to ${active ? 'ACTIVE' : 'INACTIVE'}`,
+        metadata: { adminId, active }
+      });
+    } catch (logErr) {
+      console.warn('[AdminServer] Failed to write activity log:', logErr);
     }
 
     return {

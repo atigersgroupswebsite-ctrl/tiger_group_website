@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, Trash2, Home, MapPin, PhoneCall } from 'lucide-react';
 import type { AddressDetails, EmergencyContact } from '../../types/joining';
+import { normalizeIndianPhoneNumber } from '../../utils/phoneUtils';
 
 interface AddressSectionProps {
   permanentAddress: AddressDetails;
@@ -31,6 +32,34 @@ export const AddressSection: React.FC<AddressSectionProps> = ({
   errors,
   readOnly = false
 }) => {
+  const handleEmergencyPhoneChange = (id: string, val: string) => {
+    const norm = normalizeIndianPhoneNumber(val);
+    if (norm.isValid) {
+      onEmergencyChange(id, 'contactNumber', norm.displayDigits);
+      return;
+    }
+    const digits = val.replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('91')) {
+      const local = digits.slice(2);
+      if (/^[6-9]\d{9}$/.test(local)) {
+        onEmergencyChange(id, 'contactNumber', local);
+        return;
+      }
+    }
+    onEmergencyChange(id, 'contactNumber', digits.slice(0, 10));
+  };
+
+  const handleEmergencyPhonePaste = (id: string, e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text');
+    if (pasted) {
+      const norm = normalizeIndianPhoneNumber(pasted);
+      if (norm.isValid) {
+        e.preventDefault();
+        onEmergencyChange(id, 'contactNumber', norm.displayDigits);
+      }
+    }
+  };
+
   return (
     <div>
       <div className="joining-step-header">
@@ -339,13 +368,14 @@ export const AddressSection: React.FC<AddressSectionProps> = ({
                   <span className="field-phone-prefix">+91</span>
                   <input
                     type="tel"
-                    maxLength={10}
+                    maxLength={16}
                     className={`field-phone-input ${readOnly ? 'read-only-field' : ''}`}
                     placeholder="10-digit number"
                     value={contact.contactNumber}
                     readOnly={readOnly}
                     disabled={readOnly}
-                    onChange={(e) => onEmergencyChange(contact.id, 'contactNumber', e.target.value)}
+                    onChange={(e) => handleEmergencyPhoneChange(contact.id, e.target.value)}
+                    onPaste={(e) => handleEmergencyPhonePaste(contact.id, e)}
                   />
                 </div>
               </div>

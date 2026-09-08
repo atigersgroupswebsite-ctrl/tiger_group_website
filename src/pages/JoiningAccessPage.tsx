@@ -298,6 +298,23 @@ export const JoiningAccessPage: React.FC = () => {
                     </>
                   )}
                 </button>
+
+                <div style={{ textAlign: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #E2E8F0' }}>
+                  <Link
+                    to="/joining"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      color: '#192A56',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      textDecoration: 'none'
+                    }}
+                  >
+                    <span>Direct Access & Check Joining Form &rarr;</span>
+                  </Link>
+                </div>
               </form>
             </div>
           )}
@@ -403,6 +420,24 @@ export const JoiningAccessPage: React.FC = () => {
                 >
                   Use a different email address
                 </button>
+
+                <Link
+                  to="/joining"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: '42px',
+                    backgroundColor: '#C59B27',
+                    color: '#FFFFFF',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    textDecoration: 'none'
+                  }}
+                >
+                  Open Joining Form Directly &rarr;
+                </Link>
               </div>
             </div>
           )}

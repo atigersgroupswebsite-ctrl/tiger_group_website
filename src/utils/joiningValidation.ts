@@ -1,4 +1,5 @@
 import type { JoiningFormData } from '../types/joining';
+import { isValidIndianPhoneNumber } from './phoneUtils';
 
 export interface StepValidationResult {
   isValid: boolean;
@@ -11,8 +12,7 @@ export const isValidEmail = (email: string): boolean => {
 };
 
 export const isValidMobile = (phone: string): boolean => {
-  const cleaned = phone.replace(/[\s\-\+]/g, '').replace(/^91/, '');
-  return /^[6-9]\d{9}$/.test(cleaned);
+  return isValidIndianPhoneNumber(phone);
 };
 
 export const isValidPinCode = (pin: string): boolean => {
@@ -291,7 +291,7 @@ export const validateBank = (bank: JoiningFormData['bank']): StepValidationResul
 };
 
 // Validate Step 05: Education Details (OPTIONAL as per client business requirements)
-export const validateEducation = (records: JoiningFormData['education']): StepValidationResult => {
+export const validateEducation = (records: JoiningFormData['education'] | undefined | null): StepValidationResult => {
   const errors: Record<string, string> = {};
   const missingFields: string[] = [];
 
@@ -300,18 +300,31 @@ export const validateEducation = (records: JoiningFormData['education']): StepVa
     return { isValid: true, errors: {}, missingFields: [] };
   }
 
-  // If candidate partially fills a record, validate the entered record
-  records.forEach((rec, idx) => {
+  // Filter out completely blank rows or untouched legacy template entries
+  const activeRecords = records.filter((rec) => {
+    const isLegacyDummy =
+      (rec.qualification === '10th / SSC' || rec.qualification === '12th / HSC') &&
+      !rec.boardOrUniversity?.trim() &&
+      !rec.yearOfPassing?.trim() &&
+      !rec.percentageOrGrade?.trim();
+    if (isLegacyDummy) return false;
+
     const hasAnyContent = Boolean(
       rec.qualification?.trim() ||
       rec.boardOrUniversity?.trim() ||
       rec.yearOfPassing?.trim() ||
       rec.percentageOrGrade?.trim()
     );
+    return hasAnyContent;
+  });
 
-    // If row has no content at all, skip it (candidate chose not to provide it)
-    if (!hasAnyContent) return;
+  // If no active/entered records exist, validation passes
+  if (activeRecords.length === 0) {
+    return { isValid: true, errors: {}, missingFields: [] };
+  }
 
+  // If candidate partially fills an active record, validate the entered record
+  activeRecords.forEach((rec, idx) => {
     if (!rec.qualification?.trim()) {
       errors[`edu_${rec.id}_qualification`] = `Row #${idx + 1}: Qualification is required`;
       missingFields.push(`Row #${idx + 1} Qualification`);

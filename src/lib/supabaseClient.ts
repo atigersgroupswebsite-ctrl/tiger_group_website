@@ -7,19 +7,21 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
 
+const env = (typeof import.meta !== 'undefined' && (import.meta as any).env) ? (import.meta as any).env : (typeof process !== 'undefined' ? process.env : {});
+
 // 1. Resolve Supabase URL (supports standard VITE_SUPABASE_URL, NEXT_PUBLIC_, and fallbacks)
 const rawUrl =
-  (import.meta.env.VITE_SUPABASE_URL as string | undefined) ||
-  (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string | undefined) ||
-  (import.meta.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined) ||
+  (env.VITE_SUPABASE_URL as string | undefined) ||
+  (env.VITE_PUBLIC_SUPABASE_URL as string | undefined) ||
+  (env.NEXT_PUBLIC_SUPABASE_URL as string | undefined) ||
   '';
 
 // 2. Resolve Anon / Publishable Key (supports VITE_SUPABASE_ANON_KEY, VITE_SUPABASE_PUBLISHABLE_KEY, and NEXT_PUBLIC_)
 const rawAnonKey =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ||
-  (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ||
-  (import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined) ||
-  (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string | undefined) ||
+  (env.VITE_SUPABASE_ANON_KEY as string | undefined) ||
+  (env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ||
+  (env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined) ||
+  (env.VITE_PUBLIC_SUPABASE_ANON_KEY as string | undefined) ||
   '';
 
 // Normalize URL (strip trailing slashes)
@@ -47,11 +49,11 @@ export const supabaseDiagnostics = {
       return 'INVALID_URL_FORMAT';
     }
   })(),
-  configuredKeyVariable: (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)
+  configuredKeyVariable: (env.VITE_SUPABASE_ANON_KEY as string | undefined)
     ? 'VITE_SUPABASE_ANON_KEY'
-    : (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined)
+    : (env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined)
       ? 'VITE_SUPABASE_PUBLISHABLE_KEY'
-      : (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string | undefined)
+      : (env.VITE_PUBLIC_SUPABASE_ANON_KEY as string | undefined)
         ? 'VITE_PUBLIC_SUPABASE_ANON_KEY'
         : 'NONE'
 };

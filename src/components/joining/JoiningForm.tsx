@@ -38,7 +38,8 @@ import {
 import {
   getJoiningForm,
   saveJoiningDraft,
-  submitJoiningForm
+  submitJoiningForm,
+  sanitizeEducationRecords
 } from '../../services/joiningService';
 
 const DRAFT_STORAGE_KEY = 'ATG_JOINING_FORM_DRAFT';
@@ -63,6 +64,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
         return {
           ...INITIAL_JOINING_FORM_DATA,
           ...parsed,
+          education: sanitizeEducationRecords(parsed.education || []),
           status: resolvedStatus,
           submissionStatus: resolvedStatus,
           documents: {
@@ -163,7 +165,9 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
                   currentAddress: { ...dbData.currentAddress, ...localParsed.currentAddress },
                   sameAsPermanentAddress: localParsed.sameAsPermanentAddress ?? dbData.sameAsPermanentAddress,
                   bank: { ...dbData.bank, ...localParsed.bank },
-                  education: (localParsed.education && localParsed.education.length > 0) ? localParsed.education : dbData.education,
+                  education: Array.isArray(localParsed.education)
+                    ? sanitizeEducationRecords(localParsed.education)
+                    : sanitizeEducationRecords(dbData.education || []),
                   family: (localParsed.family && localParsed.family.length > 0) ? localParsed.family : dbData.family,
                   emergencyContacts: (localParsed.emergencyContacts && localParsed.emergencyContacts.length > 0) ? localParsed.emergencyContacts : dbData.emergencyContacts,
                   declarations: { ...dbData.declarations, ...localParsed.declarations }

@@ -715,7 +715,10 @@ export interface Database {
       reference_slips: {
         Row: {
           id: string;
-          application_id: string;
+          application_id: string | null;
+          joining_form_id: string | null;
+          company_id: string | null;
+          company_name: string | null;
           reference_number: string;
           date: string;
           interview_date: string | null;
@@ -738,7 +741,10 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          application_id: string;
+          application_id?: string | null;
+          joining_form_id?: string | null;
+          company_id?: string | null;
+          company_name?: string | null;
           reference_number: string;
           date?: string;
           interview_date?: string | null;
@@ -761,7 +767,10 @@ export interface Database {
         };
         Update: {
           id?: string;
-          application_id?: string;
+          application_id?: string | null;
+          joining_form_id?: string | null;
+          company_id?: string | null;
+          company_name?: string | null;
           reference_number?: string;
           date?: string;
           interview_date?: string | null;
@@ -788,7 +797,8 @@ export interface Database {
       consultancy_returns: {
         Row: {
           id: string;
-          application_id: string;
+          application_id: string | null;
+          joining_form_id: string | null;
           candidate_acceptance: boolean;
           candidate_signature_path: string | null;
           accepted_at: string | null;
@@ -797,7 +807,8 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          application_id: string;
+          application_id?: string | null;
+          joining_form_id?: string | null;
           candidate_acceptance?: boolean;
           candidate_signature_path?: string | null;
           accepted_at?: string | null;
@@ -806,7 +817,8 @@ export interface Database {
         };
         Update: {
           id?: string;
-          application_id?: string;
+          application_id?: string | null;
+          joining_form_id?: string | null;
           candidate_acceptance?: boolean;
           candidate_signature_path?: string | null;
           accepted_at?: string | null;
@@ -1181,8 +1193,14 @@ export type DocumentRow = Database['public']['Tables']['documents']['Row'];
 export type PaymentRow = Database['public']['Tables']['payments']['Row'];
 export type EmployeeRow = Database['public']['Tables']['employees']['Row'];
 export type ActivityLogRow = Database['public']['Tables']['activity_logs']['Row'];
-export type ActivityLogInsert = Database['public']['Tables']['activity_logs']['Insert'];
 export type ReferenceSlipRow = Database['public']['Tables']['reference_slips']['Row'];
+export type ReferenceSlipInsert = Database['public']['Tables']['reference_slips']['Insert'];
+export type ReferenceSlipUpdate = Database['public']['Tables']['reference_slips']['Update'];
+
+export type ConsultancyReturnRow = Database['public']['Tables']['consultancy_returns']['Row'];
+export type ConsultancyReturnInsert = Database['public']['Tables']['consultancy_returns']['Insert'];
+export type ConsultancyReturnUpdate = Database['public']['Tables']['consultancy_returns']['Update'];
+
 export type EmployerEnquiryRow = Database['public']['Tables']['employer_enquiries']['Row'];
 
 export type NotificationRow = Database['public']['Tables']['notifications']['Row'];

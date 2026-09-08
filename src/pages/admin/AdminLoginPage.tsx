@@ -32,7 +32,7 @@ export const AdminLoginPage: React.FC = () => {
   const location = useLocation();
 
   const [method, setMethod] = useState<LoginMethod>('PASSWORD');
-  const [email, setEmail] = useState<string>('admin@atigergroups.com');
+  const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [otpCode, setOtpCode] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -82,8 +82,7 @@ export const AdminLoginPage: React.FC = () => {
         setLocalError(res.error || 'Authentication failed. Please verify your email and password.');
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'An error occurred during authentication.';
-      setLocalError(msg);
+      setLocalError('Invalid administrator credentials or unauthorized account.');
     } finally {
       setIsSubmitting(false);
     }
@@ -160,13 +159,6 @@ export const AdminLoginPage: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // Helper to fill credentials quickly
-  const handleQuickFill = (fillEmail: string, fillPass: string) => {
-    setEmail(fillEmail);
-    setPassword(fillPass);
-    setLocalError(null);
   };
 
   return (
@@ -722,53 +714,6 @@ export const AdminLoginPage: React.FC = () => {
             )}
           </div>
         )}
-
-        {/* Quick Fill Credentials Helper Box */}
-        <div
-          style={{
-            marginTop: '1.5rem',
-            paddingTop: '1.25rem',
-            borderTop: '1px solid #EAE8E4'
-          }}
-        >
-          <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Quick-Fill Authorized Accounts:
-          </span>
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => handleQuickFill('admin@atigergroups.com', 'Shoaibs@1203')}
-              style={{
-                fontSize: '0.75rem',
-                backgroundColor: '#F1F5F9',
-                border: '1px solid #CBD5E1',
-                padding: '0.35rem 0.65rem',
-                borderRadius: '6px',
-                color: '#192A56',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
-              admin@atigergroups.com
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickFill('shoaibsheikh2312@gmail.com', 'Shoaibs@1203')}
-              style={{
-                fontSize: '0.75rem',
-                backgroundColor: '#F1F5F9',
-                border: '1px solid #CBD5E1',
-                padding: '0.35rem 0.65rem',
-                borderRadius: '6px',
-                color: '#192A56',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
-              shoaibsheikh2312@gmail.com
-            </button>
-          </div>
-        </div>
 
         {/* Safe Diagnostic Status Indicator (No secrets exposed) */}
         <div

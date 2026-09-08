@@ -39,6 +39,8 @@ import { AdminStatusBadge } from '../../components/admin/AdminStatusBadge';
 import { JoiningReview } from '../../components/admin/JoiningReview';
 import { DocumentVerificationPanel } from '../../components/admin/DocumentVerificationPanel';
 import { AdminPaymentPanel } from '../../components/admin/AdminPaymentPanel';
+import { ReferenceSlipApplicationTab } from '../../components/admin/ReferenceSlipApplicationTab';
+import { EmployeeIdCardPanel } from '../../components/admin/EmployeeIdCardPanel';
 import {
   ArrowLeft,
   Lock,
@@ -1179,43 +1181,42 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
       )}
 
       {/* =========================================================================
-          TAB 5: REFERENCE SLIP (Stage 7 Placeholder Shell)
+          TAB 5: REFERENCE SLIP & CONSULTANCY RETURN MODULE
           ========================================================================= */}
-      {activeTab === 'reference-slip' && (
-        <div className="admin-card" style={{ padding: '2.5rem 1.5rem', textAlign: 'center' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#F3E8FF', color: '#7E22CE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-            <FileCheck size={24} />
-          </div>
-          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', fontWeight: 800, color: '#192A56' }}>
-            Candidate Reference Slip & Consultancy Return Dossier
-          </h3>
-          <p style={{ margin: '0 auto 1.5rem auto', maxWidth: '550px', fontSize: '0.85rem', color: '#64748B', lineHeight: 1.5 }}>
-            Official reference slips and signed employer return packets will be compiled and downloadable in <strong>Stage 7</strong> after candidate registration fee confirmation.
-          </p>
-          <div style={{ fontSize: '0.775rem', color: '#94A3B8' }}>
-            Module scheduled for activation in Stage 7
-          </div>
-        </div>
+      {activeTab === 'reference-slip' && id && (
+        <ReferenceSlipApplicationTab
+          applicationId={id}
+          onRefreshParent={loadApplicationData}
+        />
       )}
 
       {/* =========================================================================
           TAB 6: EMPLOYEE ONBOARDING (Stage 8 Placeholder Shell)
           ========================================================================= */}
-      {activeTab === 'employee' && (
-        <div className="admin-card" style={{ padding: '2.5rem 1.5rem', textAlign: 'center' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#DCFCE7', color: '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-            <Briefcase size={24} />
-          </div>
-          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', fontWeight: 800, color: '#192A56' }}>
-            Official Employee Profile & Identity Card Generation
-          </h3>
-          <p style={{ margin: '0 auto 1.5rem auto', maxWidth: '550px', fontSize: '0.85rem', color: '#64748B', lineHeight: 1.5 }}>
-            Creation of official employee master records, issuance of Employee Code, and generation of the client's 14-page Joining Packet PDF and printable Employee ID Card will be enabled in <strong>Stage 8</strong>.
-          </p>
-          <div style={{ fontSize: '0.775rem', color: '#94A3B8' }}>
-            Module scheduled for activation in Stage 8
-          </div>
-        </div>
+      {activeTab === 'employee' && application && (
+        <EmployeeIdCardPanel
+          applicationId={application.id}
+          joiningFormId={joiningForm?.id || null}
+          candidateName={application.full_name}
+          candidateEmail={application.email}
+          candidateMobile={application.mobile}
+          bloodGroup={joiningForm?.blood_group || null}
+          emergencyContactName={emergency[0]?.name || null}
+          emergencyContactPhone={emergency[0]?.contact_number || null}
+          emergencyContactRelation={emergency[0]?.relation || null}
+          photoUrl={
+            (joiningForm as any)?.photo_storage_path ||
+            documents.find(d => (d.document_type as string) === 'PHOTO' || (d.document_type as string) === 'PASSPORT_PHOTO')?.storage_path ||
+            null
+          }
+          signatureUrl={
+            (joiningForm as any)?.signature_storage_path ||
+            documents.find(d => d.document_type === 'SIGNATURE')?.storage_path ||
+            null
+          }
+          existingEmployee={employee}
+          onEmployeeUpdated={(updatedEmp) => setEmployee(updatedEmp)}
+        />
       )}
 
       {/* =========================================================================

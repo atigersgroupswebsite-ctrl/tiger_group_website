@@ -22,6 +22,7 @@ import type { PaymentStatus } from '../../types/database';
 import { RecordOfflinePaymentModal } from '../../components/admin/RecordOfflinePaymentModal';
 import { PaymentReceiptModal } from '../../components/admin/PaymentReceiptModal';
 import { downloadPaymentReceiptPdf, type PaymentReceiptData } from '../../utils/paymentReceiptGenerator';
+import { formatIndianPhoneNumber } from '../../utils/phoneUtils';
 import {
   CreditCard,
   Search,
@@ -594,7 +595,7 @@ export const AdminPaymentsPage: React.FC = () => {
                           {p.candidateName}
                         </div>
                         <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
-                          {p.candidateEmail || p.candidateMobile || 'Contact on file'}
+                          {p.candidateEmail || (p.candidateMobile ? formatIndianPhoneNumber(p.candidateMobile) : 'Contact on file')}
                         </div>
                       </td>
 

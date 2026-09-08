@@ -13,6 +13,7 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import type { JoiningFormData } from '../types/joining';
 import { JOINING_PDF_MAPPINGS } from '../constants/joiningPdfCoordinates';
+import { sanitizeEducationRecords } from './joiningService';
 
 async function convertDataUrlToBytes(dataUrl?: string): Promise<{ bytes: Uint8Array; isPng: boolean } | null> {
   if (!dataUrl || !dataUrl.startsWith('data:')) return null;
@@ -105,6 +106,7 @@ export async function generateJoiningPacketPdf(formData: JoiningFormData): Promi
 
   const isFemale = p.gender?.toLowerCase() === 'female';
   const hasWomenConsent = isFemale && Boolean(decl.womenNightShiftConsent);
+  const activeEdu = sanitizeEducationRecords(formData.education || []);
 
   // ---------------------------------------------------------------------------
   // PAGE 1: CHECKLIST & EMPLOYEE INFO
@@ -125,7 +127,7 @@ export async function generateJoiningPacketPdf(formData: JoiningFormData): Promi
   drawText(0, '✓ ATTESTED', m1.chk_epfo, true);
   drawText(0, '✓ ATTESTED', m1.chk_esic, true);
   drawText(0, isFemale ? (hasWomenConsent ? '✓ ACCEPTED' : 'NOT APPLICABLE') : 'N/A (MALE)', m1.chk_womenConsent);
-  drawText(0, formData.education?.length > 0 ? '✓ ATTACHED' : 'OPTIONAL (NOT PROVIDED)', m1.chk_education);
+  drawText(0, activeEdu.length > 0 ? '✓ ATTACHED' : 'OPTIONAL (NOT PROVIDED)', m1.chk_education);
   drawText(0, p.aadhaarNumber ? '✓ ATTACHED' : '—', m1.chk_idProof, true);
   drawText(0, bank.bankAccountNumber ? '✓ ATTACHED' : '—', m1.chk_bankProof, true);
   drawText(0, photoUrl ? '✓ UPLOADED' : '—', m1.chk_photos);
@@ -184,8 +186,8 @@ export async function generateJoiningPacketPdf(formData: JoiningFormData): Promi
   drawText(2, bank.branchName, m3.branchName);
 
   // Education rows (optional)
-  if (formData.education && formData.education.length > 0) {
-    formData.education.slice(0, 3).forEach((edu, idx) => {
+  if (activeEdu.length > 0) {
+    activeEdu.slice(0, 3).forEach((edu, idx) => {
       const y = m3.eduRowY[idx] || 500;
       drawText(2, edu.qualification, { x: m3.eduCols.qualification, y, size: 8 });
       drawText(2, edu.boardOrUniversity, { x: m3.eduCols.board, y, size: 8 });
@@ -206,29 +208,7 @@ export async function generateJoiningPacketPdf(formData: JoiningFormData): Promi
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // PAGE 4: IDENTITY CARD
-  // ---------------------------------------------------------------------------
-  const m4 = JOINING_PDF_MAPPINGS.page4;
-  drawText(3, p.employeeName, m4.employeeName, true);
-  drawText(3, emp.employeeCode || '—', m4.employeeCode);
-  drawText(3, emp.designation, m4.designation);
-  drawText(3, emp.department, m4.department);
-  drawText(3, emp.location || 'Nagpur, MH', m4.location);
-  if (ec) {
-    drawText(3, ec.name, m4.emerName);
-    drawText(3, `${ec.contactNumber} (${ec.relation})`, m4.emerPhone);
-  }
-  drawText(3, p.bloodGroup || '—', m4.bloodGroup);
-  drawText(3, decl.declarationDate, m4.date);
-
-  // Embed Photo and Signature on ID Card
-  if (photoUrl) {
-    await drawImage(3, photoUrl, m4.photoBox);
-  }
-  if (signatureUrl) {
-    await drawImage(3, signatureUrl, m4.signatureBox);
-  }
+  // (Identity Card Page has been separated from Joining Packet - managed in Employee Admin)
 
   // ---------------------------------------------------------------------------
   // PAGE 5: JOINING REPORT
@@ -324,13 +304,16 @@ export async function generateJoiningPacketPdf(formData: JoiningFormData): Promi
   }
 
   // ---------------------------------------------------------------------------
-  // CONDITIONAL PAGE HANDLING (PART 14, 16, 24)
-  // If candidate is NOT female (or did not consent), remove Page 6!
-  // Note: Page 6 in 0-indexed is 5
+  // CONDITIONAL PAGE HANDLING & PACKET ASSEMBLY
+  // 1. Remove Page 6 (Form 'L' Women Night Shift) if not applicable (index 5)
+  // 2. Remove Page 4 (Identity Card Format, index 3) - ID Card is separated to Employee Admin
+  // Note: removing index 5 first preserves index 3 without offset shift.
   // ---------------------------------------------------------------------------
   if (!hasWomenConsent) {
     pdfDoc.removePage(5);
   }
+  // Master index 3 corresponds to IDENTITY CARD FORMAT (PAGE 04)
+  pdfDoc.removePage(3);
 
   // 3. Serialize and return Blob
   const pdfBytes = await pdfDoc.save();

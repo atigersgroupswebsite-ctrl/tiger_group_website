@@ -33,6 +33,7 @@ import type {
 } from '../../types/database';
 import { CompanyInformationEditor } from './CompanyInformationEditor';
 import { AdminSensitiveRevealModal } from './AdminSensitiveRevealModal';
+import { formatIndianPhoneNumber } from '../../utils/phoneUtils';
 
 interface JoiningReviewProps {
   application: ApplicationRow;
@@ -269,12 +270,16 @@ export const JoiningReview: React.FC<JoiningReviewProps> = ({
 
           <div>
             <div style={{ fontSize: '0.725rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 700 }}>Mobile Contact</div>
-            <div style={{ fontSize: '0.9rem', color: '#192A56', fontWeight: 600, marginTop: '2px' }}>{joiningForm?.employee_contact_number || application.mobile}</div>
+            <div style={{ fontSize: '0.9rem', color: '#192A56', fontWeight: 600, marginTop: '2px' }}>
+              {formatIndianPhoneNumber(joiningForm?.employee_contact_number || application.mobile)}
+            </div>
           </div>
 
           <div>
             <div style={{ fontSize: '0.725rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 700 }}>Alternate Contact</div>
-            <div style={{ fontSize: '0.9rem', color: '#192A56', fontWeight: 600, marginTop: '2px' }}>{joiningForm?.other_contact_number || '—'}</div>
+            <div style={{ fontSize: '0.9rem', color: '#192A56', fontWeight: 600, marginTop: '2px' }}>
+              {joiningForm?.other_contact_number ? formatIndianPhoneNumber(joiningForm.other_contact_number) : '—'}
+            </div>
           </div>
 
           <div>
@@ -516,7 +521,7 @@ export const JoiningReview: React.FC<JoiningReviewProps> = ({
                   <tr key={em.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                     <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, color: '#192A56' }}>{em.name}</td>
                     <td style={{ padding: '0.65rem 0.75rem', color: '#475569' }}>{em.relation}</td>
-                    <td style={{ padding: '0.65rem 0.75rem', color: '#192A56', fontWeight: 600 }}>{em.contact_number}</td>
+                    <td style={{ padding: '0.65rem 0.75rem', color: '#192A56', fontWeight: 600 }}>{em.contact_number ? formatIndianPhoneNumber(em.contact_number) : '—'}</td>
                     <td style={{ padding: '0.65rem 0.75rem', color: '#475569' }}>{em.address || '—'}</td>
                   </tr>
                 ))}

@@ -16,6 +16,7 @@ export type ActivityEntityType =
   | 'PAYMENT'
   | 'DOCUMENT'
   | 'GENERATED_FILE'
+  | 'REFERENCE_SLIP'
   | 'SETTINGS'
   | 'ADMIN_USER'
   | 'EMPLOYER_ENQUIRY';

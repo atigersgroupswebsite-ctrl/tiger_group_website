@@ -39,6 +39,7 @@ import {
   ShieldCheck,
   Activity
 } from 'lucide-react';
+import { normalizeIndianPhoneNumber, formatIndianPhoneNumber } from '../../utils/phoneUtils';
 
 
 const COMPANY_TYPE_CONFIG: Record<CompanyType, { label: string; color: string; bg: string; border: string }> = {
@@ -161,7 +162,11 @@ export const AdminCompanyDetailPage: React.FC = () => {
       company_type: formType,
       address: formAddress.trim() || null,
       contact_email: formEmail.trim().toLowerCase() || null,
-      contact_phone: formPhone.trim() || null,
+      contact_phone: formPhone.trim()
+        ? (normalizeIndianPhoneNumber(formPhone).isValid
+            ? normalizeIndianPhoneNumber(formPhone).normalized
+            : formPhone.trim())
+        : null,
       active: formActive
     };
 
@@ -451,7 +456,7 @@ export const AdminCompanyDetailPage: React.FC = () => {
                 <span style={{ color: '#1E293B', fontWeight: 500, marginTop: '0.15rem', display: 'block' }}>
                   {company.contact_phone ? (
                     <a href={`tel:${company.contact_phone}`} style={{ color: '#1E40AF', textDecoration: 'none' }}>
-                      {company.contact_phone}
+                      {formatIndianPhoneNumber(company.contact_phone)}
                     </a>
                   ) : (
                     <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>None</span>

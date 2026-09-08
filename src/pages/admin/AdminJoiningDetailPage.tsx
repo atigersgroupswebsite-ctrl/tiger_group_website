@@ -23,6 +23,11 @@ import {
   Printer
 } from 'lucide-react';
 
+import { EmployeeIdCardPanel } from '../../components/admin/EmployeeIdCardPanel';
+import { getEmployeeByJoiningFormId } from '../../services/employeeService';
+import type { EmployeeRow } from '../../types/database';
+import { formatIndianPhoneNumber } from '../../utils/phoneUtils';
+
 export const AdminJoiningDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -31,6 +36,7 @@ export const AdminJoiningDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState<any>(null);
+  const [employee, setEmployee] = useState<EmployeeRow | null>(null);
   const [emergency, setEmergency] = useState<any[]>([]);
   const [education, setEducation] = useState<any[]>([]);
   const [family, setFamily] = useState<any[]>([]);
@@ -93,6 +99,12 @@ export const AdminJoiningDetailPage: React.FC = () => {
           if (sigData?.signedUrl && isMounted) {
             setSignatureUrl(sigData.signedUrl);
           }
+        }
+
+        // 4. Fetch linked Employee record if already promoted
+        const empRecord = await getEmployeeByJoiningFormId(id);
+        if (empRecord && isMounted) {
+          setEmployee(empRecord);
         }
       } catch (err: any) {
         if (isMounted) {
@@ -280,7 +292,7 @@ export const AdminJoiningDetailPage: React.FC = () => {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <Phone size={13} />
-                <span>{form.employee_contact_number || 'N/A'}</span>
+                <span>{form.employee_contact_number ? formatIndianPhoneNumber(form.employee_contact_number) : 'N/A'}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <Calendar size={13} />
@@ -346,7 +358,7 @@ export const AdminJoiningDetailPage: React.FC = () => {
             </div>
             <div>
               <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748B', fontWeight: 700 }}>Contact Number</span>
-              <div style={{ fontWeight: 600, color: '#0F172A', marginTop: '2px' }}>{form.employee_contact_number || '—'}</div>
+              <div style={{ fontWeight: 600, color: '#0F172A', marginTop: '2px' }}>{form.employee_contact_number ? formatIndianPhoneNumber(form.employee_contact_number) : '—'}</div>
             </div>
             <div>
               <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748B', fontWeight: 700 }}>Email Address</span>
@@ -412,7 +424,7 @@ export const AdminJoiningDetailPage: React.FC = () => {
                   {emergency.map((em, idx) => (
                     <tr key={em.id || idx} style={{ borderBottom: '1px solid #F1F5F9' }}>
                       <td style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>{em.name}</td>
-                      <td style={{ padding: '0.6rem 0.8rem' }}>{em.contact_number}</td>
+                      <td style={{ padding: '0.6rem 0.8rem' }}>{formatIndianPhoneNumber(em.contact_number)}</td>
                       <td style={{ padding: '0.6rem 0.8rem' }}>{em.relation}</td>
                       <td style={{ padding: '0.6rem 0.8rem', color: '#64748B' }}>{em.address || '—'}</td>
                     </tr>
@@ -591,6 +603,24 @@ export const AdminJoiningDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* 6. EMPLOYEE IDENTITY CARD & ADMINISTRATION */}
+        {form && (
+          <EmployeeIdCardPanel
+            joiningFormId={form.id}
+            candidateName={form.candidate_name || 'Candidate'}
+            candidateEmail={form.email}
+            candidateMobile={form.employee_contact_number}
+            bloodGroup={form.blood_group || null}
+            emergencyContactName={emergency[0]?.name || null}
+            emergencyContactPhone={emergency[0]?.contact_number || null}
+            emergencyContactRelation={emergency[0]?.relation || null}
+            photoUrl={photoUrl}
+            signatureUrl={signatureUrl}
+            existingEmployee={employee}
+            onEmployeeUpdated={(updatedEmp) => setEmployee(updatedEmp)}
+          />
+        )}
       </div>
     </div>
   );

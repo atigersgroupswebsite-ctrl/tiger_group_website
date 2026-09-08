@@ -19,6 +19,7 @@ import type { ActivityLogRow, PaymentStatus } from '../../types/database';
 import { PaymentReceiptModal } from '../../components/admin/PaymentReceiptModal';
 import { downloadPaymentReceiptPdf, type PaymentReceiptData } from '../../utils/paymentReceiptGenerator';
 import { resendPaymentReceiptEmail } from '../../services/paymentService';
+import { formatIndianPhoneNumber } from '../../utils/phoneUtils';
 import {
   CreditCard,
   ArrowLeft,
@@ -472,7 +473,7 @@ export const AdminPaymentDetailPage: React.FC = () => {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem' }}>
                 <span style={{ color: '#64748B' }}>Candidate Mobile:</span>
-                <span style={{ color: '#1E293B' }}>{payment.candidateMobile || 'Not on file'}</span>
+                <span style={{ color: '#1E293B' }}>{payment.candidateMobile ? formatIndianPhoneNumber(payment.candidateMobile) : 'Not on file'}</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem' }}>

@@ -28,6 +28,7 @@ import {
   Loader2,
   Trash2
 } from 'lucide-react';
+import { formatIndianPhoneNumber } from '../../utils/phoneUtils';
 
 const PAGE_SIZE = 15;
 
@@ -444,7 +445,7 @@ export const AdminEmployerEnquiriesPage: React.FC = () => {
                         {enq.email}
                       </td>
                       <td style={{ color: '#4A5568', fontSize: '0.825rem' }}>
-                        {enq.phone}
+                        {enq.phone ? formatIndianPhoneNumber(enq.phone) : '—'}
                       </td>
                       <td style={{ color: '#64748B' }}>
                         {enq.district ? `${enq.district}, ${enq.state}` : enq.state || '—'}
@@ -623,7 +624,7 @@ export const AdminEmployerEnquiriesPage: React.FC = () => {
                   Contact Phone
                 </div>
                 <div style={{ fontSize: '0.875rem', color: '#192A56', fontWeight: 600, marginTop: '2px' }}>
-                  {selectedEnquiry.phone}
+                  {selectedEnquiry.phone ? formatIndianPhoneNumber(selectedEnquiry.phone) : '—'}
                 </div>
               </div>
 

@@ -79,22 +79,7 @@ export const INITIAL_JOINING_FORM_DATA: JoiningFormData = {
     esicNumber: '',
     ptNumber: ''
   },
-  education: [
-    {
-      id: 'edu-1',
-      qualification: '10th / SSC',
-      boardOrUniversity: '',
-      yearOfPassing: '',
-      percentageOrGrade: ''
-    },
-    {
-      id: 'edu-2',
-      qualification: '12th / HSC',
-      boardOrUniversity: '',
-      yearOfPassing: '',
-      percentageOrGrade: ''
-    }
-  ],
+  education: [],
   family: [
     {
       id: 'fam-1',
@@ -206,7 +191,7 @@ export const JOINING_STEPS = [
   { step: 1, id: 'personal', label: 'Personal Information', shortLabel: '01 Personal' },
   { step: 2, id: 'address', label: 'Address & Emergency', shortLabel: '02 Address & Emergency' },
   { step: 3, id: 'bank', label: 'Bank Details', shortLabel: '03 Bank' },
-  { step: 4, id: 'education', label: 'Education Details', shortLabel: '04 Education' },
+  { step: 4, id: 'education', label: 'Education Details (Optional)', shortLabel: '04 Education (Opt)' },
   { step: 5, id: 'family', label: 'Family Details', shortLabel: '05 Family' },
   { step: 6, id: 'documents', label: 'Documents & Photos', shortLabel: '06 Documents' },
   { step: 7, id: 'declarations', label: 'Declarations & Consent', shortLabel: '07 Declarations' },

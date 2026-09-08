@@ -1,5 +1,5 @@
 import React from 'react';
-import { normalizeIndianMobile } from '../../utils/phoneUtils';
+import { normalizeIndianPhoneNumber } from '../../utils/phoneUtils';
 
 interface PhoneInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
   id: string;
@@ -19,7 +19,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     const pasted = e.clipboardData.getData('text');
     if (pasted) {
-      const norm = normalizeIndianMobile(pasted);
+      const norm = normalizeIndianPhoneNumber(pasted);
       if (norm.isValid) {
         e.preventDefault();
         onChange(norm.displayDigits);
@@ -29,16 +29,36 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    // Check if raw input contains +91 or more than 10 digits
-    const norm = normalizeIndianMobile(raw);
+    const digits = raw.replace(/\D/g, '');
+
+    // If input has 12 digits starting with country code 91 (e.g. 918349353946):
+    if (digits.length === 12 && digits.startsWith('91')) {
+      const norm12 = normalizeIndianPhoneNumber(digits);
+      if (norm12.isValid) {
+        onChange(norm12.displayDigits);
+        return;
+      }
+    }
+
+    // Check if full input normalizes cleanly
+    const norm = normalizeIndianPhoneNumber(raw);
     if (norm.isValid) {
       onChange(norm.displayDigits);
       return;
     }
 
-    // Only accept numeric digits, maximum 10 digits
-    const cleanDigits = raw.replace(/\D/g, '').slice(0, 10);
-    onChange(cleanDigits);
+    // Standard digit typing: limit to 10 digits
+    onChange(digits.slice(0, 10));
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw) {
+      const norm = normalizeIndianPhoneNumber(raw);
+      if (norm.isValid) {
+        onChange(norm.displayDigits);
+      }
+    }
   };
 
   return (
@@ -53,6 +73,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
         value={value}
         onChange={handleChange}
         onPaste={handlePaste}
+        onBlur={handleBlur}
         placeholder={placeholder}
         className="field-phone-input"
         aria-invalid={hasError}

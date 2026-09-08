@@ -37,6 +37,7 @@ import {
   Phone,
   MapPin
 } from 'lucide-react';
+import { normalizeIndianPhoneNumber, formatIndianPhoneNumber } from '../../utils/phoneUtils';
 
 
 const COMPANY_TYPE_CONFIG: Record<CompanyType, { label: string; color: string; bg: string; border: string }> = {
@@ -172,7 +173,11 @@ export const AdminCompaniesPage: React.FC = () => {
       company_type: formType,
       address: formAddress.trim() || null,
       contact_email: formEmail.trim().toLowerCase() || null,
-      contact_phone: formPhone.trim() || null,
+      contact_phone: formPhone.trim()
+        ? (normalizeIndianPhoneNumber(formPhone).isValid
+            ? normalizeIndianPhoneNumber(formPhone).normalized
+            : formPhone.trim())
+        : null,
       active: formActive
     };
 
@@ -208,7 +213,11 @@ export const AdminCompaniesPage: React.FC = () => {
       company_type: formType,
       address: formAddress.trim() || null,
       contact_email: formEmail.trim().toLowerCase() || null,
-      contact_phone: formPhone.trim() || null,
+      contact_phone: formPhone.trim()
+        ? (normalizeIndianPhoneNumber(formPhone).isValid
+            ? normalizeIndianPhoneNumber(formPhone).normalized
+            : formPhone.trim())
+        : null,
       active: formActive
     };
 
@@ -633,7 +642,7 @@ export const AdminCompaniesPage: React.FC = () => {
                         {company.contact_phone ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#334155', marginTop: '0.2rem' }}>
                             <Phone size={13} style={{ color: '#94A3B8' }} />
-                            <span>{company.contact_phone}</span>
+                            <span>{formatIndianPhoneNumber(company.contact_phone)}</span>
                           </div>
                         ) : null}
                         {!company.contact_email && !company.contact_phone && (

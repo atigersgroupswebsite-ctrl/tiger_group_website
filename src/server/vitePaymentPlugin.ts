@@ -71,6 +71,21 @@ export function paymentApiPlugin(): Plugin {
           }
         }
 
+        // Handle Employee Operations (e.g. Send ID Card Email)
+        if (url === '/api/admin/employees/send-id-card' && req.method?.toUpperCase() === 'POST') {
+          const authHeader = req.headers['authorization'];
+          try {
+            const rawBody = await parseRequestBody(req);
+            const body = JSON.parse(rawBody || '{}');
+            const { sendEmployeeIdCardServerHandler } = await import('./employeeEmailService.ts');
+            const result = await sendEmployeeIdCardServerHandler(body, authHeader);
+            return sendJsonResponse(res, result.status || 200, result.data);
+          } catch (empErr: any) {
+            console.error('[API_EMPLOYEE_SEND_ID_CARD_ERROR]', empErr);
+            return sendJsonResponse(res, 500, { success: false, error: empErr.message || 'Failed to dispatch Employee ID card' });
+          }
+        }
+
         if (!url.startsWith('/api/payment') && !url.startsWith('/api/payments')) {
           return next();
         }
