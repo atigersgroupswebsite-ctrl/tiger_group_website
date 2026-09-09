@@ -154,7 +154,59 @@ export interface JoiningFormData {
   family: FamilyMemberRecord[];
   documents: Record<DocumentCategory, UploadedDocument>;
   declarations: DeclarationsInfo;
+  customFields?: Record<string, any>;
   status: 'DRAFT' | 'SUBMITTED';
   submissionStatus?: 'DRAFT' | 'SUBMITTED';
   submittedAt?: string;
+}
+
+export type ConfigurableSection =
+  | 'personal'
+  | 'address'
+  | 'bank'
+  | 'education'
+  | 'family'
+  | 'documents'
+  | 'declarations'
+  | 'custom';
+
+export type ConfigurableFieldType =
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'date'
+  | 'email'
+  | 'phone'
+  | 'select'
+  | 'radio'
+  | 'checkbox'
+  | 'file';
+
+export interface FieldSelectOption {
+  label: string;
+  value: string;
+}
+
+export interface FieldConditionalRule {
+  dependsOn: string;
+  value: string | boolean;
+}
+
+export interface JoiningFieldConfig {
+  id: string;
+  field_key: string;
+  section: ConfigurableSection | string;
+  label: string;
+  field_type: ConfigurableFieldType;
+  is_required: boolean;
+  is_enabled: boolean;
+  is_system: boolean;
+  display_order: number;
+  placeholder?: string | null;
+  help_text?: string | null;
+  options?: FieldSelectOption[] | null;
+  conditional_rule?: FieldConditionalRule | null;
+  validation_rules?: Record<string, any> | null;
+  created_at?: string;
+  updated_at?: string;
 }

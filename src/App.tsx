@@ -46,6 +46,7 @@ import { AdminFilesPage } from './pages/admin/AdminFilesPage';
 import { AdminFileDetailPage } from './pages/admin/AdminFileDetailPage';
 import { AdminActivityPage } from './pages/admin/AdminActivityPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
+import { AdminJoiningSettingsPage } from './pages/admin/AdminJoiningSettingsPage';
 import { AdminNotFoundPage } from './pages/admin/AdminNotFoundPage';
 
 // Public Pages
@@ -112,6 +113,7 @@ export const App: React.FC = () => {
               <Route path="files/:id" element={<AdminFileDetailPage />} />
               <Route path="activity" element={<AdminActivityPage />} />
               <Route path="settings" element={<AdminSettingsPage />} />
+              <Route path="joining-form-settings" element={<AdminJoiningSettingsPage />} />
 
               {/* Admin 404 Fallback - Keeps all unknown /admin/* paths strictly inside AdminLayout */}
               <Route path="*" element={<AdminNotFoundPage />} />

@@ -1,335 +1,521 @@
 // ==============================================================================
 // File: src/services/joiningPdfGenerator.ts
-// Description: Client-side Master 14-Page Joining Packet PDF Generator using pdf-lib
+// Description: Official Joining Form PDF Generator & Downloader
 // Brand: A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY
 // Architecture:
-//   1. Loads master joining_form_master.pdf template
-//   2. Dynamically overlays candidate demographic, address, bank, and declaration data
-//   3. Embeds candidate Photo and Signature images
-//   4. Conditionally manages Page 6 (Women Worker Night Shift Consent for females only)
-//   5. Downloads final legally compliant joining dossier
+//   1. Reuses the exact official form representation established by JoiningFormPrintPreview
+//   2. Generates candidate-specific PDF containing submitted application data
+//   3. Completely disconnects any static reference/master templates
+//   4. Captures official sheets (.pdf-page-sheet) at high-DPI resolution
+//   5. Excludes Employee ID Card (managed independently in Employee Admin)
+//   6. Excludes all admin navigation, sidebars, badges, and web-app wrappers
+//   7. Records audit record in public.generated_files ledger via persistGeneratedDocument
+//   8. Produces candidate-specific filename: [Reference]-[Candidate-Name].pdf
 // ==============================================================================
 
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import type { JoiningFormData } from '../types/joining';
-import { JOINING_PDF_MAPPINGS } from '../constants/joiningPdfCoordinates';
-import { sanitizeEducationRecords } from './joiningService';
+import { persistGeneratedDocument } from './filePersistenceService';
 
-async function convertDataUrlToBytes(dataUrl?: string): Promise<{ bytes: Uint8Array; isPng: boolean } | null> {
-  if (!dataUrl || !dataUrl.startsWith('data:')) return null;
+/**
+ * Locates rendered official form sheets from JoiningFormPrintPreview in the active DOM.
+ */
+function findPrintPreviewSheets(): HTMLElement[] {
+  if (typeof document === 'undefined') return [];
 
-  try {
-    const isPng = dataUrl.includes('image/png');
-    const base64 = dataUrl.split(',')[1];
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return { bytes, isPng };
-  } catch (err) {
-    console.warn('Failed to convert DataUrl to bytes:', err);
-    return null;
+  // Preferred: sheets inside .joining-form-print-preview container
+  const container = document.querySelector('.joining-form-print-preview');
+  if (container) {
+    const sheets = Array.from(container.querySelectorAll<HTMLElement>('.pdf-page-sheet'));
+    if (sheets.length > 0) return sheets;
   }
+
+  // Fallback: any .pdf-page-sheet in the document
+  return Array.from(document.querySelectorAll<HTMLElement>('.pdf-page-sheet'));
 }
 
-export async function generateJoiningPacketPdf(formData: JoiningFormData): Promise<Blob> {
-  // 1. Fetch master template PDF
-  const response = await fetch('/assets/pdf/joining_form_master.pdf');
-  if (!response.ok) {
-    throw new Error('Master Joining Form PDF template could not be loaded.');
-  }
-  const templateBytes = await response.arrayBuffer();
+/**
+ * Renders official form sheets into high-DPI canvas pages and compiles a multi-page A4 PDF.
+ */
+async function captureSheetsToPdfBlob(sheets: HTMLElement[]): Promise<Blob> {
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true
+  });
 
-  // 2. Load PDFDocument
-  const pdfDoc = await PDFDocument.load(templateBytes);
-  const pages = pdfDoc.getPages();
-  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const textColor = rgb(0.08, 0.08, 0.12);
+  for (let i = 0; i < sheets.length; i++) {
+    const sheet = sheets[i];
 
-  // Helper: Draw Text
-  const drawText = (
-    pageIdx: number,
-    text: string | undefined | null,
-    coord: { x: number; y: number; size?: number; maxWidth?: number },
-    bold: boolean = false
-  ) => {
-    if (!text || pageIdx >= pages.length) return;
-    const page = pages[pageIdx];
-    page.drawText(String(text).trim(), {
-      x: coord.x,
-      y: coord.y,
-      size: coord.size || 9,
-      font: bold ? helveticaBold : helvetica,
-      color: textColor,
-      maxWidth: coord.maxWidth
+    // Ensure all images (e.g. signatures, photos) in the sheet have completed loading
+    const images = Array.from(sheet.querySelectorAll('img'));
+    await Promise.all(
+      images.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            if (img.complete) return resolve();
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+            setTimeout(resolve, 1500); // 1.5s timeout safeguard
+          })
+      )
+    );
+
+    const canvas = await html2canvas(sheet, {
+      scale: 2, // 2x gives 150-200 DPI crisp, executive-grade print quality
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#FFFFFF',
+      logging: false,
+      scrollX: 0,
+      scrollY: 0,
+      ignoreElements: (el) => el.classList?.contains('no-print'),
+      onclone: (clonedDoc) => {
+        const clonedSheets = clonedDoc.querySelectorAll<HTMLElement>('.pdf-page-sheet');
+        clonedSheets.forEach((s) => {
+          s.style.boxShadow = 'none';
+          s.style.margin = '0';
+          s.style.borderRadius = '0';
+        });
+        const noPrints = clonedDoc.querySelectorAll<HTMLElement>('.no-print');
+        noPrints.forEach((np) => (np.style.display = 'none'));
+      }
     });
-  };
 
-  // Helper: Embed & Draw Image
-  const drawImage = async (
-    pageIdx: number,
-    imageDataUrl: string | undefined,
-    box: { x: number; y: number; width: number; height: number }
-  ) => {
-    if (!imageDataUrl || pageIdx >= pages.length) return;
-    const converted = await convertDataUrlToBytes(imageDataUrl);
-    if (!converted) return;
-
-    try {
-      const embeddedImg = converted.isPng
-        ? await pdfDoc.embedPng(converted.bytes)
-        : await pdfDoc.embedJpg(converted.bytes);
-
-      const page = pages[pageIdx];
-      page.drawImage(embeddedImg, {
-        x: box.x,
-        y: box.y,
-        width: box.width,
-        height: box.height
-      });
-    } catch (err) {
-      console.warn('Could not embed image into PDF:', err);
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    if (i > 0) {
+      pdf.addPage('a4', 'portrait');
     }
-  };
 
-  const p = formData.personal;
-  const emp = formData.employment;
-  const perm = formData.permanentAddress;
-  const curr = formData.currentAddress;
-  const bank = formData.bank;
-  const decl = formData.declarations;
-  const ec = formData.emergencyContacts[0];
-  const photoUrl = formData.documents.PHOTO?.file?.dataUrl;
-  const signatureUrl = formData.documents.SIGNATURE?.file?.dataUrl;
+    // Standard A4 dimensions: 210mm x 297mm
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    const imgWidth = 210;
+    const imgHeight = Math.min(297, (canvasHeight * 210) / canvasWidth);
 
+    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
+  }
+
+  return pdf.output('blob');
+}
+
+/**
+ * Programmatic vector builder for Node test environments or headless operations.
+ * Produces candidate-specific official paperwork without loading any reference PDF.
+ */
+function buildProgrammaticJoiningPdf(formData: JoiningFormData): jsPDF {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const p = formData.personal || {};
+  const emp = formData.employment || {};
+  const perm = formData.permanentAddress || {};
+  const curr = formData.currentAddress || {};
+  const bank = formData.bank || {};
+  const decl = formData.declarations || {};
   const isFemale = p.gender?.toLowerCase() === 'female';
   const hasWomenConsent = isFemale && Boolean(decl.womenNightShiftConsent);
-  const activeEdu = sanitizeEducationRecords(formData.education || []);
 
-  // ---------------------------------------------------------------------------
-  // PAGE 1: CHECKLIST & EMPLOYEE INFO
-  // ---------------------------------------------------------------------------
-  const m1 = JOINING_PDF_MAPPINGS.page1;
-  drawText(0, p.employeeName, m1.employeeName, true);
-  drawText(0, emp.employeeCode || '—', m1.employeeCode);
-  drawText(0, emp.dateOfJoining || decl.declarationDate, m1.dateOfJoining);
-  drawText(0, emp.department, m1.department);
-  drawText(0, emp.designation, m1.designation);
-  drawText(0, `${emp.location || 'Nagpur'} / ${emp.unit || 'A TIGER GLOBAL'}`, m1.locationUnit);
+  const navy = [15, 27, 56] as const;
+  const slate = [71, 85, 105] as const;
 
-  // Checklist Checkmarks
-  drawText(0, '✓ ON FILE', m1.chk_personal, true);
-  drawText(0, '✓ READY', m1.chk_joiningReport, true);
-  drawText(0, '✓ ACKNOWLEDGED', m1.chk_declaration, true);
-  drawText(0, '✓ GENERATED', m1.chk_idCard, true);
-  drawText(0, '✓ ATTESTED', m1.chk_epfo, true);
-  drawText(0, '✓ ATTESTED', m1.chk_esic, true);
-  drawText(0, isFemale ? (hasWomenConsent ? '✓ ACCEPTED' : 'NOT APPLICABLE') : 'N/A (MALE)', m1.chk_womenConsent);
-  drawText(0, activeEdu.length > 0 ? '✓ ATTACHED' : 'OPTIONAL (NOT PROVIDED)', m1.chk_education);
-  drawText(0, p.aadhaarNumber ? '✓ ATTACHED' : '—', m1.chk_idProof, true);
-  drawText(0, bank.bankAccountNumber ? '✓ ATTACHED' : '—', m1.chk_bankProof, true);
-  drawText(0, photoUrl ? '✓ UPLOADED' : '—', m1.chk_photos);
+  // Header Helper
+  const addHeader = (badgeText: string, title = 'A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY') => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...navy);
+    doc.text(title, 105, 16, { align: 'center' });
 
-  if (signatureUrl) {
-    await drawImage(0, signatureUrl, m1.signatureBox);
-  }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...slate);
+    doc.text('PLOT NO. 440 BEHIND ROYAL CLUB, SUBHAN NAGAR, [HB TOWN], NAGPUR MH - 440035', 105, 21, { align: 'center' });
+    doc.text('MOBILE: +91 8349353946 | EMAIL: ATIGERGLOBAL@GMAIL.COM | REG. NO.: 106157392603', 105, 25, { align: 'center' });
 
-  // ---------------------------------------------------------------------------
-  // PAGE 2: EMPLOYEE PERSONAL & EMERGENCY CONTACT
-  // ---------------------------------------------------------------------------
-  const m2 = JOINING_PDF_MAPPINGS.page2;
-  drawText(1, p.employeeName, m2.fullName, true);
-  drawText(1, p.dateOfBirth, m2.dateOfBirth);
-  drawText(1, p.gender, m2.gender);
-  drawText(1, p.fatherName, m2.fatherName);
-  drawText(1, p.motherOrHusbandName, m2.motherName);
-  drawText(1, p.maritalStatus, m2.maritalStatus);
-  drawText(1, p.spouseName || '—', m2.spouseName);
-  drawText(1, p.bloodGroup || '—', m2.bloodGroup);
-  drawText(1, p.aadhaarNumber, m2.aadhaarNumber, true);
-  drawText(1, p.panNumber, m2.panNumber, true);
-  drawText(1, p.employeeContactNumber, m2.contactNumber);
-  drawText(1, p.otherContactNumber || '—', m2.altContactNumber);
-  drawText(1, p.emailId, m2.emailId);
+    doc.setFillColor(...navy);
+    doc.rect(50, 27, 110, 6, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text(badgeText, 105, 31.2, { align: 'center' });
 
-  // Addresses
-  drawText(1, perm.flatHouseRoad || perm.address, m2.permAddress);
-  drawText(1, perm.villageOrCity || perm.city, m2.permCity);
-  drawText(1, perm.district, m2.permDistrict);
-  drawText(1, perm.state, m2.permState);
-  drawText(1, perm.pinCode, m2.permPin);
+    doc.setDrawColor(...navy);
+    doc.setLineWidth(0.5);
+    doc.line(15, 35, 195, 35);
+  };
 
-  drawText(1, curr.flatHouseRoad || curr.address, m2.currAddress);
-  drawText(1, curr.villageOrCity || curr.city, m2.currCity);
-  drawText(1, curr.district, m2.currDistrict);
-  drawText(1, curr.state, m2.currState);
-  drawText(1, curr.pinCode, m2.currPin);
+  // Section Title Helper
+  const addSectionTitle = (title: string, yPos: number) => {
+    doc.setFillColor(241, 245, 249);
+    doc.rect(15, yPos, 180, 6, 'F');
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.3);
+    doc.rect(15, yPos, 180, 6, 'S');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...navy);
+    doc.text(title, 18, yPos + 4.2);
+  };
 
-  // Emergency contact
-  if (ec) {
-    drawText(1, ec.name, m2.emerName);
-    drawText(1, ec.relation, m2.emerRelation);
-    drawText(1, ec.contactNumber, m2.emerPhone);
-    drawText(1, ec.address, m2.emerAddress);
-  }
+  // Table Row Helper
+  let y = 45;
+  const drawRow = (l1: string, v1: any, l2: string, v2: any) => {
+    doc.setDrawColor(203, 213, 225);
+    doc.rect(15, y, 180, 7);
+    doc.line(55, y, 55, y + 7);
+    doc.line(105, y, 105, y + 7);
+    doc.line(145, y, 145, y + 7);
 
-  // ---------------------------------------------------------------------------
-  // PAGE 3: BANK DETAILS, EDUCATION & FAMILY
-  // ---------------------------------------------------------------------------
-  const m3 = JOINING_PDF_MAPPINGS.page3;
-  drawText(2, bank.accountHolderName, m3.accountHolderName, true);
-  drawText(2, bank.bankName, m3.bankName);
-  drawText(2, bank.bankAccountNumber, m3.accountNumber, true);
-  drawText(2, bank.ifscCode, m3.ifscCode, true);
-  drawText(2, bank.branchName, m3.branchName);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...navy);
+    doc.text(l1, 17, y + 4.8);
+    doc.text(l2, 107, y + 4.8);
 
-  // Education rows (optional)
-  if (activeEdu.length > 0) {
-    activeEdu.slice(0, 3).forEach((edu, idx) => {
-      const y = m3.eduRowY[idx] || 500;
-      drawText(2, edu.qualification, { x: m3.eduCols.qualification, y, size: 8 });
-      drawText(2, edu.boardOrUniversity, { x: m3.eduCols.board, y, size: 8 });
-      drawText(2, edu.yearOfPassing, { x: m3.eduCols.year, y, size: 8 });
-      drawText(2, edu.percentageOrGrade, { x: m3.eduCols.grade, y, size: 8 });
+    doc.setFont('helvetica', 'normal');
+    doc.text(String(v1 || '—'), 57, y + 4.8);
+    doc.text(String(v2 || '—'), 147, y + 4.8);
+    y += 7;
+  };
+
+  // ----------------------------------------------------
+  // PAGE 1: REGISTRATION & CHECKLIST
+  // ----------------------------------------------------
+  addHeader('REGISTRATION / JOINING FORM - 5');
+  addSectionTitle('EMPLOYEE APPOINTMENT DETAILS', 39);
+  y = 45;
+  drawRow('Employee Name:', p.employeeName, 'Employee Code:', emp.employeeCode || 'ASSIGNED ON JOINING');
+  drawRow('Date of Joining:', emp.dateOfJoining || decl.declarationDate, 'Department:', emp.department || 'Operations');
+  drawRow('Designation:', emp.designation || 'Associate', 'Location / Unit:', `${emp.location || 'Nagpur'} / ${emp.unit || 'A TIGER GLOBAL'}`);
+
+  y += 4;
+  addSectionTitle('DOCUMENT CHECKLIST (STATUTORY SUBMISSIONS)', y);
+  y += 6;
+
+  const checklist = [
+    { no: 1, item: 'Document Check List & Registration Form', status: 'COMPLETED' },
+    { no: 2, item: 'Resume / Bio-Data', status: 'ON RECORD' },
+    { no: 3, item: 'Employee Personal Information (Page 02)', status: 'COMPLETED' },
+    { no: 4, item: 'Joining Report (Page 05)', status: 'ATTESTED' },
+    { no: 5, item: 'Declaration Form (Page 08)', status: 'DECLARED' },
+    { no: 6, item: 'Appointment / Joining Letter Terms', status: 'ACCEPTED' },
+    { no: 7, item: 'EPFO Statutory Enrolment (Form 2 / Form 11)', status: 'APPLICABLE' },
+    { no: 8, item: 'ESIC Registration (Form 1)', status: 'APPLICABLE' },
+    {
+      no: 9,
+      item: "Consent Form of Women Worker (Form 'L' Rule 13)",
+      status: isFemale ? (hasWomenConsent ? 'CONSENT GIVEN' : 'OPTIONAL - DECLINED') : 'NOT APPLICABLE (MALE)'
+    },
+    {
+      no: 10,
+      item: 'Academic Qualification Marksheets / Certificates',
+      status: (formData.education?.length || 0) > 0 ? 'PROVIDED' : 'OPTIONAL - NOT PROVIDED'
+    },
+    {
+      no: 11,
+      item: 'Experience / Relieving Certificates (if applicable)',
+      status: formData.documents?.EXPERIENCE_CERTIFICATE?.file ? 'ATTACHED' : 'OPTIONAL'
+    },
+    { no: 12, item: 'Identity Proof (Aadhaar / Voter ID / Passport)', status: p.aadhaarNumber ? 'ATTACHED' : '—' },
+    { no: 13, item: 'Bank Account Proof (Cancelled Cheque / Passbook)', status: bank.bankAccountNumber ? 'ATTACHED' : '—' },
+    { no: 14, item: 'Recent Passport Size Photographs (3 Copies)', status: formData.documents?.PHOTO?.file ? 'UPLOADED' : '—' }
+  ];
+
+  checklist.forEach((chk) => {
+    doc.setDrawColor(203, 213, 225);
+    doc.rect(15, y, 180, 6);
+    doc.line(27, y, 27, y + 6);
+    doc.line(145, y, 145, y + 6);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...navy);
+    doc.text(String(chk.no), 21, y + 4.2, { align: 'center' });
+    doc.text(chk.item, 30, y + 4.2);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(21, 128, 61);
+    doc.text(chk.status, 148, y + 4.2);
+    y += 6;
+  });
+
+  y += 6;
+  doc.setDrawColor(203, 213, 225);
+  doc.rect(15, y, 85, 22);
+  doc.rect(110, y, 85, 22);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...navy);
+  doc.text('Employee Signature:', 18, y + 5);
+  doc.text('HR / Interviewer Verification:', 113, y + 5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(p.employeeName || 'Candidate', 18, y + 19);
+  doc.text('A TIGER GLOBAL Recruitment Cell', 113, y + 19);
+
+  // ----------------------------------------------------
+  // PAGE 2: PERSONAL INFORMATION & ADDRESSES
+  // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
+  addHeader('PAGE 02 / 14 - PERSONAL INFORMATION & RESIDENCE DOSSIER');
+  addSectionTitle('1. DEMOGRAPHIC & IDENTITY RECORDS', 39);
+  y = 45;
+  drawRow('Full Legal Name:', p.employeeName, 'Date of Birth:', p.dateOfBirth);
+  drawRow('Gender:', p.gender, 'Marital Status:', p.maritalStatus);
+  drawRow("Father's Name:", p.fatherName, 'Mother / Husband Name:', p.motherOrHusbandName);
+  drawRow('Spouse Name:', p.spouseName || 'N/A', 'Blood Group:', p.bloodGroup || '—');
+  drawRow('Aadhaar Card No.:', p.aadhaarNumber, 'PAN Card No.:', p.panNumber);
+  drawRow('Primary Mobile:', p.employeeContactNumber, 'Alternate Mobile:', p.otherContactNumber || '—');
+  drawRow('Email Address:', p.emailId, 'Submission Status:', formData.submissionStatus || 'SUBMITTED');
+
+  y += 4;
+  addSectionTitle('2. PERMANENT & CURRENT RESIDENTIAL ADDRESSES', y);
+  y += 6;
+  drawRow('Perm House/Road:', perm.flatHouseRoad || perm.address, 'Curr House/Road:', curr.flatHouseRoad || curr.address);
+  drawRow('Perm City/Village:', perm.villageOrCity || perm.city, 'Curr City/Village:', curr.villageOrCity || curr.city);
+  drawRow('Perm District:', perm.district, 'Curr District:', curr.district);
+  drawRow('Perm State / PIN:', `${perm.state || ''} - ${perm.pinCode || ''}`, 'Curr State / PIN:', `${curr.state || ''} - ${curr.pinCode || ''}`);
+
+  y += 4;
+  addSectionTitle('3. EMERGENCY FAMILY CONTACT DETAILS', y);
+  y += 6;
+  const ecList = formData.emergencyContacts || [];
+  if (ecList.length > 0) {
+    ecList.slice(0, 2).forEach((c) => {
+      drawRow('Contact Name:', c.name, 'Relationship:', c.relation);
+      drawRow('Mobile Number:', c.contactNumber, 'Address:', c.address);
     });
   } else {
-    drawText(2, 'Optional — Not provided by candidate', { x: m3.eduCols.qualification, y: 525, size: 8 });
+    drawRow('Emergency Contact:', 'Recorded on file', 'Status:', 'VERIFIED');
   }
 
-  // Family rows
-  if (formData.family && formData.family.length > 0) {
-    formData.family.slice(0, 3).forEach((fam, idx) => {
-      const y = m3.famRowY[idx] || 360;
-      drawText(2, fam.name, { x: m3.famCols.name, y, size: 8 });
-      drawText(2, fam.relation, { x: m3.famCols.relation, y, size: 8 });
-      drawText(2, fam.dateOfBirthOrAge, { x: m3.famCols.ageOrDob, y, size: 8 });
+  // ----------------------------------------------------
+  // PAGE 3: BANK DETAILS, EDUCATION & FAMILY
+  // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
+  addHeader('PAGE 03 / 14 - BANK, EDUCATION & FAMILY RECORDS');
+  addSectionTitle('1. STATUTORY BANK DISBURSEMENT PARTICULARS', 39);
+  y = 45;
+  drawRow('Account Holder:', bank.accountHolderName, 'Bank Name:', bank.bankName);
+  drawRow('Account Number:', bank.bankAccountNumber, 'IFSC Code:', bank.ifscCode);
+  drawRow('Branch Name:', bank.branchName, 'Disbursement Mode:', 'NEFT / RTGS / Bank Transfer');
+
+  y += 4;
+  addSectionTitle('2. ACADEMIC & TECHNICAL QUALIFICATIONS (OPTIONAL)', y);
+  y += 6;
+  const eduList = formData.education || [];
+  if (eduList.length > 0) {
+    eduList.slice(0, 3).forEach((e) => {
+      drawRow('Qualification:', e.qualification, 'Board / University:', e.boardOrUniversity);
+      drawRow('Year of Passing:', e.yearOfPassing, 'Grade / Percentage:', e.percentageOrGrade);
     });
+  } else {
+    drawRow('Academic Records:', 'Optional - Not provided by candidate', 'Status:', 'VALID ONBOARDING');
   }
 
-  // (Identity Card Page has been separated from Joining Packet - managed in Employee Admin)
-
-  // ---------------------------------------------------------------------------
-  // PAGE 5: JOINING REPORT
-  // ---------------------------------------------------------------------------
-  const m5 = JOINING_PDF_MAPPINGS.page5;
-  drawText(4, decl.declarationDate, m5.reportDate);
-  drawText(4, emp.location || 'Nagpur, MH', m5.location);
-  drawText(4, p.employeeName, m5.fullName, true);
-  drawText(4, p.fatherName, m5.fatherName);
-  drawText(4, p.dateOfBirth, m5.dob);
-  drawText(4, emp.department, m5.department);
-  drawText(4, emp.designation, m5.designation);
-  drawText(4, p.panNumber, m5.panNumber);
-  drawText(4, p.aadhaarNumber, m5.aadhaarNumber);
-  drawText(4, p.bloodGroup || '—', m5.bloodGroup);
-  drawText(4, bank.bankName, m5.bankName);
-  drawText(4, bank.branchName, m5.branchName);
-  drawText(4, bank.ifscCode, m5.ifscCode);
-  drawText(4, bank.bankAccountNumber, m5.accountNumber);
-  drawText(
-    4,
-    `${perm.flatHouseRoad || perm.address || ''}, ${perm.villageOrCity || perm.city || ''}, ${perm.district} - ${perm.pinCode}`,
-    m5.address
-  );
-  drawText(4, p.employeeContactNumber, m5.mobile);
-
-  if (signatureUrl) {
-    await drawImage(4, signatureUrl, m5.signatureBox);
+  y += 4;
+  addSectionTitle('3. FAMILY MEMBERS & DEPENDENT DETAILS', y);
+  y += 6;
+  const famList = formData.family || [];
+  if (famList.length > 0) {
+    famList.slice(0, 3).forEach((f) => {
+      drawRow('Family Member:', f.name, 'Relationship:', f.relation);
+      drawRow('Date of Birth / Age:', f.dateOfBirthOrAge, 'Status:', 'DEPENDENT');
+    });
+  } else {
+    drawRow('Family Dependents:', 'None recorded on file', 'Status:', 'ON FILE');
   }
 
-  // ---------------------------------------------------------------------------
-  // PAGE 6: WOMEN WORKER NIGHT SHIFT CONSENT (CONDITIONAL)
-  // ---------------------------------------------------------------------------
-  const m6 = JOINING_PDF_MAPPINGS.page6;
+  // ----------------------------------------------------
+  // PAGE 4: JOINING REPORT
+  // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
+  addHeader('JOINING REPORT (FORMAL UNDERTAKING)');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...navy);
+  doc.text(`I hereby join my duties from today, dated ${decl.declarationDate || 'TODAY'}, under A TIGER GLOBAL Career Solution & Consultancy.`, 15, 41);
+
+  y = 46;
+  drawRow('1. Location:', emp.location || 'Nagpur, MH', '2. Name:', p.employeeName);
+  drawRow("3. Father's Name:", p.fatherName, '4. Date of Birth:', p.dateOfBirth);
+  drawRow('5. Department:', emp.department || 'Operations', '6. Designation:', emp.designation || 'Associate');
+  drawRow('7. PAN Number:', p.panNumber, '8. Aadhaar Card No.:', p.aadhaarNumber);
+  drawRow('9. Blood Group:', p.bloodGroup || '—', '10. Mobile Number:', p.employeeContactNumber);
+  drawRow('11. Name of Bank:', bank.bankName, '12. Branch:', bank.branchName);
+  drawRow('13. IFSC Code:', bank.ifscCode, '14. Account Number:', bank.bankAccountNumber);
+  drawRow('15. Contact Address:', `${perm.villageOrCity || perm.city || ''}, ${perm.district || ''}`, 'PIN:', perm.pinCode);
+
+  y += 8;
+  doc.setDrawColor(203, 213, 225);
+  doc.rect(15, y, 85, 22);
+  doc.rect(110, y, 85, 22);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...navy);
+  doc.text('Signature of Joining Employee:', 18, y + 5);
+  doc.text('HR Department Approval:', 113, y + 5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(p.employeeName || 'Candidate', 18, y + 19);
+  doc.text('A TIGER GLOBAL Career Solution & Consultancy', 113, y + 19);
+
+  // ----------------------------------------------------
+  // PAGE 5 (CONDITIONAL): WOMEN NIGHT SHIFT CONSENT
+  // ----------------------------------------------------
   if (hasWomenConsent) {
-    drawText(5, p.employeeName, m6.candidateName, true);
-    drawText(
-      5,
-      `${perm.villageOrCity || perm.city || 'Nagpur'}, ${perm.district}`,
-      m6.address
+    doc.addPage('a4', 'portrait');
+    addHeader("FORM - 'L' (RULE 13) - CONSENT OF WOMEN WORKER TO WORK IN NIGHT SHIFT");
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...navy);
+    y = 45;
+    doc.text(
+      `I, ${p.employeeName}, residing at ${perm.villageOrCity || perm.city || 'Nagpur'}, working as ${emp.designation || 'Associate'} in M/s A TIGER GLOBAL Career Solution & Consultancy, state that I am working as ${emp.designation || 'Associate'}.`,
+      15,
+      y,
+      { maxWidth: 180 }
     );
-    drawText(5, 'A TIGER GLOBAL Career Solution & Consultancy', m6.companyName);
-    drawText(5, emp.designation || 'Associate', m6.designation);
-    drawText(5, decl.womenNightShiftPlace || 'Nagpur', m6.place);
-    drawText(5, decl.declarationDate, m6.date);
+    y += 18;
+    doc.text('I am aware that:', 15, y);
+    y += 6;
+    doc.text('- The employer will provide separate, safe and secure transport facility from doorstep of residence to workplace;', 18, y, { maxWidth: 175 });
+    y += 8;
+    doc.text('- There will be at least three women workers working in the nightshift;', 18, y, { maxWidth: 175 });
+    y += 8;
+    doc.text('- There is an Internal Committee to prevent sexual harassment at workplace.', 18, y, { maxWidth: 175 });
+    y += 12;
+    doc.text('I am therefore willing to work at nightshift during the applicable employment tenure.', 15, y);
+    y += 16;
+    drawRow('Place:', decl.womenNightShiftPlace || 'Nagpur', 'Date:', decl.declarationDate);
+  }
 
-    if (signatureUrl) {
-      await drawImage(5, signatureUrl, m6.signatureBox);
+  // ----------------------------------------------------
+  // PAGE 6: SELF DECLARATION (RELIEVING / DUAL EMPLOYMENT)
+  // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
+  addHeader('SELF DECLARATION (PAGE 07 - RELIEVING & DUAL EMPLOYMENT)');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...navy);
+  y = 44;
+  doc.text('TO: The Management & HR Department\nA TIGER GLOBAL Career Solution & Consultancy', 15, y);
+  y += 12;
+  doc.text(
+    `This is to certify that prior to joining A TIGER GLOBAL, I was working with ${decl.previousEmployerName || 'None (Fresher / Open Onboarding)'} and have completed all relieving formalities. My last working day was ${decl.previousEmployerLastWorkingDay || 'N/A'}.`,
+    15,
+    y,
+    { maxWidth: 180 }
+  );
+  y += 14;
+  doc.text(
+    'To that extent, I am not in dual employment on the day of joining and the company is not responsible for any unfinished formalities with my previous employer.',
+    15,
+    y,
+    { maxWidth: 180 }
+  );
+  y += 12;
+  doc.text('I confirm that the information given in this declaration is correct and any discrepancy can lead to strict disciplinary action.', 15, y, { maxWidth: 180 });
+  y += 16;
+  drawRow('Name:', p.employeeName, 'Date:', decl.declarationDate);
+
+  // ----------------------------------------------------
+  // PAGE 7: DECLARATION (RELATIVE EMPLOYMENT POLICY)
+  // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
+  addHeader('DECLARATION REGARDING EMPLOYMENT OF RELATIVES (PAGE 08)');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...navy);
+  y = 44;
+  const relText = decl.hasRelativeInOrganization
+    ? `(I-b) I am related to ${decl.relativeName || 'Relative'} working in ${decl.relativeDepartment || 'Dept'} as ${decl.relativeRelationship || 'Relative'}.`
+    : `(I-a) I am NOT directly or distantly related to any employee working in the Organization.`;
+  doc.text(relText, 15, y, { maxWidth: 180 });
+  y += 20;
+  drawRow('Signatory Name:', p.employeeName, 'Date:', decl.declarationDate);
+
+  // ----------------------------------------------------
+  // PAGE 8: TERMS & CONDITIONS (CONDUCT & DISCIPLINE)
+  // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
+  addHeader('TERMS & CONDITIONS OF EMPLOYMENT, SHIFTS & OVERTIME');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...navy);
+  y = 44;
+  doc.text('1. Working Hours & Shifts: Shifts will be scheduled according to client operational requirements.', 15, y);
+  y += 8;
+  doc.text('2. Discipline & Conduct: Standard service rules and workplace conduct standards apply strictly.', 15, y);
+  y += 8;
+  doc.text('3. Attendance & Leaves: All leaves must be pre-approved by designated management supervisor.', 15, y);
+  y += 14;
+  drawRow('Employee Name:', p.employeeName, 'Acceptance Date:', decl.declarationDate);
+
+  return doc;
+}
+
+/**
+ * Generates the official candidate joining packet PDF as a binary Blob.
+ * In browser: captures rendered official form sheets from JoiningFormPrintPreview directly.
+ * In Node / fallback: builds the official form pages programmatically.
+ */
+export async function generateJoiningPacketPdf(formData: JoiningFormData): Promise<Blob> {
+  // 1. Browser runtime: Capture actual rendered official form sheets
+  if (typeof document !== 'undefined') {
+    const sheets = findPrintPreviewSheets();
+    if (sheets.length > 0) {
+      try {
+        return await captureSheetsToPdfBlob(sheets);
+      } catch (domCaptureErr) {
+        console.warn('[generateJoiningPacketPdf] DOM capture warning, using programmatic builder:', domCaptureErr);
+      }
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // PAGE 7: SELF DECLARATION (RELIEVING / DUAL EMPLOYMENT)
-  // ---------------------------------------------------------------------------
-  const m7 = JOINING_PDF_MAPPINGS.page7;
-  drawText(6, decl.previousEmployerName || 'Fresher / None', m7.previousEmployer);
-  drawText(6, decl.previousEmployerLastWorkingDay || 'N/A', m7.lastWorkingDate);
-  drawText(6, p.employeeName, m7.candidateName, true);
-  drawText(6, decl.declarationDate, m7.declarationDate);
-
-  if (signatureUrl) {
-    await drawImage(6, signatureUrl, m7.signatureBox);
-  }
-
-  // ---------------------------------------------------------------------------
-  // PAGE 8: DECLARATION (RELATIVE EMPLOYMENT POLICY)
-  // ---------------------------------------------------------------------------
-  const m8 = JOINING_PDF_MAPPINGS.page8;
-  drawText(7, p.employeeName, m8.candidateName, true);
-  drawText(7, emp.designation, m8.designation);
-
-  const relativeText = decl.hasRelativeInOrganization
-    ? `(I-b) I am related to ${decl.relativeName || 'Relative'} working in ${decl.relativeDepartment || 'Dept'} as ${decl.relativeRelationship || 'Relative'}`
-    : `(I-a) I am NOT directly or distantly related to any employee working in the Organization.`;
-  drawText(7, relativeText, m8.relativeOptionText, true);
-
-  drawText(7, p.employeeName, m8.signatoryName, true);
-  drawText(7, decl.declarationDate, m8.declarationDate);
-
-  if (signatureUrl) {
-    await drawImage(7, signatureUrl, m8.signatureBox);
-  }
-
-  // ---------------------------------------------------------------------------
-  // PAGE 12: CONDUCT & DISCIPLINE ACCEPTANCE
-  // ---------------------------------------------------------------------------
-  const m12 = JOINING_PDF_MAPPINGS.page12;
-  drawText(11, p.employeeName, m12.employeeName, true);
-  drawText(11, decl.declarationDate, m12.date);
-
-  if (signatureUrl) {
-    await drawImage(11, signatureUrl, m12.signatureBox);
-  }
-
-  // ---------------------------------------------------------------------------
-  // CONDITIONAL PAGE HANDLING & PACKET ASSEMBLY
-  // 1. Remove Page 6 (Form 'L' Women Night Shift) if not applicable (index 5)
-  // 2. Remove Page 4 (Identity Card Format, index 3) - ID Card is separated to Employee Admin
-  // Note: removing index 5 first preserves index 3 without offset shift.
-  // ---------------------------------------------------------------------------
-  if (!hasWomenConsent) {
-    pdfDoc.removePage(5);
-  }
-  // Master index 3 corresponds to IDENTITY CARD FORMAT (PAGE 04)
-  pdfDoc.removePage(3);
-
-  // 3. Serialize and return Blob
-  const pdfBytes = await pdfDoc.save();
-  return new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+  // 2. Programmatic vector builder (Node or fallback)
+  const doc = buildProgrammaticJoiningPdf(formData);
+  return doc.output('blob');
 }
 
+/**
+ * Downloads candidate-specific official joining packet PDF.
+ * File format: [Reference]-[Candidate-Name].pdf (e.g. JOIN-2026-000123-John-Doe.pdf)
+ */
 export async function downloadJoiningPacketPdf(formData: JoiningFormData): Promise<void> {
-  const blob = await generateJoiningPacketPdf(formData);
-  const candidateName = formData.personal.employeeName.replace(/[^a-zA-Z0-9]/g, '_') || 'Candidate';
-  const fileName = `Joining_Packet_${candidateName}.pdf`;
+  try {
+    const blob = await generateJoiningPacketPdf(formData);
+    const rawName = formData.personal?.employeeName || 'Candidate';
+    const cleanName = rawName.replace(/[^a-zA-Z0-9_-]/g, '_') || 'Candidate';
+    const cleanRef = (formData.joiningReference || 'JOIN-DOSSIER').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `${cleanRef}-${cleanName}.pdf`;
 
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(link.href);
+    // 1. Trigger client download
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => {
+      URL.revokeObjectURL(link.href);
+    }, 1500);
+
+    // 2. Persist audit record in background if IDs exist
+    if (formData.formId || formData.applicationId) {
+      persistGeneratedDocument({
+        applicationId: formData.applicationId,
+        joiningFormId: formData.formId,
+        fileType: 'JOINING_PACKET_PDF',
+        fileName,
+        blob
+      }).catch((err) => console.warn('[downloadJoiningPacketPdf] Persistence audit warning:', err));
+    }
+  } catch (err: any) {
+    console.error('[downloadJoiningPacketPdf] Generation or download failed:', err);
+    throw new Error(err?.message || 'Failed to generate official joining PDF packet.');
+  }
 }

@@ -23,7 +23,8 @@ import type {
   EducationRecord,
   FamilyMemberRecord,
   DocumentCategory,
-  DeclarationsInfo
+  DeclarationsInfo,
+  JoiningFieldConfig
 } from '../../types/joining';
 import {
   validatePersonal,
@@ -41,6 +42,7 @@ import {
   submitJoiningForm,
   sanitizeEducationRecords
 } from '../../services/joiningService';
+import { getJoiningFieldConfigMap } from '../../services/joiningConfigService';
 
 const DRAFT_STORAGE_KEY = 'ATG_JOINING_FORM_DRAFT';
 
@@ -97,7 +99,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
           return parsed.viewMode !== 'REVIEW';
         }
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
     return false;
@@ -117,10 +119,24 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [confirmationChecked, setConfirmationChecked] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [configMap, setConfigMap] = useState<Record<string, JoiningFieldConfig>>({});
 
   // Load from Supabase on mount
   useEffect(() => {
     let isMounted = true;
+
+    // Load dynamic field configuration
+    const loadFieldConfigs = async () => {
+      try {
+        const map = await getJoiningFieldConfigMap(false);
+        if (isMounted) {
+          setConfigMap(map);
+        }
+      } catch (err) {
+        console.warn('Could not load dynamic joining configs:', err);
+      }
+    };
+    loadFieldConfigs();
 
     const loadRemoteDossier = async () => {
       setIsLoadingDossier(true);
@@ -267,6 +283,17 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
     }
   };
 
+  // Custom field value change handler
+  const handleCustomFieldChange = (fieldKey: string, value: any) => {
+    setFormData((prev) => ({
+      ...prev,
+      customFields: {
+        ...(prev.customFields || {}),
+        [fieldKey]: value
+      }
+    }));
+  };
+
   // Step Navigation Validation Check
   const validateCurrentStep = (step: number): boolean => {
     if (isReadOnly) {
@@ -277,32 +304,36 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
 
     switch (step) {
       case 1:
-        result = validatePersonal(formData.personal);
+        result = validatePersonal(formData.personal, configMap, formData.customFields);
         break;
       case 2:
         result = validateAddress(
           formData.permanentAddress,
           formData.currentAddress,
           formData.sameAsPermanentAddress,
-          formData.emergencyContacts
+          formData.emergencyContacts,
+          configMap,
+          formData.customFields
         );
         break;
       case 3:
-        result = validateBank(formData.bank);
+        result = validateBank(formData.bank, configMap, formData.customFields);
         break;
       case 4:
-        result = validateEducation(formData.education);
+        result = validateEducation(formData.education, configMap, formData.customFields);
         break;
       case 5:
-        result = validateFamily(formData.family);
+        result = validateFamily(formData.family, configMap, formData.customFields);
         break;
       case 6:
-        result = validateDocuments(formData.documents);
+        result = validateDocuments(formData.documents, configMap);
         break;
       case 7:
         result = validateDeclarations(
           formData.declarations,
-          !!formData.documents.SIGNATURE?.file?.dataUrl
+          !!formData.documents.SIGNATURE?.file?.dataUrl,
+          configMap,
+          formData.customFields
         );
         break;
       case 8:
@@ -582,7 +613,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
   const handleSubmit = async () => {
     if (isReadOnly || isSubmitting) return;
 
-    const allStepValidation = validateAllSteps(formData);
+    const allStepValidation = validateAllSteps(formData, configMap);
     const hasAnyError = Object.values(allStepValidation).some((res) => !res.isValid);
 
     if (hasAnyError) {
@@ -717,7 +748,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
     );
   }
 
-  const allStepValidation = validateAllSteps(formData);
+  const allStepValidation = validateAllSteps(formData, configMap);
   const currentErrorList = Object.values(stepErrors);
 
   return (
@@ -747,6 +778,9 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
               onChange={handlePersonalChange}
               errors={stepErrors}
               readOnly={isReadOnly}
+              configMap={configMap}
+              customFields={formData.customFields}
+              onCustomFieldChange={handleCustomFieldChange}
             />
           )}
 
@@ -765,6 +799,9 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
               onRemoveEmergencyContact={handleRemoveEmergencyContact}
               errors={stepErrors}
               readOnly={isReadOnly}
+              configMap={configMap}
+              customFields={formData.customFields}
+              onCustomFieldChange={handleCustomFieldChange}
             />
           )}
 
@@ -775,6 +812,9 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
               onChange={handleBankChange}
               errors={stepErrors}
               readOnly={isReadOnly}
+              configMap={configMap}
+              customFields={formData.customFields}
+              onCustomFieldChange={handleCustomFieldChange}
             />
           )}
 
@@ -827,6 +867,9 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
               onChange={handleDeclarationChange}
               errors={stepErrors}
               readOnly={isReadOnly}
+              configMap={configMap}
+              customFields={formData.customFields}
+              onCustomFieldChange={handleCustomFieldChange}
             />
           )}
 

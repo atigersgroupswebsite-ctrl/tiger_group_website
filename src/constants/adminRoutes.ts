@@ -32,6 +32,7 @@ export const ADMIN_ROUTES = {
   fileDetail: (id: string = ':id') => `/admin/files/${id}`,
   activity: '/admin/activity',
   settings: '/admin/settings',
+  joiningFormSettings: '/admin/joining-form-settings',
   adminUsers: '/admin/admin-users',
   settingsAdminUsers: '/admin/settings/admin-users'
 } as const;

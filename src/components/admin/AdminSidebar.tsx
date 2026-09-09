@@ -14,15 +14,16 @@ import {
   Factory,
   FileCheck2,
   FolderOpen,
+  FolderArchive,
   CreditCard,
   FileText,
   UserCheck,
   Download,
-  FolderArchive,
   Activity,
   Settings,
   ExternalLink,
   ShieldCheck,
+  SlidersHorizontal,
   X
 } from 'lucide-react';
 import { ADMIN_ROUTES } from '../../constants/adminRoutes';
@@ -57,7 +58,8 @@ const MANAGEMENT_SUITE_ITEMS: NavItemDef[] = [
   { name: 'Employees', path: ADMIN_ROUTES.employees, icon: UserCheck, isStage3: true },
   { name: 'Files', path: ADMIN_ROUTES.files, icon: FolderArchive, isStage3: true },
   { name: 'Activity', path: ADMIN_ROUTES.activity, icon: Activity, isStage3: true },
-  { name: 'Settings', path: ADMIN_ROUTES.settings, icon: Settings, isStage3: true }
+  { name: 'Settings', path: ADMIN_ROUTES.settings, icon: Settings, isStage3: true },
+  { name: 'Joining Config', path: ADMIN_ROUTES.joiningFormSettings, icon: SlidersHorizontal, isStage3: true }
 ];
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseMobile }) => {

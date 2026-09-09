@@ -164,6 +164,16 @@ export const AdminSettingsPage: React.FC = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <Link
+            to="/admin/joining-form-settings"
+            className="admin-btn admin-btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}
+          >
+            <Layers size={16} />
+            <span>Joining Form Settings</span>
+            <ExternalLink size={13} />
+          </Link>
+
+          <Link
             to="/admin/settings/admin-users"
             className="admin-btn admin-btn-secondary"
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}

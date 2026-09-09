@@ -10,6 +10,7 @@ import type { Database } from '../types/database';
 import { INITIAL_JOINING_FORM_DATA } from '../data/mockJoiningData';
 import { validateAllSteps } from '../utils/joiningValidation';
 import { normalizeIndianPhoneNumber, getIndianPhoneDisplayDigits } from '../utils/phoneUtils';
+import { getJoiningFieldConfigMap } from './joiningConfigService';
 
 /**
  * Sanitizes education records by removing empty or dummy placeholder rows.
@@ -541,7 +542,8 @@ export function buildJoiningFormDataFromDb(params: BuildJoiningFormDataParams): 
       womenNightShiftPlace: (declarationRow as any)?.women_night_shift_place || '',
       signatoryName: declarationRow?.signatory_name || candidateName,
       declarationDate: declarationRow?.declaration_date || (formRecord?.submitted_at ? new Date(formRecord.submitted_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
-    }
+    },
+    customFields: (formRecord as any)?.custom_fields || {}
   };
 }
 
@@ -750,6 +752,7 @@ export async function saveJoiningDraft(
       education: sanitizeEducationRecords(data.education || []),
       family: data.family || [],
       declarations: data.declarations || {},
+      custom_fields: data.customFields || {},
       photo_path: data.documents?.PHOTO?.file?.dataUrl?.includes('storage/v1') ? undefined : undefined,
       candidate_signature_path: data.documents?.SIGNATURE?.file?.dataUrl?.includes('storage/v1') ? undefined : undefined
     };
@@ -780,8 +783,9 @@ export async function submitJoiningForm(
   identifier: string | undefined,
   data: JoiningFormData
 ): Promise<JoiningServiceResult<{ submittedAt: string; joiningReference?: string; formId?: string }>> {
-  // 1. Step-by-step client validation check
-  const stepValidation = validateAllSteps(data);
+  // 1. Authoritative validation check against dynamic database field configuration
+  const configMap = await getJoiningFieldConfigMap();
+  const stepValidation = validateAllSteps(data, configMap);
   const hasErrors = Object.values(stepValidation).some((res) => !res.isValid);
   if (hasErrors) {
     return { success: false, error: 'Please resolve all required fields before submission.' };
@@ -821,7 +825,8 @@ export async function submitJoiningForm(
       emergency_contacts: canonicalizeEmergencyPhones(data.emergencyContacts || []),
       education: sanitizeEducationRecords(data.education || []),
       family: data.family || [],
-      declarations: data.declarations || {}
+      declarations: data.declarations || {},
+      custom_fields: data.customFields || {}
     };
 
     const { data: rpcRes, error: rpcErr } = await supabase.rpc('submit_joining_form_bundle', {

@@ -357,6 +357,8 @@ export interface Database {
           pt_number: string | null;
           candidate_signature_path: string | null;
           photo_path: string | null;
+          father_name: string | null;
+          custom_fields: Record<string, any>;
           submission_status: JoiningSubmissionStatus;
           submitted_at: string | null;
           created_at: string;
@@ -412,6 +414,8 @@ export interface Database {
           pt_number?: string | null;
           candidate_signature_path?: string | null;
           photo_path?: string | null;
+          father_name?: string | null;
+          custom_fields?: Record<string, any>;
           submission_status?: JoiningSubmissionStatus;
           submitted_at?: string | null;
           created_at?: string;
@@ -467,6 +471,8 @@ export interface Database {
           pt_number?: string | null;
           candidate_signature_path?: string | null;
           photo_path?: string | null;
+          father_name?: string | null;
+          custom_fields?: Record<string, any>;
           submission_status?: JoiningSubmissionStatus;
           submitted_at?: string | null;
           created_at?: string;
@@ -561,6 +567,66 @@ export interface Database {
           age_or_date_of_birth?: string | null;
           relation?: string;
           sort_order?: number;
+        };
+        Relationships: [];
+      };
+
+      joining_form_field_configs: {
+        Row: {
+          id: string;
+          field_key: string;
+          section: string;
+          label: string;
+          field_type: string;
+          is_required: boolean;
+          is_enabled: boolean;
+          is_system: boolean;
+          display_order: number;
+          placeholder: string | null;
+          help_text: string | null;
+          options: any[] | null;
+          validation_rules: Record<string, any> | null;
+          conditional_rules: Record<string, any> | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          field_key: string;
+          section: string;
+          label: string;
+          field_type: string;
+          is_required?: boolean;
+          is_enabled?: boolean;
+          is_system?: boolean;
+          display_order?: number;
+          placeholder?: string | null;
+          help_text?: string | null;
+          options?: any[] | null;
+          validation_rules?: Record<string, any> | null;
+          conditional_rules?: Record<string, any> | null;
+          conditional_rule?: Record<string, any> | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          field_key?: string;
+          section?: string;
+          label?: string;
+          field_type?: string;
+          is_required?: boolean;
+          is_enabled?: boolean;
+          is_system?: boolean;
+          display_order?: number;
+          placeholder?: string | null;
+          help_text?: string | null;
+          options?: any[] | null;
+          validation_rules?: Record<string, any> | null;
+          conditional_rules?: Record<string, any> | null;
+          conditional_rule?: Record<string, any> | null;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };

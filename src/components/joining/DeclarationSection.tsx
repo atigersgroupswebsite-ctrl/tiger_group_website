@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileSignature, ShieldCheck, AlertCircle, Users, Moon } from 'lucide-react';
-import type { DeclarationsInfo } from '../../types/joining';
+import type { DeclarationsInfo, JoiningFieldConfig } from '../../types/joining';
+import { CustomFieldsRenderer } from './CustomFieldsRenderer';
 
 interface DeclarationSectionProps {
   declarations: DeclarationsInfo;
@@ -12,6 +13,9 @@ interface DeclarationSectionProps {
   onChange: (field: keyof DeclarationsInfo, value: any) => void;
   errors: Record<string, string>;
   readOnly?: boolean;
+  configMap?: Record<string, JoiningFieldConfig>;
+  customFields?: Record<string, any>;
+  onCustomFieldChange?: (fieldKey: string, value: any) => void;
 }
 
 export const DeclarationSection: React.FC<DeclarationSectionProps> = ({
@@ -23,7 +27,10 @@ export const DeclarationSection: React.FC<DeclarationSectionProps> = ({
   candidateDesignation = '',
   onChange,
   errors,
-  readOnly = false
+  readOnly = false,
+  configMap,
+  customFields,
+  onCustomFieldChange
 }) => {
   const isFemale = candidateGender.toLowerCase() === 'female';
 
@@ -508,6 +515,16 @@ export const DeclarationSection: React.FC<DeclarationSectionProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Dynamic Custom Fields configured for Declarations Section */}
+      <CustomFieldsRenderer
+        section="declarations"
+        configMap={configMap}
+        customFields={customFields}
+        onChange={onCustomFieldChange}
+        errors={errors}
+        readOnly={readOnly}
+      />
     </div>
   );
 };
