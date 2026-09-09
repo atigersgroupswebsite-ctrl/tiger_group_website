@@ -61,7 +61,7 @@ export const AlreadyRegisteredCTA: React.FC = () => {
             </div>
 
             <div>
-              <Button to="/joining/access" variant="primary" size="md" icon={<ArrowRight size={16} />}>
+              <Button to="/joining" variant="primary" size="md" icon={<ArrowRight size={16} />}>
                 ACCESS JOINING FORM →
               </Button>
             </div>

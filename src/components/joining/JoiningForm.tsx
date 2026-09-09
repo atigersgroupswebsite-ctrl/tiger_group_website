@@ -4,6 +4,7 @@ import { FormProgress } from './FormProgress';
 import { FormNavigation } from './FormNavigation';
 import { FormError } from './FormError';
 import { FormSuccess } from './FormSuccess';
+import { CandidateEmailEntry } from './CandidateEmailEntry';
 import { PersonalSection } from './PersonalSection';
 import { AddressSection } from './AddressSection';
 import { BankSection } from './BankSection';
@@ -81,9 +82,24 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
     return INITIAL_JOINING_FORM_DATA;
   });
 
-  const [isLoadingDossier, setIsLoadingDossier] = useState<boolean>(true);
+  const [isLoadingDossier, setIsLoadingDossier] = useState<boolean>(Boolean(applicationId));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSavingDraft, setIsSavingDraft] = useState<boolean>(false);
+
+  const [uploadSessionId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('ATG_JOINING_UPLOAD_SESSION');
+      if (saved) return saved;
+      const newId = `cand_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      localStorage.setItem('ATG_JOINING_UPLOAD_SESSION', newId);
+      return newId;
+    } catch {
+      return `cand_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    }
+  });
+
+  const candidateEmail = formData.personal?.emailId?.trim();
+  const [emailEntered, setEmailEntered] = useState<boolean>(() => Boolean(candidateEmail));
 
   // Single authoritative source of truth for submission state
   const isSubmitted = formData.status === 'SUBMITTED' || formData.submissionStatus === 'SUBMITTED';
@@ -121,6 +137,31 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [configMap, setConfigMap] = useState<Record<string, JoiningFieldConfig>>({});
 
+  const handleEmailContinue = (email: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      personal: { ...prev.personal, emailId: email },
+      userEmail: email
+    }));
+    setEmailEntered(true);
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+  };
+
+  const handleReset = () => {
+    try {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      localStorage.removeItem('ATG_JOINING_UPLOAD_SESSION');
+    } catch (e) {
+      console.warn('Draft cleanup notice:', e);
+    }
+    setFormData(INITIAL_JOINING_FORM_DATA);
+    setCurrentStep(1);
+    setCompletedSteps([1]);
+    setShowSuccessScreen(false);
+    setEmailEntered(false);
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+  };
+
   // Load from Supabase on mount
   useEffect(() => {
     let isMounted = true;
@@ -139,6 +180,11 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
     loadFieldConfigs();
 
     const loadRemoteDossier = async () => {
+      if (!applicationId) {
+        setIsLoadingDossier(false);
+        return;
+      }
+
       setIsLoadingDossier(true);
       setLoadError(null);
 
@@ -711,12 +757,13 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
     window.scrollTo({ top: 120, behavior: 'smooth' });
   };
 
-  // Post-submission acknowledgment view (Read-only lock, no reset)
+  // Post-submission acknowledgment view (Read-only lock, with optional reset)
   if (isSubmitted && showSuccessScreen) {
     return (
       <FormSuccess
         formData={formData}
         onViewSubmission={handleViewSubmission}
+        onReset={handleReset}
       />
     );
   }
@@ -745,6 +792,16 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
           RETRY CONNECTION
         </button>
       </div>
+    );
+  }
+
+  // Public Email Entry Gate: Candidate enters email first before filling form
+  if (!emailEntered && !isSubmitted) {
+    return (
+      <CandidateEmailEntry
+        initialEmail={formData.personal?.emailId || ''}
+        onContinue={handleEmailContinue}
+      />
     );
   }
 
@@ -844,6 +901,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
           {currentStep === 6 && (
             <DocumentUploader
               applicationId={formData.formId || applicationId}
+              uploadSessionId={uploadSessionId}
               documents={formData.documents}
               onDocumentChange={handleDocumentChange}
               errors={stepErrors}

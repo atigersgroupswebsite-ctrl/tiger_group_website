@@ -7,10 +7,11 @@ import { uploadCandidateDocument, removeCandidateDocument } from '../../services
 
 interface DocumentUploaderProps {
   applicationId?: string;
+  uploadSessionId?: string;
   documents: Record<DocumentCategory, UploadedDocument>;
   onDocumentChange: (
     category: DocumentCategory,
-    fileMeta: { name: string; size: number; type: string; dataUrl?: string } | undefined
+    fileMeta: { name: string; size: number; type: string; dataUrl?: string; storagePath?: string } | undefined
   ) => void;
   errors: Record<string, string>;
   readOnly?: boolean;
@@ -18,6 +19,7 @@ interface DocumentUploaderProps {
 
 export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   applicationId,
+  uploadSessionId,
   documents,
   onDocumentChange,
   errors,
@@ -44,46 +46,35 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       return;
     }
 
-    if (applicationId) {
-      setUploadingCategory(category);
-      try {
-        const res = await uploadCandidateDocument(applicationId, category, file);
-        if (res.success && res.data) {
-          onDocumentChange(category, {
-            name: res.data.name,
-            size: res.data.size,
-            type: res.data.type,
-            dataUrl: res.data.dataUrl
-          });
-        } else {
-          alert(res.error || 'Document upload failed.');
-        }
-      } catch (err: any) {
-        alert(err.message || 'Document upload error.');
-      } finally {
-        setUploadingCategory(null);
-      }
-    } else {
-      const reader = new FileReader();
-      reader.onload = (loadEvt) => {
-        const dataUrl = loadEvt.target?.result as string;
+    const effectiveOwner = applicationId || uploadSessionId || 'temp_candidate';
+    setUploadingCategory(category);
+    try {
+      const res = await uploadCandidateDocument(effectiveOwner, category, file);
+      if (res.success && res.data) {
         onDocumentChange(category, {
-          name: file.name,
-          size: file.size,
-          type: file.type || 'application/pdf',
-          dataUrl
+          name: res.data.name,
+          size: res.data.size,
+          type: res.data.type,
+          dataUrl: res.data.dataUrl,
+          storagePath: res.data.storagePath
         });
-      };
-      reader.readAsDataURL(file);
+      } else {
+        alert(res.error || 'Document upload failed.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Document upload error.');
+    } finally {
+      setUploadingCategory(null);
     }
   };
 
   const handleDocumentRemove = async (category: DocumentCategory) => {
     if (readOnly) return;
-    if (applicationId) {
+    const effectiveOwner = applicationId || uploadSessionId;
+    if (effectiveOwner) {
       setUploadingCategory(category);
       try {
-        await removeCandidateDocument(applicationId, category);
+        await removeCandidateDocument(effectiveOwner, category);
       } catch (err) {
         console.warn('Document remove error:', err);
       } finally {
@@ -118,6 +109,7 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       <div className="photo-signature-grid">
         <PhotoUploader
           applicationId={applicationId}
+          uploadSessionId={uploadSessionId}
           photoDataUrl={documents.PHOTO?.file?.dataUrl}
           onPhotoChange={(dataUrl, fileMeta) => {
             if (dataUrl && fileMeta) {
@@ -132,6 +124,7 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
 
         <SignatureUploader
           applicationId={applicationId}
+          uploadSessionId={uploadSessionId}
           signatureDataUrl={documents.SIGNATURE?.file?.dataUrl}
           onSignatureChange={(dataUrl, fileMeta) => {
             if (dataUrl && fileMeta) {

@@ -28,14 +28,14 @@ export const Navbar: React.FC = () => {
     { label: 'Services', path: '/services' },
     { label: 'Jobs', path: '/jobs' },
     { label: 'Enquiry', path: '/enquiry' },
-    { label: 'Joining', path: '/joining/access' },
+    { label: 'Joining', path: '/joining' },
     { label: 'For Employers', path: '/for-employers' },
     { label: 'Contact', path: '/contact' }
   ];
 
   const isLinkActive = (linkPath: string) => {
-    if (linkPath === '/joining/access') {
-      return location.pathname === '/joining/access' || location.pathname === '/joining';
+    if (linkPath === '/joining') {
+      return location.pathname === '/joining' || location.pathname === '/joining/access';
     }
     if (linkPath === '/for-employers') {
       return location.pathname === '/for-employers' || location.pathname === '/employers';

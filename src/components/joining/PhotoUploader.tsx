@@ -4,14 +4,16 @@ import { uploadCandidateDocument, removeCandidateDocument } from '../../services
 
 interface PhotoUploaderProps {
   applicationId?: string;
+  uploadSessionId?: string;
   photoDataUrl?: string;
-  onPhotoChange: (dataUrl: string | undefined, fileMeta?: { name: string; size: number; type: string }) => void;
+  onPhotoChange: (dataUrl: string | undefined, fileMeta?: { name: string; size: number; type: string; storagePath?: string }) => void;
   error?: string;
   readOnly?: boolean;
 }
 
 export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   applicationId,
+  uploadSessionId,
   photoDataUrl,
   onPhotoChange,
   error,
@@ -37,44 +39,34 @@ export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       return;
     }
 
-    if (applicationId) {
-      setIsUploading(true);
-      try {
-        const res = await uploadCandidateDocument(applicationId, 'PHOTO', file);
-        if (res.success && res.data) {
-          onPhotoChange(res.data.dataUrl, {
-            name: res.data.name,
-            size: res.data.size,
-            type: res.data.type
-          });
-        } else {
-          alert(res.error || 'Photograph upload failed.');
-        }
-      } catch (err: any) {
-        alert(err.message || 'Photograph upload error.');
-      } finally {
-        setIsUploading(false);
-      }
-    } else {
-      const reader = new FileReader();
-      reader.onload = (loadEvent) => {
-        const result = loadEvent.target?.result as string;
-        onPhotoChange(result, {
-          name: file.name,
-          size: file.size,
-          type: file.type
+    const effectiveOwner = applicationId || uploadSessionId || 'temp_candidate';
+    setIsUploading(true);
+    try {
+      const res = await uploadCandidateDocument(effectiveOwner, 'PHOTO', file);
+      if (res.success && res.data) {
+        onPhotoChange(res.data.dataUrl, {
+          name: res.data.name,
+          size: res.data.size,
+          type: res.data.type,
+          storagePath: res.data.storagePath
         });
-      };
-      reader.readAsDataURL(file);
+      } else {
+        alert(res.error || 'Photograph upload failed.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Photograph upload error.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleRemove = async () => {
     if (readOnly) return;
-    if (applicationId) {
+    const effectiveOwner = applicationId || uploadSessionId;
+    if (effectiveOwner) {
       setIsUploading(true);
       try {
-        await removeCandidateDocument(applicationId, 'PHOTO');
+        await removeCandidateDocument(effectiveOwner, 'PHOTO');
       } catch (err) {
         console.warn('Photograph remove error:', err);
       } finally {

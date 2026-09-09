@@ -86,6 +86,20 @@ export function paymentApiPlugin(): Plugin {
           }
         }
 
+        // Handle Public Joining Operations (e.g. Send Confirmation / Receipt Email)
+        if (url === '/api/joining/send-receipt' && req.method?.toUpperCase() === 'POST') {
+          try {
+            const rawBody = await parseRequestBody(req);
+            const body = JSON.parse(rawBody || '{}');
+            const { sendJoiningReceiptServerHandler } = await import('./joiningEmailService.ts');
+            const result = await sendJoiningReceiptServerHandler(body);
+            return sendJsonResponse(res, result.status || 200, result.data);
+          } catch (joinEmailErr: any) {
+            console.error('[API_JOINING_SEND_RECEIPT_ERROR]', joinEmailErr);
+            return sendJsonResponse(res, 500, { success: false, error: joinEmailErr.message || 'Failed to dispatch joining receipt' });
+          }
+        }
+
         if (!url.startsWith('/api/payment') && !url.startsWith('/api/payments')) {
           return next();
         }

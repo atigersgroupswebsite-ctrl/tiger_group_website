@@ -71,7 +71,7 @@ export const Footer: React.FC = () => {
               <li><Link to="/services" className="footer-link"><ArrowRight size={12} /> Services</Link></li>
               <li><Link to="/jobs" className="footer-link"><ArrowRight size={12} /> Jobs</Link></li>
               <li><Link to="/enquiry" className="footer-link"><ArrowRight size={12} /> Enquiry</Link></li>
-              <li><Link to="/joining/access" className="footer-link"><ArrowRight size={12} /> Joining</Link></li>
+              <li><Link to="/joining" className="footer-link"><ArrowRight size={12} /> Joining</Link></li>
               <li><Link to="/for-employers" className="footer-link"><ArrowRight size={12} /> For Employers</Link></li>
               <li><Link to="/contact" className="footer-link"><ArrowRight size={12} /> Contact</Link></li>
             </ul>

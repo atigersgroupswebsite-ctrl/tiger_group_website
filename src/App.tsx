@@ -11,7 +11,7 @@
 // ==============================================================================
 
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { PublicLayout } from './components/layout/PublicLayout';
 import { ScrollToTop } from './components/common/ScrollToTop';
 
@@ -61,7 +61,6 @@ import { EmployerEnquiryPage } from './pages/EmployerEnquiryPage';
 import { Employers } from './pages/Employers';
 import { Contact } from './pages/Contact';
 import { Joining } from './pages/Joining';
-import { JoiningAccessPage } from './pages/JoiningAccessPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CandidatePaymentPage } from './pages/CandidatePaymentPage';
 import { TermsAndConditionsPage } from './pages/TermsAndConditionsPage';
@@ -136,7 +135,7 @@ export const App: React.FC = () => {
             <Route path="/for-employers" element={<Employers />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
-            <Route path="/joining/access" element={<JoiningAccessPage />} />
+            <Route path="/joining/access" element={<Navigate to="/joining" replace />} />
             <Route path="/joining/payment" element={<CandidatePaymentPage />} />
             <Route path="/joining" element={<Joining />} />
             <Route path="/terms-and-conditions" element={<TermsAndConditionsPage />} />

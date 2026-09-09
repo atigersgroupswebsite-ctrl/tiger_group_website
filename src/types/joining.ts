@@ -104,6 +104,7 @@ export interface UploadedDocument {
     size: number;
     type: string;
     dataUrl?: string;
+    storagePath?: string;
   };
   verificationStatus?: 'UPLOADED' | 'VERIFIED' | 'REJECTED' | 'PENDING';
   rejectionReason?: string;
