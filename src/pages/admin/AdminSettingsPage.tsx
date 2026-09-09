@@ -35,6 +35,8 @@ import {
   Layers
 } from 'lucide-react';
 
+import { CompanySignatureSettingsSection } from '../../components/admin/CompanySignatureSettingsSection';
+
 export const AdminSettingsPage: React.FC = () => {
   const { role } = useAdminAuth();
   const { setSoundEnabled } = useAdminNotifications();
@@ -45,7 +47,7 @@ export const AdminSettingsPage: React.FC = () => {
 
   const [settings, setSettings] = useState<EnrichedSystemSetting[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'FINANCIAL' | 'OPERATIONS' | 'SUPPORT' | 'PREFERENCES'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'FINANCIAL' | 'OPERATIONS' | 'SUPPORT' | 'PREFERENCES' | 'COMPANY_ASSETS'>('ALL');
 
   // Form edit states (keyed by setting key)
   const [formState, setFormState] = useState<Record<string, any>>({});
@@ -246,6 +248,7 @@ export const AdminSettingsPage: React.FC = () => {
       >
         {[
           { id: 'ALL', label: 'All Settings' },
+          { id: 'COMPANY_ASSETS', label: 'Company Assets (Signature)' },
           { id: 'FINANCIAL', label: 'Financial Defaults' },
           { id: 'OPERATIONS', label: 'Operational Defaults' },
           { id: 'SUPPORT', label: 'Support & Helpline' },
@@ -272,8 +275,13 @@ export const AdminSettingsPage: React.FC = () => {
         ))}
       </div>
 
-      {/* Settings Grid */}
-      {loading ? (
+      {/* Main Content Area */}
+      {activeTab === 'COMPANY_ASSETS' ? (
+        <CompanySignatureSettingsSection isSuperAdmin={isSuperAdmin} />
+      ) : (
+        <>
+          {/* Settings Grid */}
+          {loading ? (
         <div className="admin-card" style={{ padding: '3rem', textAlign: 'center', color: '#64748B' }}>
           <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 0.75rem auto', color: 'var(--color-champagne-dark)' }} />
           <div>Loading system configuration...</div>
@@ -655,6 +663,13 @@ export const AdminSettingsPage: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* Company Assets Section (Founder / CEO Signature) when viewing ALL */}
+      {activeTab === 'ALL' && (
+        <CompanySignatureSettingsSection isSuperAdmin={isSuperAdmin} />
+      )}
+    </>
+  )}
 
       {/* Admin User Management Callout Card */}
       <div

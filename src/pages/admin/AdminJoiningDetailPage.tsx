@@ -11,7 +11,7 @@
 //   - ID Card & Reference Slips preserved as post-joining admin panels outside print
 // ==============================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -24,17 +24,28 @@ import {
 } from 'lucide-react';
 
 import { JoiningFormPrintPreview } from '../../components/joining/JoiningFormPrintPreview';
+import { DocumentVerificationPanel } from '../../components/admin/DocumentVerificationPanel';
 import { EmployeeIdCardPanel } from '../../components/admin/EmployeeIdCardPanel';
 import { ReferenceSlipApplicationTab } from '../../components/admin/ReferenceSlipApplicationTab';
 import { getAdminJoiningDossier, type AdminJoiningDossierResult } from '../../services/joiningService';
 import { downloadJoiningPacketPdf } from '../../services/joiningPdfGenerator';
 import { getEmployeeByJoiningFormId } from '../../services/employeeService';
-import type { EmployeeRow } from '../../types/database';
+import {
+  getCandidateDocuments,
+  calculateDocumentVerificationStats
+} from '../../services/adminDocumentService';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import type { EmployeeRow, DocumentRow } from '../../types/database';
 import type { JoiningFormData } from '../../types/joining';
 
 export const AdminJoiningDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { profile } = useAdminAuth();
+  const canVerify =
+    profile?.role === 'SUPER_ADMIN' ||
+    profile?.role === 'DOCUMENT_VERIFIER' ||
+    profile?.role === 'COORDINATOR';
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,51 +53,47 @@ export const AdminJoiningDetailPage: React.FC = () => {
   const [formData, setFormData] = useState<JoiningFormData | null>(null);
   const [rawDossier, setRawDossier] = useState<AdminJoiningDossierResult['raw'] | null>(null);
   const [employee, setEmployee] = useState<EmployeeRow | null>(null);
+  const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
 
-  useEffect(() => {
+  const loadJoiningDetails = useCallback(async () => {
     if (!id) return;
-    let isMounted = true;
+    setLoading(true);
+    setError(null);
 
-    const loadJoiningDetails = async () => {
-      setLoading(true);
-      setError(null);
+    try {
+      // 1. Fetch normalized joining dossier using shared admin service
+      const res = await getAdminJoiningDossier(id);
 
-      try {
-        // 1. Fetch normalized joining dossier using shared admin service
-        const res = await getAdminJoiningDossier(id);
-
-        if (!res.success || !res.data) {
-          throw new Error(res.error || 'Joining record not found.');
-        }
-
-        if (!isMounted) return;
-        setFormData(res.data.formData);
-        setRawDossier(res.data.raw);
-
-        // 2. Fetch linked Employee record if already promoted
-        const formId = res.data.raw.joiningForm?.id || id;
-        const empRecord = await getEmployeeByJoiningFormId(formId);
-        if (empRecord && isMounted) {
-          setEmployee(empRecord);
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          setError(err.message || 'Failed to load joining record details.');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+      if (!res.success || !res.data) {
+        throw new Error(res.error || 'Joining record not found.');
       }
-    };
 
-    loadJoiningDetails();
+      setFormData(res.data.formData);
+      setRawDossier(res.data.raw);
 
-    return () => {
-      isMounted = false;
-    };
+      // 2. Fetch linked Employee record if already promoted
+      const formId = res.data.raw.joiningForm?.id || id;
+      const empRecord = await getEmployeeByJoiningFormId(formId);
+      if (empRecord) {
+        setEmployee(empRecord);
+      }
+
+      // 3. Fetch candidate's documents exclusively for this joining dossier
+      const docsRes = await getCandidateDocuments({ joiningFormId: formId });
+      if (docsRes.success && docsRes.data) {
+        setDocuments(docsRes.data);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load joining record details.');
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    loadJoiningDetails();
+  }, [loadJoiningDetails]);
 
   // Handler: Download Official Joining Packet PDF
   const handleDownloadPdf = async () => {
@@ -142,6 +149,7 @@ export const AdminJoiningDetailPage: React.FC = () => {
   }
 
   const isSubmitted = formData.submissionStatus === 'SUBMITTED';
+  const docStats = calculateDocumentVerificationStats(documents);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '1100px', margin: '0 auto' }}>
@@ -231,6 +239,40 @@ export const AdminJoiningDetailPage: React.FC = () => {
                 <span>DRAFT</span>
               </span>
             )}
+
+            {/* Document Verification Status Badge */}
+            <span
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                color: docStats.allRequiredVerified
+                  ? '#166534'
+                  : docStats.hasRejections
+                  ? '#991B1B'
+                  : '#1E40AF',
+                backgroundColor: docStats.allRequiredVerified
+                  ? '#DCFCE7'
+                  : docStats.hasRejections
+                  ? '#FEE2E2'
+                  : '#EFF6FF',
+                padding: '3px 9px',
+                borderRadius: '12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                border: `1px solid ${
+                  docStats.allRequiredVerified
+                    ? '#BBF7D0'
+                    : docStats.hasRejections
+                    ? '#FECACA'
+                    : '#BFDBFE'
+                }`
+              }}
+            >
+              <span>
+                {docStats.verifiedCount}/{docStats.totalRequired} Docs Verified
+              </span>
+            </span>
           </div>
         </div>
 
@@ -291,6 +333,24 @@ export const AdminJoiningDetailPage: React.FC = () => {
           Marked with .no-print so they never contaminate the official form print
           ========================================================================= */}
       <div className="no-print" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1rem' }}>
+        {/* Candidate Documents & Statutory Verification Workspace */}
+        {rawDossier?.joiningForm?.id && (
+          <div style={{ background: '#FFFFFF', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#192A56', marginBottom: '1rem' }}>
+              Candidate Documents & Statutory Verification
+            </h2>
+            <DocumentVerificationPanel
+              joiningFormId={rawDossier.joiningForm.id}
+              applicationId={rawDossier.joiningForm.application_id}
+              candidateName={formData.personal.employeeName}
+              referenceNumber={formData.joiningReference || undefined}
+              documents={documents}
+              canVerify={canVerify}
+              onRefresh={loadJoiningDetails}
+            />
+          </div>
+        )}
+
         {/* Reference Slip & Consultancy Return */}
         {rawDossier?.joiningForm?.id && (
           <div style={{ background: '#FFFFFF', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '1.5rem' }}>
@@ -308,6 +368,13 @@ export const AdminJoiningDetailPage: React.FC = () => {
             candidateName={formData.personal.employeeName}
             candidateEmail={formData.personal.emailId}
             candidateMobile={formData.personal.employeeContactNumber}
+            dob={formData.personal.dateOfBirth}
+            address={[
+              formData.permanentAddress?.address,
+              formData.permanentAddress?.city,
+              formData.permanentAddress?.state,
+              formData.permanentAddress?.pinCode
+            ].filter(Boolean).join(', ')}
             bloodGroup={formData.personal.bloodGroup || null}
             emergencyContactName={formData.emergencyContacts[0]?.name || null}
             emergencyContactPhone={formData.emergencyContacts[0]?.contactNumber || null}

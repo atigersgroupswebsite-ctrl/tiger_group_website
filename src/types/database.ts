@@ -911,6 +911,9 @@ export interface Database {
           joining_date: string | null;
           employment_status: EmploymentStatus;
           id_card_number: string | null;
+          verification_token: string | null;
+          verification_enabled: boolean;
+          id_card_issued_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -930,6 +933,9 @@ export interface Database {
           joining_date?: string | null;
           employment_status?: EmploymentStatus;
           id_card_number?: string | null;
+          verification_token?: string | null;
+          verification_enabled?: boolean;
+          id_card_issued_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -949,6 +955,9 @@ export interface Database {
           joining_date?: string | null;
           employment_status?: EmploymentStatus;
           id_card_number?: string | null;
+          verification_token?: string | null;
+          verification_enabled?: boolean;
+          id_card_issued_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1233,6 +1242,17 @@ export interface Database {
       is_super_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      manage_company_signature: {
+        Args: {
+          p_action: string;
+          p_payload?: Json;
+        };
+        Returns: {
+          success: boolean;
+          setting?: Json;
+          error?: string;
+        };
       };
     };
     Enums: {

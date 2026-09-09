@@ -33,7 +33,8 @@ import type {
 } from '../../types/database';
 import {
   getApplicationJoiningBundle,
-  calculateDocumentVerificationStats
+  calculateDocumentVerificationStats,
+  getCandidateDocuments
 } from '../../services/adminDocumentService';
 import { AdminStatusBadge } from '../../components/admin/AdminStatusBadge';
 import { JoiningReview } from '../../components/admin/JoiningReview';
@@ -231,18 +232,7 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
         setCompanies(compData as CompanyRow[]);
       }
 
-      // 3. Fetch Documents
-      const { data: docData } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('application_id', id)
-        .order('uploaded_at', { ascending: false });
-
-      if (docData) {
-        setDocuments(docData as DocumentRow[]);
-      }
-
-      // 4. Fetch Payments
+      // 3. Fetch Payments
       const { data: payData } = await supabase
         .from('payments')
         .select('*')
@@ -253,7 +243,7 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
         setPayments(payData as PaymentRow[]);
       }
 
-      // 5. Fetch Employee record
+      // 4. Fetch Employee record
       const { data: empData } = await supabase
         .from('employees')
         .select('*')
@@ -264,7 +254,7 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
         setEmployee(empData as EmployeeRow);
       }
 
-      // 6. Fetch Activity Logs
+      // 5. Fetch Activity Logs
       const { data: actData } = await supabase
         .from('activity_logs')
         .select('*')
@@ -275,7 +265,7 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
         setActivityLogs(actData as ActivityLogRow[]);
       }
 
-      // 7. Fetch Joining Dossier Bundle
+      // 6. Fetch Joining Dossier Bundle
       const bundle = await getApplicationJoiningBundle(id);
       if (bundle.success) {
         setJoiningForm(bundle.joiningForm);
@@ -283,6 +273,16 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
         setFamily(bundle.family);
         setEmergency(bundle.emergency);
         setDeclarations(bundle.declarations);
+      }
+
+      // 7. Fetch Candidate Documents belonging strictly to this candidate
+      const targetJoiningFormId = bundle.joiningForm?.id || null;
+      const docRes = await getCandidateDocuments({
+        applicationId: id,
+        joiningFormId: targetJoiningFormId
+      });
+      if (docRes.success && docRes.data) {
+        setDocuments(docRes.data);
       }
     } catch (err: unknown) {
       console.error('[ApplicationDetail] Error loading application:', err);
@@ -1141,19 +1141,37 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
           TAB 2: JOINING REVIEW (All 8 Sections + Company Assignment Editor)
           ========================================================================= */}
       {activeTab === 'joining' && (
-        <JoiningReview
-          application={application}
-          joiningForm={joiningForm}
-          education={education}
-          family={family}
-          emergency={emergency}
-          declarations={declarations}
-          companies={companies}
-          isSuperAdmin={isSuperAdmin}
-          canEditCompanyInfo={canEditCompanyInfo}
-          onRefresh={loadApplicationData}
-          logActivity={logActivity}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <JoiningReview
+            application={application}
+            joiningForm={joiningForm}
+            education={education}
+            family={family}
+            emergency={emergency}
+            declarations={declarations}
+            companies={companies}
+            isSuperAdmin={isSuperAdmin}
+            canEditCompanyInfo={canEditCompanyInfo}
+            onRefresh={loadApplicationData}
+            logActivity={logActivity}
+          />
+
+          {/* Direct Candidate Documents & Verification Section inside Joining View */}
+          <div style={{ background: '#FFFFFF', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#192A56', marginBottom: '1rem' }}>
+              Candidate Documents & Statutory Verification
+            </h2>
+            <DocumentVerificationPanel
+              applicationId={application.id}
+              joiningFormId={joiningForm?.id || null}
+              candidateName={application.full_name}
+              referenceNumber={application.application_number}
+              documents={documents}
+              canVerify={canVerify}
+              onRefresh={loadApplicationData}
+            />
+          </div>
+        </div>
       )}
 
       {/* =========================================================================
@@ -1162,6 +1180,9 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
       {activeTab === 'documents' && (
         <DocumentVerificationPanel
           applicationId={application.id}
+          joiningFormId={joiningForm?.id || null}
+          candidateName={application.full_name}
+          referenceNumber={application.application_number}
           documents={documents}
           canVerify={canVerify}
           onRefresh={loadApplicationData}
@@ -1200,6 +1221,8 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
           candidateName={application.full_name}
           candidateEmail={application.email}
           candidateMobile={application.mobile}
+          dob={joiningForm?.date_of_birth || null}
+          address={application.address || (joiningForm?.permanent_address as string) || null}
           bloodGroup={joiningForm?.blood_group || null}
           emergencyContactName={emergency[0]?.name || null}
           emergencyContactPhone={emergency[0]?.contact_number || null}

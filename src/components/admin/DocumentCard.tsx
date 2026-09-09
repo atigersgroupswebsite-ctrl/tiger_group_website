@@ -68,21 +68,35 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           ? '#FFF8F8'
           : '#FFFFFF',
         transition: 'box-shadow 0.2s ease',
-        minHeight: '220px'
+        minHeight: '220px',
+        minWidth: 0,
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+        width: '100%'
       }}
     >
       {/* Card Header */}
-      <div>
+      <div style={{ minWidth: 0, width: '100%' }}>
         <div
           style={{
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'space-between',
             gap: '0.75rem',
-            marginBottom: '0.75rem'
+            marginBottom: '0.75rem',
+            width: '100%',
+            minWidth: 0
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              minWidth: 0,
+              flex: '1 1 auto'
+            }}
+          >
             <div
               style={{
                 width: '36px',
@@ -106,11 +120,31 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             >
               <FileText size={18} />
             </div>
-            <div>
-              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#192A56' }}>
+            <div style={{ minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: '0.95rem',
+                  fontWeight: 800,
+                  color: '#192A56',
+                  wordBreak: 'break-word',
+                  lineHeight: 1.25
+                }}
+              >
                 {displayTitle}
               </h4>
-              <div style={{ fontSize: '0.725rem', color: '#64748B', marginTop: '2px' }}>
+              <div
+                title={document.original_file_name || undefined}
+                style={{
+                  fontSize: '0.725rem',
+                  color: '#64748B',
+                  marginTop: '2px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: '100%'
+                }}
+              >
                 {document.original_file_name || 'candidate_document'}
                 {document.file_size ? ` • ${formatFileSize(document.file_size)}` : ''}
               </div>
@@ -143,7 +177,8 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                 : isRejected
                 ? '1px solid #FCA5A5'
                 : '1px solid #FDE68A',
-              flexShrink: 0
+              flexShrink: 0,
+              whiteSpace: 'nowrap'
             }}
           >
             {isVerified && <CheckCircle size={12} />}
@@ -220,7 +255,11 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
         {/* View Button */}
         <button
           type="button"
-          onClick={() => onView(document)}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onView(document);
+          }}
           disabled={isProcessing}
           className="btn-admin-secondary"
           style={{
@@ -236,11 +275,15 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
         </button>
 
         {/* Verification Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
           {/* Verify Button */}
           <button
             type="button"
-            onClick={() => onVerify(document)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onVerify(document);
+            }}
             disabled={!canVerify || isProcessing || isVerified}
             style={{
               padding: '0.45rem 0.85rem',
@@ -268,7 +311,11 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           {/* Reject Button */}
           <button
             type="button"
-            onClick={() => onReject(document)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onReject(document);
+            }}
             disabled={!canVerify || isProcessing}
             style={{
               padding: '0.45rem 0.85rem',

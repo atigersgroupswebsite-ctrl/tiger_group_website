@@ -752,8 +752,15 @@ export async function processEmployeeIdCardGeneration(
     emergencyContactName?: string | null;
     emergencyContactPhone?: string | null;
     emergencyContactRelation?: string | null;
+    dob?: string | null;
+    mobile?: string | null;
+    email?: string | null;
+    address?: string | null;
+    companyName?: string | null;
+    verificationToken?: string | null;
     photoUrl?: string | null;
     signatureUrl?: string | null;
+    companySignatureUrl?: string | null;
   },
   currentAdminId?: string | null
 ): Promise<{
@@ -762,9 +769,67 @@ export async function processEmployeeIdCardGeneration(
   storagePath?: string;
   blob?: Blob;
   pdfBytes?: Uint8Array;
+  fileName?: string;
   error?: string;
 }> {
   try {
+    // 1. Ensure verification_token exists on employee
+    let vToken = contextData.verificationToken || employee.verification_token;
+    if (!vToken && isSupabaseConfigured) {
+      vToken = `atg_v_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`;
+      await supabase
+        .from('employees')
+        .update({ verification_token: vToken })
+        .eq('id', employee.id);
+      employee.verification_token = vToken;
+    }
+
+    // 2. Resolve additional profile fields if not passed
+    let resolvedDob = contextData.dob || null;
+    let resolvedMobile = contextData.mobile || employee.mobile || null;
+    let resolvedEmail = contextData.email || employee.email || null;
+    let resolvedAddress = contextData.address || employee.location || null;
+    let resolvedBlood = contextData.bloodGroup || null;
+
+    if (isSupabaseConfigured) {
+      if (employee.joining_form_id && (!resolvedDob || !resolvedMobile || !resolvedEmail || !resolvedAddress || !resolvedBlood)) {
+        const { data: jf } = await supabase
+          .from('joining_forms')
+          .select('date_of_birth, employee_contact_number, email, permanent_address, blood_group')
+          .eq('id', employee.joining_form_id)
+          .maybeSingle();
+
+        if (jf) {
+          if (!resolvedDob && jf.date_of_birth) resolvedDob = jf.date_of_birth;
+          if (!resolvedMobile && jf.employee_contact_number) resolvedMobile = jf.employee_contact_number;
+          if (!resolvedEmail && jf.email) resolvedEmail = jf.email;
+          if (!resolvedBlood && jf.blood_group) resolvedBlood = jf.blood_group;
+          if (!resolvedAddress && jf.permanent_address) {
+            const pa = jf.permanent_address as any;
+            if (typeof pa === 'string') {
+              resolvedAddress = pa;
+            } else if (typeof pa === 'object' && pa !== null) {
+              resolvedAddress = [pa.address || pa.addressLine1 || pa.line1, pa.city, pa.district, pa.state, pa.pincode || pa.pinCode].filter(Boolean).join(', ');
+            }
+          }
+        }
+      }
+
+      if (employee.application_id && (!resolvedMobile || !resolvedEmail || !resolvedAddress)) {
+        const { data: app } = await supabase
+          .from('applications')
+          .select('mobile, email, address')
+          .eq('id', employee.application_id)
+          .maybeSingle();
+
+        if (app) {
+          if (!resolvedMobile && app.mobile) resolvedMobile = app.mobile;
+          if (!resolvedEmail && app.email) resolvedEmail = app.email;
+          if (!resolvedAddress && app.address) resolvedAddress = app.address;
+        }
+      }
+    }
+
     const cardData: EmployeeIdCardData = {
       employeeId: employee.id,
       applicationId: employee.application_id,
@@ -773,14 +838,21 @@ export async function processEmployeeIdCardGeneration(
       employeeCode: employee.employee_code,
       designation: employee.designation,
       department: employee.department,
+      companyName: contextData.companyName || 'A TIGER GLOBAL Career Solution & Consultancy',
       location: employee.location,
-      bloodGroup: contextData.bloodGroup || '—',
+      dob: resolvedDob,
+      mobile: resolvedMobile,
+      email: resolvedEmail,
+      address: resolvedAddress,
+      bloodGroup: resolvedBlood || '—',
       emergencyContactName: contextData.emergencyContactName,
       emergencyContactPhone: contextData.emergencyContactPhone,
       emergencyContactRelation: contextData.emergencyContactRelation,
       issuanceDate: employee.joining_date || new Date().toLocaleDateString('en-GB'),
+      verificationToken: vToken,
       photoUrlOrData: contextData.photoUrl,
-      signatureUrlOrData: contextData.signatureUrl
+      signatureUrlOrData: contextData.signatureUrl,
+      companySignatureUrlOrData: contextData.companySignatureUrl
     };
 
     const result = await generateAndPersistEmployeeIdCard(cardData, currentAdminId);
@@ -798,7 +870,8 @@ export async function processEmployeeIdCardGeneration(
       fileId: result.fileId,
       storagePath: result.storagePath,
       blob: result.blob,
-      pdfBytes: result.pdfBytes
+      pdfBytes: result.pdfBytes,
+      fileName: result.fileName
     };
   } catch (err: any) {
     console.error('[processEmployeeIdCardGeneration] Error:', err);
@@ -820,6 +893,10 @@ export async function dispatchEmployeeIdCardToEmail(
     emergencyContactRelation?: string | null;
     photoUrl?: string | null;
     signatureUrl?: string | null;
+    dob?: string | null;
+    mobile?: string | null;
+    email?: string | null;
+    address?: string | null;
   }
 ): Promise<{
   success: boolean;
@@ -836,27 +913,14 @@ export async function dispatchEmployeeIdCardToEmail(
   }
 
   try {
-    // 2. Generate or retrieve the ID Card PDF
-    const cardData: EmployeeIdCardData = {
-      employeeId: employee.id,
-      applicationId: employee.application_id,
-      joiningFormId: employee.joining_form_id,
-      employeeName: employee.candidate_name || 'Employee',
-      employeeCode: employee.employee_code,
-      designation: employee.designation,
-      department: employee.department,
-      location: employee.location,
-      bloodGroup: contextData.bloodGroup || '—',
-      emergencyContactName: contextData.emergencyContactName,
-      emergencyContactPhone: contextData.emergencyContactPhone,
-      emergencyContactRelation: contextData.emergencyContactRelation,
-      issuanceDate: employee.joining_date || new Date().toLocaleDateString('en-GB'),
-      photoUrlOrData: contextData.photoUrl,
-      signatureUrlOrData: contextData.signatureUrl
-    };
-
-    // Ensure ID Card is persisted before email dispatch
-    await generateAndPersistEmployeeIdCard(cardData);
+    // 2. Generate or retrieve the ID Card PDF using authoritative dynamic generator
+    const genRes = await processEmployeeIdCardGeneration(employee, contextData);
+    if (!genRes.success || !genRes.pdfBytes) {
+      return {
+        success: false,
+        error: genRes.error || 'Failed to generate authoritative ID Card PDF for email attachment.'
+      };
+    }
 
     // 3. Dispatch via secure server-side endpoint
     const { data: { session } } = await supabase.auth.getSession();

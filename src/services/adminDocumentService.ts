@@ -179,11 +179,22 @@ export async function getDocumentSignedUrl(
  */
 export async function verifyCandidateDocument(
   docId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  error?: string;
+  documentId?: string;
+  verificationStatus?: string;
+  verifiedAt?: string;
+}> {
   if (!docId) return { success: false, error: 'Document ID is required.' };
 
   if (!isSupabaseConfigured) {
-    return { success: true };
+    return {
+      success: true,
+      documentId: docId,
+      verificationStatus: 'VERIFIED',
+      verifiedAt: new Date().toISOString()
+    };
   }
 
   try {
@@ -195,7 +206,13 @@ export async function verifyCandidateDocument(
       return { success: false, error: error.message };
     }
 
-    const res = data as { success?: boolean; error?: string };
+    const res = data as {
+      success?: boolean;
+      error?: string;
+      document_id?: string;
+      verification_status?: string;
+      verified_at?: string;
+    };
     if (!res?.success) {
       return { success: false, error: res?.error || 'Verification failed.' };
     }
@@ -211,7 +228,12 @@ export async function verifyCandidateDocument(
       // Non-critical audit attribution
     }
 
-    return { success: true };
+    return {
+      success: true,
+      documentId: res.document_id || docId,
+      verificationStatus: res.verification_status || 'VERIFIED',
+      verifiedAt: res.verified_at || new Date().toISOString()
+    };
   } catch (err: any) {
     return { success: false, error: err.message || 'Verification failed.' };
   }
@@ -225,7 +247,14 @@ export async function verifyCandidateDocument(
 export async function rejectCandidateDocument(
   docId: string,
   reason: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  error?: string;
+  documentId?: string;
+  verificationStatus?: string;
+  rejectionReason?: string;
+  rejectedAt?: string;
+}> {
   if (!docId) return { success: false, error: 'Document ID is required.' };
   const trimmed = reason.trim();
   if (!trimmed) {
@@ -233,7 +262,13 @@ export async function rejectCandidateDocument(
   }
 
   if (!isSupabaseConfigured) {
-    return { success: true };
+    return {
+      success: true,
+      documentId: docId,
+      verificationStatus: 'REJECTED',
+      rejectionReason: trimmed,
+      rejectedAt: new Date().toISOString()
+    };
   }
 
   try {
@@ -246,7 +281,14 @@ export async function rejectCandidateDocument(
       return { success: false, error: error.message };
     }
 
-    const res = data as { success?: boolean; error?: string };
+    const res = data as {
+      success?: boolean;
+      error?: string;
+      document_id?: string;
+      verification_status?: string;
+      rejection_reason?: string;
+      rejected_at?: string;
+    };
     if (!res?.success) {
       return { success: false, error: res?.error || 'Rejection failed.' };
     }
@@ -262,9 +304,67 @@ export async function rejectCandidateDocument(
       // Non-critical audit attribution
     }
 
-    return { success: true };
+    return {
+      success: true,
+      documentId: res.document_id || docId,
+      verificationStatus: res.verification_status || 'REJECTED',
+      rejectionReason: res.rejection_reason || trimmed,
+      rejectedAt: res.rejected_at || new Date().toISOString()
+    };
   } catch (err: any) {
     return { success: false, error: err.message || 'Rejection failed.' };
+  }
+}
+
+// ==============================================================================
+// CANDIDATE-SPECIFIC DOCUMENT RETRIEVAL (PRIMARY EMBEDDED WORKSPACE)
+// ==============================================================================
+
+/**
+ * Fetches documents belonging exclusively to a candidate's application or standalone joining record.
+ * Supports:
+ *   1. Application-based candidate:
+ *      Queries documents where application_id = applicationId OR joining_form_id = joiningFormId.
+ *   2. Standalone Joining Form candidate:
+ *      Queries documents where joining_form_id = joiningFormId.
+ * Guarantees zero cross-candidate document leakage and uses database indexes.
+ */
+export async function getCandidateDocuments(params: {
+  applicationId?: string | null;
+  joiningFormId?: string | null;
+}): Promise<{ success: boolean; data?: DocumentRow[]; error?: string }> {
+  const { applicationId, joiningFormId } = params;
+
+  if (!applicationId && !joiningFormId) {
+    return { success: false, error: 'Either applicationId or joiningFormId must be provided.' };
+  }
+
+  if (!isSupabaseConfigured) {
+    return { success: true, data: [] };
+  }
+
+  try {
+    let query = supabase
+      .from('documents')
+      .select('*')
+      .order('uploaded_at', { ascending: false });
+
+    if (applicationId && joiningFormId) {
+      query = query.or(`application_id.eq.${applicationId},joining_form_id.eq.${joiningFormId}`);
+    } else if (applicationId) {
+      query = query.eq('application_id', applicationId);
+    } else if (joiningFormId) {
+      query = query.eq('joining_form_id', joiningFormId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: (data || []) as DocumentRow[] };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to load candidate documents.' };
   }
 }
 

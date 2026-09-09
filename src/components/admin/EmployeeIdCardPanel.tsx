@@ -11,6 +11,7 @@
 // ==============================================================================
 
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   CreditCard,
   CheckCircle2,
@@ -19,7 +20,8 @@ import {
   User,
   FileCheck,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Download
 } from 'lucide-react';
 import type { EmployeeRow, GeneratedFileRow } from '../../types/database';
 import {
@@ -29,6 +31,10 @@ import {
   getLatestGeneratedIdCard
 } from '../../services/employeeService';
 import { getGeneratedDocumentSignedUrl } from '../../services/filePersistenceService';
+import {
+  getCompanySignatureSettings,
+  type CompanySignatureMetadata
+} from '../../services/companySignatureService';
 
 interface EmployeeIdCardPanelProps {
   applicationId?: string | null;
@@ -40,6 +46,8 @@ interface EmployeeIdCardPanelProps {
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
   emergencyContactRelation?: string | null;
+  dob?: string | null;
+  address?: string | null;
   photoUrl?: string | null;
   signatureUrl?: string | null;
   existingEmployee?: EmployeeRow | null;
@@ -56,6 +64,8 @@ export const EmployeeIdCardPanel: React.FC<EmployeeIdCardPanelProps> = ({
   emergencyContactName,
   emergencyContactPhone,
   emergencyContactRelation,
+  dob,
+  address,
   photoUrl,
   signatureUrl,
   existingEmployee,
@@ -88,6 +98,20 @@ export const EmployeeIdCardPanel: React.FC<EmployeeIdCardPanelProps> = ({
 
   const [latestCardFile, setLatestCardFile] = useState<GeneratedFileRow | null>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [companySignatureMeta, setCompanySignatureMeta] = useState<CompanySignatureMetadata | null>(null);
+
+  // Load active company signature metadata
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCompanySig = async () => {
+      const meta = await getCompanySignatureSettings();
+      if (isMounted) setCompanySignatureMeta(meta);
+    };
+    fetchCompanySig();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Sync with prop
   useEffect(() => {
@@ -178,6 +202,10 @@ export const EmployeeIdCardPanel: React.FC<EmployeeIdCardPanelProps> = ({
         emergencyContactName,
         emergencyContactPhone,
         emergencyContactRelation,
+        dob,
+        mobile: candidateMobile || employee.mobile,
+        email: email || candidateEmail || employee.email,
+        address,
         photoUrl,
         signatureUrl
       });
@@ -223,6 +251,52 @@ export const EmployeeIdCardPanel: React.FC<EmployeeIdCardPanelProps> = ({
     await handleGenerateIdCard();
   };
 
+  // Handle Download ID Card
+  const handleDownloadIdCard = async () => {
+    if (!employee) {
+      setStatusMessage({
+        type: 'error',
+        text: 'Please create or activate the official employee record first.'
+      });
+      return;
+    }
+
+    try {
+      setStatusMessage(null);
+      const res = await processEmployeeIdCardGeneration(employee, {
+        bloodGroup,
+        emergencyContactName,
+        emergencyContactPhone,
+        emergencyContactRelation,
+        dob,
+        mobile: candidateMobile || employee.mobile,
+        email: email || candidateEmail || employee.email,
+        address,
+        photoUrl,
+        signatureUrl
+      });
+
+      if (!res.success || !res.blob) {
+        throw new Error(res.error || 'Failed to generate Employee ID Card for download.');
+      }
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(res.blob);
+      link.download = res.fileName || `${employee.employee_code}-ID-Card.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+
+      setStatusMessage({
+        type: 'success',
+        text: `Downloaded official ID Card for ${employee.employee_code}.`
+      });
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: err.message || 'ID Card download failed.' });
+    }
+  };
+
   // Handle Send to Employee Email
   const handleSendEmail = async () => {
     if (!employee) {
@@ -250,6 +324,10 @@ export const EmployeeIdCardPanel: React.FC<EmployeeIdCardPanelProps> = ({
         emergencyContactName,
         emergencyContactPhone,
         emergencyContactRelation,
+        dob,
+        mobile: candidateMobile || employee.mobile,
+        email: email || candidateEmail || employee.email,
+        address,
         photoUrl,
         signatureUrl
       });
@@ -680,18 +758,38 @@ export const EmployeeIdCardPanel: React.FC<EmployeeIdCardPanelProps> = ({
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                  Document Template:
+                  Card Standard:
                 </span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0F1B38' }}>
-                  Client Master Page 04
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0F1B38' }}>
+                  ISO/IEC 7810 ID-1 (CR80) — 85.6mm × 54.0mm
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                  Blood Group:
+                  Card Architecture:
                 </span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0F1B38' }}>
-                  {bloodGroup || 'On Record'}
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#166534' }}>
+                  Dynamic 2-Sided Vector Standard
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                  Founder/CEO Signature:
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    color: companySignatureMeta?.enabled && companySignatureMeta?.storage_path ? '#166534' : '#B45309'
+                  }}
+                >
+                  {companySignatureMeta?.enabled && companySignatureMeta?.storage_path ? (
+                    `✓ Active (v${companySignatureMeta.version || 1})`
+                  ) : (
+                    <Link to="/admin/settings" style={{ color: '#B45309', textDecoration: 'underline' }}>
+                      ⚠ Not Configured (Configure)
+                    </Link>
+                  )}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -699,7 +797,7 @@ export const EmployeeIdCardPanel: React.FC<EmployeeIdCardPanelProps> = ({
                   Passport Photo:
                 </span>
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: photoUrl ? '#166534' : '#94A3B8' }}>
-                  {photoUrl ? '✓ Available' : 'Pending Upload'}
+                  {photoUrl ? '✓ Available on Record' : 'Pending Upload'}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -715,29 +813,29 @@ export const EmployeeIdCardPanel: React.FC<EmployeeIdCardPanelProps> = ({
 
           {/* Action Buttons */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem' }}>
               <button
                 type="button"
                 onClick={handleGenerateIdCard}
                 disabled={isGenerating || !employee}
                 style={{
-                  padding: '0.55rem 0.75rem',
+                  padding: '0.55rem 0.5rem',
                   backgroundColor: '#0F1B38',
                   color: '#FFFFFF',
                   borderRadius: '6px',
                   border: 'none',
-                  fontSize: '0.8rem',
+                  fontSize: '0.78rem',
                   fontWeight: 700,
                   cursor: employee ? 'pointer' : 'not-allowed',
                   opacity: employee ? 1 : 0.6,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '0.4rem'
+                  gap: '0.35rem'
                 }}
               >
-                <RefreshCw size={14} className={isGenerating ? 'spin' : ''} />
-                {isGenerating ? 'Generating...' : 'Generate ID Card'}
+                <RefreshCw size={13} className={isGenerating ? 'spin' : ''} />
+                {isGenerating ? 'Generating...' : 'Generate Card'}
               </button>
 
               <button
@@ -745,23 +843,47 @@ export const EmployeeIdCardPanel: React.FC<EmployeeIdCardPanelProps> = ({
                 onClick={handleOpenPreview}
                 disabled={!employee}
                 style={{
-                  padding: '0.55rem 0.75rem',
+                  padding: '0.55rem 0.5rem',
                   backgroundColor: '#FFFFFF',
                   color: '#0F1B38',
                   borderRadius: '6px',
                   border: '1px solid #CBD5E1',
-                  fontSize: '0.8rem',
+                  fontSize: '0.78rem',
                   fontWeight: 700,
                   cursor: employee ? 'pointer' : 'not-allowed',
                   opacity: employee ? 1 : 0.6,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '0.4rem'
+                  gap: '0.35rem'
                 }}
               >
-                <ExternalLink size={14} />
-                View / Print ID Card
+                <ExternalLink size={13} />
+                View / Print
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadIdCard}
+                disabled={!employee}
+                style={{
+                  padding: '0.55rem 0.5rem',
+                  backgroundColor: '#FFFFFF',
+                  color: '#0F1B38',
+                  borderRadius: '6px',
+                  border: '1px solid #CBD5E1',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: employee ? 'pointer' : 'not-allowed',
+                  opacity: employee ? 1 : 0.6,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.35rem'
+                }}
+              >
+                <Download size={13} />
+                Download PDF
               </button>
             </div>
 

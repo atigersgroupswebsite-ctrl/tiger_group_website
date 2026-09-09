@@ -1,20 +1,24 @@
 // ==============================================================================
 // File: src/services/employeeIdCardGenerator.ts
-// Description: Dedicated Employee Identity Card PDF Generator & Persistence Service
-// Brand: A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY
+// Description: Dynamic Two-Sided Employee Identity Card Generator & Persistence
+// Brand: A TIGER GROUPS — A TIGER GLOBAL Career Solution & Consultancy
+// Standard: ISO/IEC 7810 ID-1 (CR80) — 85.60 mm x 53.98 mm (Standard PVC Card)
 // Architecture:
-//   1. Clones authoritative Page 4 (index 3) of client joining_form_master.pdf
-//   2. Creates an authentic standalone 1-Page Employee Identity Card document
-//   3. Overlays authoritative employee fields, photo, and signature
+//   1. Fully dynamic vector rendering via jsPDF (Zero blank PDF background overlay)
+//   2. Front: Corporate branding, employee photo, employee details, signatures
+//        - Renders DOB, Mobile, Email from employee record (resolved from joining_forms/applications)
+//   3. Back: Verification terms, helpline, emergency contact, statutory attestation box
+//        - QR code removed pending production verification domain (reintroduce when ready)
 //   4. Persists to private 'generated-documents' bucket with file_type 'ID_CARD_PDF'
-//   5. Emits auditable activity log (EMPLOYEE_ID_CARD_GENERATED)
+//   5. Audited via activity_logs (EMPLOYEE_ID_CARD_GENERATED)
 // ==============================================================================
 
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import { JOINING_PDF_MAPPINGS } from '../constants/joiningPdfCoordinates';
+import { jsPDF } from 'jspdf';
 import { persistGeneratedDocument } from './filePersistenceService';
 import { logActivity } from './activityService';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { formatIndianPhoneNumber } from '../utils/phoneUtils';
+import { getActiveCompanySignatureDataUrl } from './companySignatureService';
 
 export interface EmployeeIdCardData {
   employeeId?: string;
@@ -24,14 +28,22 @@ export interface EmployeeIdCardData {
   employeeCode: string;
   designation?: string | null;
   department?: string | null;
+  companyName?: string | null;
   location?: string | null;
+  dob?: string | null;
+  mobile?: string | null;
+  email?: string | null;
+  address?: string | null;
   bloodGroup?: string | null;
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
   emergencyContactRelation?: string | null;
   issuanceDate?: string | null;
+  verificationToken?: string | null;
+  verificationUrl?: string | null;
   photoUrlOrData?: string | null;
   signatureUrlOrData?: string | null;
+  companySignatureUrlOrData?: string | null;
 }
 
 export interface GeneratedIdCardResult {
@@ -43,27 +55,63 @@ export interface GeneratedIdCardResult {
 }
 
 /**
- * Converts a base64 Data URL or fetched image URL into raw Uint8Array bytes
+ * Standard ID Card Dimensions: ISO/IEC 7810 ID-1 (CR80)
+ * 85.6 mm width x 54.0 mm height (Landscape orientation)
  */
-async function resolveImageBytes(
-  imageSource?: string | null
-): Promise<{ bytes: Uint8Array; isPng: boolean } | null> {
+export const ID_CARD_DIMENSIONS = {
+  widthMm: 85.6,
+  heightMm: 54.0,
+  orientation: 'landscape' as const,
+  unit: 'mm' as const
+};
+
+/**
+ * Normalizes a date into official DD/MM/YYYY display format
+ */
+function formatDisplayDate(val?: string | null): string {
+  if (!val) return '—';
+  const trimmed = val.trim();
+  if (!trimmed || trimmed === '—') return '—';
+
+  // YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = trimmed.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch;
+    return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+  }
+
+  // DD-MM-YYYY or DD/MM/YYYY
+  const dmyMatch = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dmyMatch) {
+    const [, d, m, y] = dmyMatch;
+    return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+  }
+
+  return trimmed;
+}
+
+/**
+ * Formats canonical Indian mobile numbers for ID card display
+ */
+function formatDisplayMobile(val?: string | null): string {
+  if (!val) return '—';
+  const trimmed = val.trim();
+  if (!trimmed || trimmed === '—') return '—';
+  const formatted = formatIndianPhoneNumber(trimmed);
+  return formatted || trimmed;
+}
+
+/**
+ * Resolves an image source into an embedded Data URL
+ */
+async function resolveImageDataUrl(imageSource?: string | null): Promise<string | null> {
   if (!imageSource) return null;
 
   try {
-    // 1. Data URL format
-    if (imageSource.startsWith('data:')) {
-      const isPng = imageSource.includes('image/png');
-      const base64 = imageSource.split(',')[1];
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      return { bytes, isPng };
+    if (imageSource.startsWith('data:image/')) {
+      return imageSource;
     }
 
-    // 2. HTTP / HTTPS / Blob / relative URL format
     if (
       imageSource.startsWith('http://') ||
       imageSource.startsWith('https://') ||
@@ -72,208 +120,541 @@ async function resolveImageBytes(
     ) {
       const res = await fetch(imageSource);
       if (!res.ok) return null;
-      const buffer = await res.arrayBuffer();
-      const contentType = res.headers.get('content-type') || '';
-      const isPng =
-        contentType.includes('image/png') ||
-        imageSource.toLowerCase().includes('.png');
-      return { bytes: new Uint8Array(buffer), isPng };
+      const contentType = res.headers.get('content-type') || 'image/jpeg';
+      const arrayBuffer = await res.arrayBuffer();
+      
+      let base64 = '';
+      if (typeof Buffer !== 'undefined') {
+        base64 = Buffer.from(arrayBuffer).toString('base64');
+      } else {
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        base64 = btoa(binary);
+      }
+      return `data:${contentType};base64,${base64}`;
     }
   } catch (err) {
-    console.warn('[resolveImageBytes] Unable to process image source:', err);
+    console.warn('[resolveImageDataUrl] Unable to process image source:', err);
   }
 
   return null;
 }
 
 /**
- * Loads the master PDF template containing the client-designed Identity Card layout
+ * Retained helper: resolves public verification URL for future reintroduction of QR
  */
-async function loadTemplateBuffer(): Promise<ArrayBuffer> {
-  const res = await fetch('/assets/pdf/joining_form_master.pdf');
-  if (!res.ok) {
-    throw new Error(`Failed to load master PDF template: ${res.statusText}`);
+export function resolveVerificationUrl(token?: string | null): string {
+  if (!token) return 'https://atigergroups.com/verify/employee';
+
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}/verify/employee/${token}`;
   }
-  return await res.arrayBuffer();
+
+  const siteUrl = (typeof process !== 'undefined' && process.env?.VITE_SITE_URL)
+    ? process.env.VITE_SITE_URL.replace(/\/+$/, '')
+    : 'https://atigergroups.com';
+
+  return `${siteUrl}/verify/employee/${token}`;
 }
 
 /**
- * Generates the standalone Employee Identity Card PDF using the authentic
- * client layout (Page 4 of master document).
+ * Generates the authentic 2-Sided Employee Identity Card PDF
+ * - Page 1: Front side (Designation, Photo, Name, Code, DOB, Mobile, Email, Location, Address, Signatures)
+ * - Page 2: Back side (Terms, Return Address, Emergency Contact, Corporate Registry Attestation)
  */
 export async function generateEmployeeIdCardPdf(
   data: EmployeeIdCardData
 ): Promise<{ blob: Blob; pdfBytes: Uint8Array; fileName: string }> {
-  const templateBuffer = await loadTemplateBuffer();
+  // 1. Validate required data
+  if (!data.employeeName || !data.employeeName.trim()) {
+    throw new Error('Employee name is required to generate an official ID Card.');
+  }
+  if (!data.employeeCode || !data.employeeCode.trim()) {
+    throw new Error('Employee code is required to generate an official ID Card.');
+  }
 
-  // 1. Load the master document and isolate page index 3 (Page 4: IDENTITY CARD)
-  const masterDoc = await PDFDocument.load(templateBuffer);
-  const singleDoc = await PDFDocument.create();
+  // 2. Initialize jsPDF with standard CR80 ID Card dimensions
+  const doc = new jsPDF({
+    orientation: ID_CARD_DIMENSIONS.orientation,
+    unit: ID_CARD_DIMENSIONS.unit,
+    format: [ID_CARD_DIMENSIONS.widthMm, ID_CARD_DIMENSIONS.heightMm]
+  });
 
-  // Copy page index 3 (0-based) which is IDENTITY CARD FORMAT (PAGE 04)
-  const [idCardTemplatePage] = await singleDoc.copyPages(masterDoc, [3]);
-  const page = singleDoc.addPage(idCardTemplatePage);
+  const cardWidth = ID_CARD_DIMENSIONS.widthMm;
+  const cardHeight = ID_CARD_DIMENSIONS.heightMm;
 
-  // 2. Embed standard fonts
-  const helvetica = await singleDoc.embedFont(StandardFonts.Helvetica);
-  const helveticaBold = await singleDoc.embedFont(StandardFonts.HelveticaBold);
-  const textColor = rgb(0.08, 0.08, 0.12);
+  // Resolve assets
+  const [photoDataUrl, signatureDataUrl, companySignatureDataUrl] = await Promise.all([
+    resolveImageDataUrl(data.photoUrlOrData),
+    resolveImageDataUrl(data.signatureUrlOrData),
+    resolveImageDataUrl(data.companySignatureUrlOrData)
+  ]);
 
-  // 3. Draw text using authentic coordinates from JOINING_PDF_MAPPINGS.page4
-  const m4 = JOINING_PDF_MAPPINGS.page4;
+  // ============================================================================
+  // SIDE 1: FRONT SIDE
+  // ============================================================================
+  // Outer Border & Card Background
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(0, 0, cardWidth, cardHeight, 2, 2, 'F');
+  doc.setDrawColor(15, 27, 56);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(0.4, 0.4, cardWidth - 0.8, cardHeight - 0.8, 2, 2, 'D');
 
-  const drawField = (
-    text: string | undefined | null,
-    coord: { x: number; y: number; size?: number; maxWidth?: number },
-    bold = false
-  ) => {
-    if (!text) return;
-    page.drawText(String(text).trim(), {
-      x: coord.x,
-      y: coord.y,
-      size: coord.size || 9,
-      font: bold ? helveticaBold : helvetica,
-      color: textColor,
-      maxWidth: coord.maxWidth
-    });
+  // Top Header Banner (Midnight Navy #0F1B38)
+  doc.setFillColor(15, 27, 56);
+  doc.rect(0.4, 0.4, cardWidth - 0.8, 9.2, 'F');
+
+  // Champagne Gold Accent Strip (#C5A880)
+  doc.setFillColor(197, 168, 128);
+  doc.rect(0.4, 9.6, cardWidth - 0.8, 0.5, 'F');
+
+  // Header Branding Typography
+  doc.setTextColor(197, 168, 128);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.text('A TIGER GLOBAL', cardWidth / 2, 4.2, { align: 'center' });
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4.5);
+  doc.text('CAREER SOLUTION & CONSULTANCY', cardWidth / 2, 7.8, { align: 'center' });
+
+  // Photo Frame (Left Column)
+  const photoX = 4;
+  const photoY = 12.2;
+  const photoW = 22;
+  const photoH = 26;
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(15, 27, 56);
+  doc.setLineWidth(0.3);
+  doc.rect(photoX, photoY, photoW, photoH, 'FD');
+
+  if (photoDataUrl) {
+    try {
+      const format = photoDataUrl.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(photoDataUrl, format, photoX + 0.3, photoY + 0.3, photoW - 0.6, photoH - 0.6);
+    } catch {
+      // Fallback if image decode fails
+      doc.setTextColor(100, 116, 139);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(4.5);
+      doc.text('PHOTO ON', photoX + photoW / 2, photoY + photoH / 2 - 1.5, { align: 'center' });
+      doc.text('RECORD', photoX + photoW / 2, photoY + photoH / 2 + 2, { align: 'center' });
+    }
+  } else {
+    doc.setTextColor(100, 116, 139);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(4.5);
+    doc.text('EMPLOYEE', photoX + photoW / 2, photoY + photoH / 2 - 1.5, { align: 'center' });
+    doc.text('PHOTO', photoX + photoW / 2, photoY + photoH / 2 + 2, { align: 'center' });
+  }
+
+  // Blood Group Pill (Below photo)
+  if (data.bloodGroup && data.bloodGroup !== '—') {
+    doc.setFillColor(254, 242, 242);
+    doc.setDrawColor(254, 202, 202);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(photoX, photoY + photoH + 1, photoW, 3, 0.5, 0.5, 'FD');
+    doc.setTextColor(153, 27, 27);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(4.2);
+    doc.text(`BLOOD GRP: ${data.bloodGroup}`, photoX + photoW / 2, photoY + photoH + 3.1, { align: 'center' });
+  }
+
+  // Employee Information Details (Right Column)
+  const infoX = 29;
+  doc.setTextColor(15, 27, 56);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.text(data.employeeName.toUpperCase(), infoX, 14.5);
+
+  doc.setTextColor(30, 41, 59);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5.5);
+  const desigText = (data.designation || 'Associate').toUpperCase();
+  doc.text(desigText, infoX, 17.5);
+
+  if (data.department) {
+    doc.setTextColor(71, 85, 105);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5);
+    doc.text(` | ${data.department}`, infoX + doc.getTextWidth(desigText) + 1, 17.5);
+  }
+
+  // Subtle divider
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.line(infoX, 19.5, cardWidth - 3.5, 19.5);
+
+  // Field Rows
+  // Field Rows
+  const drawFieldRow = (label: string, val?: string | null, y?: number) => {
+    if (!y) return;
+    doc.setTextColor(71, 85, 105);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(4.8);
+    doc.text(label, infoX, y);
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'normal');
+
+    const displayVal = val?.trim() || '—';
+
+    // Auto fit font size for long single-line text (e.g. lengthy email) without truncating
+    let fontSize = 4.8;
+    doc.setFontSize(fontSize);
+    const availableWidth = cardWidth - 3.5 - (infoX + 16);
+    while (doc.getTextWidth(displayVal) > availableWidth && fontSize > 3.2) {
+      fontSize -= 0.2;
+      doc.setFontSize(fontSize);
+    }
+
+    doc.text(displayVal, infoX + 16, y);
   };
 
-  drawField(data.employeeName, m4.employeeName, true);
-  drawField(data.employeeCode, m4.employeeCode, true);
-  drawField(data.designation || 'Associate', m4.designation);
-  drawField(data.department || 'Operations', m4.department);
-  drawField(data.location || 'Nagpur, Maharashtra', m4.location);
+  const formattedDob = formatDisplayDate(data.dob);
+  const formattedMobile = formatDisplayMobile(data.mobile);
+  const formattedEmail = data.email && data.email.trim() ? data.email.trim() : '—';
 
-  if (data.emergencyContactName) {
-    drawField(data.emergencyContactName, m4.emerName);
-    const contactInfo = data.emergencyContactRelation
-      ? `${data.emergencyContactPhone || ''} (${data.emergencyContactRelation})`
-      : data.emergencyContactPhone || '';
-    drawField(contactInfo, m4.emerPhone);
-  }
+  drawFieldRow('EMP CODE:', data.employeeCode, 22.8);
+  drawFieldRow('DOB:', formattedDob, 25.8);
+  drawFieldRow('MOBILE:', formattedMobile, 28.8);
+  drawFieldRow('EMAIL:', formattedEmail, 31.8);
+  drawFieldRow('LOCATION:', data.location || 'Nagpur, Maharashtra', 34.8);
 
-  drawField(data.bloodGroup || '—', m4.bloodGroup);
-  drawField(
-    data.issuanceDate || new Date().toLocaleDateString('en-GB'),
-    m4.date
-  );
+  // Multi-line Address Rendering (Full address preserved with word wrapping; zero truncation or ellipsis)
+  const renderAddress = (rawAddress?: string | null, startY = 37.8) => {
+    const cleanAddr = (rawAddress || 'Nagpur, Maharashtra')
+      .replace(/[\r\n]+/g, ', ')
+      .replace(/\s+,/g, ',')
+      .replace(/,+/g, ', ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const displayAddr = cleanAddr || '—';
 
-  // 4. Embed Passport Photo
-  if (data.photoUrlOrData) {
-    const photo = await resolveImageBytes(data.photoUrlOrData);
-    if (photo) {
-      try {
-        const embeddedPhoto = photo.isPng
-          ? await singleDoc.embedPng(photo.bytes)
-          : await singleDoc.embedJpg(photo.bytes);
+    doc.setTextColor(71, 85, 105);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(4.8);
+    doc.text('ADDRESS:', infoX, startY);
 
-        page.drawImage(embeddedPhoto, {
-          x: m4.photoBox.x,
-          y: m4.photoBox.y,
-          width: m4.photoBox.width,
-          height: m4.photoBox.height
-        });
-      } catch (err) {
-        console.warn('Failed to embed employee photo on ID card:', err);
-      }
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'normal');
+
+    const valX = infoX + 16;
+    const maxWidth = cardWidth - 3.5 - valX; // ~37.1 mm
+
+    let addrFontSize = 4.4;
+    let lineHeight = 2.4;
+
+    doc.setFontSize(addrFontSize);
+    let lines: string[] = doc.splitTextToSize(displayAddr, maxWidth);
+
+    // If more than 2 lines, scale font size so all lines fit gracefully above the signature strip
+    if (lines.length > 2) {
+      addrFontSize = 3.8;
+      lineHeight = 2.0;
+      doc.setFontSize(addrFontSize);
+      lines = doc.splitTextToSize(displayAddr, maxWidth);
     }
-  }
 
-  // 5. Embed Employee Signature
-  if (data.signatureUrlOrData) {
-    const sig = await resolveImageBytes(data.signatureUrlOrData);
-    if (sig) {
-      try {
-        const embeddedSig = sig.isPng
-          ? await singleDoc.embedPng(sig.bytes)
-          : await singleDoc.embedJpg(sig.bytes);
-
-        page.drawImage(embeddedSig, {
-          x: m4.signatureBox.x,
-          y: m4.signatureBox.y,
-          width: m4.signatureBox.width,
-          height: m4.signatureBox.height
-        });
-      } catch (err) {
-        console.warn('Failed to embed employee signature on ID card:', err);
-      }
+    if (lines.length > 3) {
+      addrFontSize = 3.4;
+      lineHeight = 1.7;
+      doc.setFontSize(addrFontSize);
+      lines = doc.splitTextToSize(displayAddr, maxWidth);
     }
+
+    // Render every line without ellipsis or truncation
+    let currentY = startY;
+    for (let i = 0; i < lines.length; i++) {
+      doc.text(lines[i], valX, currentY);
+      currentY += lineHeight;
+    }
+  };
+
+  renderAddress(data.address, 37.8);
+
+  // Bottom Signatures Strip
+  doc.setFillColor(248, 250, 252);
+  doc.rect(0.4, 43.5, cardWidth - 0.8, 9.7, 'F');
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.line(0.4, 43.5, cardWidth - 0.4, 43.5);
+
+  // Employee Signature Box (Left)
+  if (signatureDataUrl) {
+    try {
+      const sigFormat = signatureDataUrl.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(signatureDataUrl, sigFormat, 6, 44, 20, 5.5);
+    } catch {
+      doc.setTextColor(100, 116, 139);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(4);
+      doc.text(data.employeeName, 16, 48.5, { align: 'center' });
+    }
+  } else {
+    doc.setTextColor(100, 116, 139);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(4.2);
+    doc.text(data.employeeName, 16, 48.5, { align: 'center' });
+  }
+  doc.setTextColor(71, 85, 105);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4);
+  doc.text('EMPLOYEE SIGNATURE', 16, 52, { align: 'center' });
+
+  // Authorized Signatory Box (Right - Founder / CEO Signature Area)
+  if (companySignatureDataUrl) {
+    try {
+      const compSigFormat = companySignatureDataUrl.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(companySignatureDataUrl, compSigFormat, 55, 44, 20, 5.5);
+    } catch {
+      doc.setTextColor(15, 27, 56);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(4.5);
+      doc.text('A TIGER GLOBAL Recruitment Cell', 65, 48.5, { align: 'center' });
+    }
+  } else {
+    doc.setTextColor(15, 27, 56);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(4.5);
+    doc.text('A TIGER GLOBAL Recruitment Cell', 65, 48.5, { align: 'center' });
+  }
+  doc.setTextColor(100, 116, 139);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(4);
+  doc.text('Managing Director & CEO', 65, 52, { align: 'center' });
+
+  // ============================================================================
+  // SIDE 2: BACK SIDE
+  // ============================================================================
+  doc.addPage([cardWidth, cardHeight], 'landscape');
+
+  // Outer Border & Card Background
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(0, 0, cardWidth, cardHeight, 2, 2, 'F');
+  doc.setDrawColor(15, 27, 56);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(0.4, 0.4, cardWidth - 0.8, cardHeight - 0.8, 2, 2, 'D');
+
+  // Top Header Banner
+  doc.setFillColor(15, 27, 56);
+  doc.rect(0.4, 0.4, cardWidth - 0.8, 7.5, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5.5);
+  doc.text('A TIGER GLOBAL CAREER SOLUTION & CONSULTANCY', cardWidth / 2, 4, { align: 'center' });
+  doc.setTextColor(197, 168, 128);
+  doc.setFontSize(4);
+  doc.text('STATUTORY VERIFICATION & RETURN DIRECTIVE', cardWidth / 2, 6.5, { align: 'center' });
+
+  // Left Column: Terms of Use & Return Instructions
+  const leftX = 4;
+  doc.setTextColor(15, 27, 56);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4.8);
+  doc.text('TERMS & CONDITIONS', leftX, 11);
+
+  doc.setTextColor(51, 65, 85);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(3.8);
+  const terms = [
+    '• This Identity Card is the exclusive property of A TIGER GLOBAL.',
+    '• Must be presented upon request by authorized company personnel/security.',
+    '• Misuse, duplication, or unauthorized transfer is strictly prohibited.',
+    '• Loss must be immediately reported to HR Administration.'
+  ];
+  let ty = 14;
+  terms.forEach((t) => {
+    doc.text(t, leftX, ty);
+    ty += 3;
+  });
+
+  doc.setTextColor(15, 27, 56);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4.5);
+  doc.text('IF FOUND, PLEASE RETURN TO:', leftX, ty + 1);
+
+  doc.setTextColor(51, 65, 85);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(3.7);
+  doc.text('Plot No. 440 Behind Royal Club, Suban Nagar,', leftX, ty + 4);
+  doc.text('Nagpur, Maharashtra - 440035', leftX, ty + 6.8);
+  doc.text('Helpline: +91 8349353946 | atigerglobal@gmail.com', leftX, ty + 9.6);
+
+  if (data.emergencyContactPhone) {
+    doc.setTextColor(153, 27, 27);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(3.8);
+    const emName = data.emergencyContactName ? `${data.emergencyContactName} - ` : '';
+    doc.text(`Emergency Helpline: ${emName}${data.emergencyContactPhone}`, leftX, ty + 12.8);
   }
 
-  // 6. Save and compile binary output
-  const pdfBytes = await singleDoc.save();
-  const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
-  const sanitizedCode = (data.employeeCode || 'EMP').replace(/[^a-zA-Z0-9_-]/g, '_');
-  const fileName = `ID_Card_${sanitizedCode}.pdf`;
+  // Right Column: Official Corporate Registry Cardlet (Clean Corporate Attestation — No Broken QR)
+  const regBoxX = 57;
+  const regBoxY = 9.5;
+  const regBoxW = 24.5;
+  const regBoxH = 36.5;
 
-  return { blob, pdfBytes, fileName };
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(regBoxX, regBoxY, regBoxW, regBoxH, 1.5, 1.5, 'FD');
+
+  // Header banner inside cardlet
+  doc.setFillColor(15, 27, 56);
+  doc.roundedRect(regBoxX, regBoxY, regBoxW, 5.5, 1.5, 1.5, 'F');
+  doc.rect(regBoxX, regBoxY + 3, regBoxW, 2.5, 'F');
+  doc.setTextColor(197, 168, 128);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4.2);
+  doc.text('CORPORATE REGISTRY', regBoxX + regBoxW / 2, regBoxY + 3.8, { align: 'center' });
+
+  // Organization emblem text
+  doc.setTextColor(15, 27, 56);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4.5);
+  doc.text('A TIGER GLOBAL', regBoxX + regBoxW / 2, regBoxY + 9.5, { align: 'center' });
+
+  doc.setTextColor(100, 116, 139);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(3.5);
+  doc.text('WORKFORCE DIVISION', regBoxX + regBoxW / 2, regBoxY + 13, { align: 'center' });
+
+  // Divider
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.line(regBoxX + 2, regBoxY + 15, regBoxX + regBoxW - 2, regBoxY + 15);
+
+  // Card reference & serial
+  doc.setTextColor(71, 85, 105);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(3.6);
+  doc.text('CARD SERIAL:', regBoxX + regBoxW / 2, regBoxY + 18.5, { align: 'center' });
+
+  doc.setTextColor(15, 27, 56);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4.2);
+  doc.text(`IDC-${data.employeeCode}`, regBoxX + regBoxW / 2, regBoxY + 22.5, { align: 'center' });
+
+  // Issuing office
+  doc.setTextColor(71, 85, 105);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(3.4);
+  doc.text('ISSUED AT: NAGPUR, MH', regBoxX + regBoxW / 2, regBoxY + 26.5, { align: 'center' });
+
+  // Status badge pill
+  doc.setFillColor(240, 253, 244);
+  doc.setDrawColor(187, 247, 208);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(regBoxX + 2, regBoxY + 29.5, regBoxW - 4, 4.5, 0.8, 0.8, 'FD');
+
+  doc.setTextColor(22, 101, 52);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(3.6);
+  doc.text('AUTHENTIC PVC CARD', regBoxX + regBoxW / 2, regBoxY + 32.7, { align: 'center' });
+
+  // Bottom Footer Strip
+  doc.setFillColor(15, 27, 56);
+  doc.rect(0.4, 47.5, cardWidth - 0.8, 5.7, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4);
+  doc.text('A TIGER GROUPS — WORKFORCE ONBOARDING & COMPLIANCE DIVISION', cardWidth / 2, 51.2, { align: 'center' });
+
+  // 3. Produce output
+  const pdfBytes = doc.output('arraybuffer');
+  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  const sanitizedCode = (data.employeeCode || 'ATG-EMP').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const sanitizedName = (data.employeeName || 'Candidate').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const fileName = `${sanitizedCode}-${sanitizedName}-ID-Card.pdf`;
+
+  return { blob, pdfBytes: new Uint8Array(pdfBytes), fileName };
 }
 
 /**
- * Generates and permanently saves the Employee ID Card to private Supabase storage
- * and public.generated_files ledger, then audits via activity_logs.
+ * Generates the authentic Employee Identity Card and archives it to private storage.
  */
 export async function generateAndPersistEmployeeIdCard(
   data: EmployeeIdCardData,
   currentAdminId?: string | null
 ): Promise<GeneratedIdCardResult> {
+  // Automatically resolve active Founder/CEO company signature if omitted
+  if (!data.companySignatureUrlOrData && isSupabaseConfigured) {
+    data.companySignatureUrlOrData = await getActiveCompanySignatureDataUrl();
+  }
+
   const { blob, pdfBytes, fileName } = await generateEmployeeIdCardPdf(data);
 
-  // Check version history for this entity
-  let nextVersion = 1;
-  let isRegeneration = false;
-  if (isSupabaseConfigured && (data.joiningFormId || data.applicationId)) {
-    try {
-      let q = supabase
+  let fileId: string | undefined;
+  let storagePath: string | undefined;
+
+  if (isSupabaseConfigured) {
+    // 1. Check existing version count for audit trail
+    let version = 1;
+    if (data.joiningFormId || data.applicationId) {
+      let query = supabase
         .from('generated_files')
         .select('version')
         .eq('file_type', 'ID_CARD_PDF')
-        .order('created_at', { ascending: false })
+        .order('version', { ascending: false })
         .limit(1);
 
       if (data.joiningFormId) {
-        q = q.eq('joining_form_id', data.joiningFormId);
+        query = query.eq('joining_form_id', data.joiningFormId);
       } else if (data.applicationId) {
-        q = q.eq('application_id', data.applicationId);
+        query = query.eq('application_id', data.applicationId);
       }
 
-      const { data: prev } = await q.maybeSingle();
-      if (prev) {
-        isRegeneration = true;
-        nextVersion = (prev.version || 1) + 1;
+      const { data: existingFiles } = await query;
+      if (existingFiles && existingFiles.length > 0) {
+        version = (existingFiles[0].version || 1) + 1;
       }
-    } catch (verErr) {
-      console.warn('[generateAndPersistEmployeeIdCard] Error checking previous version:', verErr);
     }
-  }
 
-  // Persist using existing file persistence architecture with version increment
-  const persistResult = await persistGeneratedDocument({
-    applicationId: data.applicationId || null,
-    joiningFormId: data.joiningFormId || null,
-    fileType: 'ID_CARD_PDF',
-    fileName,
-    blob,
-    version: nextVersion,
-    generatedBy: currentAdminId || null
-  });
+    // 2. Persist to secure storage archive
+    if (data.applicationId || data.joiningFormId) {
+      const persistResult = await persistGeneratedDocument({
+        applicationId: data.applicationId || undefined,
+        joiningFormId: data.joiningFormId || undefined,
+        fileType: 'ID_CARD_PDF',
+        fileName,
+        blob,
+        version
+      });
 
-  // Audit in activity_logs (entity_type = EMPLOYEE)
-  if (data.employeeId) {
+      fileId = persistResult?.fileId;
+      storagePath = persistResult?.storagePath;
+    }
+
+    // 3. Update employee record issued_at timestamp
+    if (data.employeeId) {
+      await supabase
+        .from('employees')
+        .update({ id_card_issued_at: new Date().toISOString() })
+        .eq('id', data.employeeId);
+    }
+
+    // 4. Log governance activity
+    const isRegeneration = version > 1;
     await logActivity({
+      action: isRegeneration ? 'EMPLOYEE_ID_CARD_REGENERATED' : 'EMPLOYEE_ID_CARD_GENERATED',
       entityType: 'EMPLOYEE',
       entityId: data.employeeId,
-      applicationId: data.applicationId || null,
-      action: isRegeneration ? 'EMPLOYEE_ID_CARD_REGENERATED' : 'EMPLOYEE_ID_CARD_GENERATED',
-      description: `${isRegeneration ? 'Regenerated' : 'Generated'} official Employee Identity Card (v${nextVersion}) for ${data.employeeCode} (${data.employeeName})`,
+      applicationId: data.applicationId,
+      description: `Generated authentic 2-sided ID Card for ${data.employeeName} (${data.employeeCode})`,
       metadata: {
-        employeeId: data.employeeId,
         employeeCode: data.employeeCode,
-        fileId: persistResult.fileId || null,
-        storagePath: persistResult.storagePath || null,
-        version: nextVersion,
-        isRegeneration,
-        timestamp: new Date().toISOString()
+        employeeName: data.employeeName,
+        fileName,
+        storagePath,
+        version,
+        generatedBy: currentAdminId || undefined,
+        verificationToken: data.verificationToken || undefined
       }
     });
   }
@@ -282,15 +663,18 @@ export async function generateAndPersistEmployeeIdCard(
     blob,
     pdfBytes,
     fileName,
-    fileId: persistResult.fileId,
-    storagePath: persistResult.storagePath
+    fileId,
+    storagePath
   };
 }
 
 /**
- * Browser-only helper: downloads the Employee ID Card directly to the client's device
+ * Triggers direct browser download of the Employee Identity Card PDF
  */
 export async function triggerIdCardDownload(data: EmployeeIdCardData): Promise<void> {
+  if (!data.companySignatureUrlOrData && isSupabaseConfigured) {
+    data.companySignatureUrlOrData = await getActiveCompanySignatureDataUrl();
+  }
   const { blob, fileName } = await generateEmployeeIdCardPdf(data);
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -298,5 +682,5 @@ export async function triggerIdCardDownload(data: EmployeeIdCardData): Promise<v
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(link.href);
+  setTimeout(() => URL.revokeObjectURL(link.href), 1500);
 }

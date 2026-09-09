@@ -104,6 +104,8 @@ export const AdminEmployeeDetailPage: React.FC = () => {
   const [emergencyContactName, setEmergencyContactName] = useState<string>('');
   const [emergencyContactPhone, setEmergencyContactPhone] = useState<string>('');
   const [emergencyContactRelation, setEmergencyContactRelation] = useState<string>('');
+  const [dob, setDob] = useState<string>('');
+  const [address, setAddress] = useState<string>('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
 
@@ -175,6 +177,15 @@ export const AdminEmployeeDetailPage: React.FC = () => {
 
           if (jf) {
             if (jf.blood_group) setBloodGroup(jf.blood_group);
+            if (jf.date_of_birth) setDob(jf.date_of_birth);
+            if (jf.permanent_address) {
+              const pa = jf.permanent_address as any;
+              if (typeof pa === 'string') {
+                setAddress(pa);
+              } else if (typeof pa === 'object' && pa !== null) {
+                setAddress([pa.address || pa.addressLine1 || pa.line1, pa.city, pa.district, pa.state, pa.pincode || pa.pinCode].filter(Boolean).join(', '));
+              }
+            }
 
             // Emergency contact
             const { data: emList } = await supabase
@@ -883,6 +894,8 @@ export const AdminEmployeeDetailPage: React.FC = () => {
             emergencyContactName={emergencyContactName}
             emergencyContactPhone={emergencyContactPhone}
             emergencyContactRelation={emergencyContactRelation}
+            dob={dob}
+            address={address}
             photoUrl={photoUrl}
             signatureUrl={signatureUrl}
             existingEmployee={employee}
