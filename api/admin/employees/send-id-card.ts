@@ -73,7 +73,7 @@ let _supabaseServer: any = null;
 
 const DEFAULT_SUPABASE_URL = 'https://bhfxqtaesvfsbdckgeka.supabase.co';
 const DEFAULT_SUPABASE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoZnhxdGFlc3Zmc2JkY2tnZXRoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODYxNjg3NSwiZXhwIjoyMTA0MTkyODc1fQ.wgYwkEqnhRs-sdi7YRx_A6nUYuCOhvVwuF54M1HeU-k';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoZnhxdGFlc3Zmc2JkY2tnZWthIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODYxNjg3NSwiZXhwIjoyMTA0MTkyODc1fQ.wgYwkEqnhRs-sdi7YRx_A6nUYuCOhvVwuF54M1HeU-k';
 
 function getSupabaseServer(): any {
   if (!_supabaseServer) {
