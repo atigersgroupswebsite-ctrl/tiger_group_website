@@ -204,7 +204,7 @@ export function paymentApiPlugin(): Plugin {
                 <h2 style="color: #0F1B38;">A TIGER GLOBAL Email Integration Test</h2>
                 <p>This test email confirms that your Resend / Custom SMTP integration is properly configured.</p>
                 <p><strong>Configured Sender:</strong> ${config.defaultFrom}</p>
-                <p><strong>Provider:</strong> ${config.hasApiKey ? 'Resend REST API' : (config.hasSmtp ? 'Resend SMTP' : 'Simulated Delivery')}</p>
+                <p><strong>Provider:</strong> ${config.hasApiKey ? 'Resend REST API' : 'Simulated Delivery'}</p>
                 <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
               </div>`,
               text: `A TIGER GLOBAL Email Integration Test\nSender: ${config.defaultFrom}\nTimestamp: ${new Date().toISOString()}`
