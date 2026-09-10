@@ -71,16 +71,20 @@ function sendResponse(res: VercelRes, statusCode: number, data: any) {
 
 let _supabaseServer: any = null;
 
+const DEFAULT_SUPABASE_URL = 'https://bhfxqtaesvfsbdckgeka.supabase.co';
+const DEFAULT_SUPABASE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoZnhxdGFlc3Zmc2JkY2tnZXRoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODYxNjg3NSwiZXhwIjoyMTA0MTkyODc1fQ.wgYwkEqnhRs-sdi7YRx_A6nUYuCOhvVwuF54M1HeU-k';
+
 function getSupabaseServer(): any {
   if (!_supabaseServer) {
     const supabaseUrl =
       process.env.SUPABASE_URL ||
       process.env.VITE_SUPABASE_URL ||
-      'https://bhfxqtaesvfsbdckgeka.supabase.co';
+      DEFAULT_SUPABASE_URL;
     const supabaseServiceKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
       process.env.VITE_SUPABASE_ANON_KEY ||
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy';
+      DEFAULT_SUPABASE_KEY;
     _supabaseServer = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -96,7 +100,7 @@ async function authenticateRequest(authHeader: string | undefined | null) {
   try {
     const { data: { user }, error } = await getSupabaseServer().auth.getUser(token);
     if (error || !user) {
-      return { authenticated: false as const, error: 'Invalid or expired authentication token' };
+      return { authenticated: false as const, error: error?.message || 'Invalid or expired authentication token' };
     }
     return { authenticated: true as const, user };
   } catch (err: any) {
