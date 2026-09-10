@@ -130,6 +130,14 @@ export const Footer: React.FC = () => {
               <Clock size={18} />
               <span>Office Hours: 11:00 AM – 4:00 PM</span>
             </div>
+
+            <div className="footer-contact-item">
+              <span>GSTIN - 27DIFPA0273P1Z4</span>
+            </div>
+
+            <div className="footer-contact-item">
+              <span>REG. NO. - 106157392603</span>
+            </div>
           </div>
         </div>
 
