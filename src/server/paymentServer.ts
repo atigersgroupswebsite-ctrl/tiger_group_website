@@ -12,8 +12,8 @@
 
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { sendPaymentReceiptEmail } from './paymentEmailService';
-import type { PaymentReceiptData } from '../utils/paymentReceiptGenerator';
+// paymentEmailService/paymentReceiptGenerator imported dynamically inside handlers
+// to prevent jspdf (browser-only) from crashing the Node.js module init.
 
 let _supabaseServer: any = null;
 
@@ -371,24 +371,26 @@ export async function verifyPaymentHandler(
   const verifiedPayment = rpcRes as any;
 
   // 3. Dispatch receipt email asynchronously (email failure does NOT fail payment)
-  const receiptData: PaymentReceiptData = {
-    applicationNumber: verifiedPayment.application_number,
-    paymentReference: verifiedPayment.payment_reference,
-    receiptNumber: verifiedPayment.receipt_number,
-    candidateName: verifiedPayment.candidate_name,
-    candidateEmail: verifiedPayment.candidate_email,
-    paymentPurpose: verifiedPayment.purpose,
-    amount: verifiedPayment.amount,
-    currency: verifiedPayment.currency,
-    paymentDate: verifiedPayment.paid_at,
-    paymentStatus: 'SUCCESS',
-    paymentMethod: 'ONLINE / RAZORPAY',
-    gateway: 'RAZORPAY',
-    gatewayOrderId: razorpay_order_id,
-    gatewayPaymentId: razorpay_payment_id
-  };
-
-  sendPaymentReceiptEmail(receiptData).catch((emailErr) => {
+  // Dynamic import keeps jspdf (browser-only) out of the module init scope.
+  import('./paymentEmailService').then(({ sendPaymentReceiptEmail }) => {
+    const receiptData = {
+      applicationNumber: verifiedPayment.application_number,
+      paymentReference: verifiedPayment.payment_reference,
+      receiptNumber: verifiedPayment.receipt_number,
+      candidateName: verifiedPayment.candidate_name,
+      candidateEmail: verifiedPayment.candidate_email,
+      paymentPurpose: verifiedPayment.purpose,
+      amount: verifiedPayment.amount,
+      currency: verifiedPayment.currency,
+      paymentDate: verifiedPayment.paid_at,
+      paymentStatus: 'SUCCESS',
+      paymentMethod: 'ONLINE / RAZORPAY',
+      gateway: 'RAZORPAY',
+      gatewayOrderId: razorpay_order_id,
+      gatewayPaymentId: razorpay_payment_id
+    };
+    return sendPaymentReceiptEmail(receiptData);
+  }).catch((emailErr) => {
     console.warn('[PAYMENT_VERIFY] Asynchronous receipt email error (ignored):', emailErr);
   });
 
@@ -615,7 +617,10 @@ export async function resendReceiptEmailHandler(
   }
 
   const app = payment.applications as any;
-  const receiptData: PaymentReceiptData = {
+  // Dynamic import keeps jspdf (browser-only) out of the module init scope.
+  const { sendPaymentReceiptEmail } = await import('./paymentEmailService');
+
+  const receiptData = {
     applicationNumber: app.application_number,
     paymentReference: payment.payment_reference,
     receiptNumber: payment.receipt_number || payment.payment_reference,
