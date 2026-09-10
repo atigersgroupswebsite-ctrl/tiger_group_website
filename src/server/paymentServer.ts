@@ -11,50 +11,16 @@
 // ==============================================================================
 
 import crypto from 'node:crypto';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServer, authenticateRequest } from './supabaseServer';
 // paymentEmailService/paymentReceiptGenerator imported dynamically inside handlers
 // to prevent jspdf (browser-only) from crashing the Node.js module init.
 
-let _supabaseServer: any = null;
-
-export function getSupabaseServer(): any {
-  if (!_supabaseServer) {
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://bhfxqtaesvfsbdckgeka.supabase.co';
-    const supabaseServiceKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.VITE_SUPABASE_ANON_KEY ||
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy';
-
-    _supabaseServer = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-  }
-  return _supabaseServer;
-}
 
 export const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TigerGlobal2026';
 export const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'test_secret_TigerGlobal2026';
 export const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || 'test_webhook_TigerGlobal2026';
 
-/**
- * Validates candidate or admin authorization from the incoming authorization header.
- */
-export async function authenticateRequest(authHeader: string | undefined | null) {
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { authenticated: false, error: 'Missing or malformed Authorization header' };
-  }
-
-  const token = authHeader.replace('Bearer ', '').trim();
-  try {
-    const { data: { user }, error } = await getSupabaseServer().auth.getUser(token);
-    if (error || !user) {
-      return { authenticated: false, error: 'Invalid or expired authentication token' };
-    }
-    return { authenticated: true, user };
-  } catch (err: any) {
-    return { authenticated: false, error: err.message || 'Authentication error' };
-  }
-}
+export { getSupabaseServer, authenticateRequest };
 
 /**
  * Handler: GET /api/payments/config?appId=...

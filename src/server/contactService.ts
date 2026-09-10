@@ -5,7 +5,7 @@
 // Features: Server validation, persistent audit / notification, and Resend email dispatch
 // ==============================================================================
 
-import { getSupabaseServer } from './paymentServer';
+import { getSupabaseServer } from './supabaseServer';
 import { sendApplicationEmail, getEmailConfig } from './resendClient';
 import { renderContactNotificationTemplate } from './emailTemplates';
 

@@ -9,7 +9,7 @@
 //   - Logs delivery audit trail via activity system (EMPLOYEE_ID_CARD_SENT)
 // ==============================================================================
 
-import { getSupabaseServer, authenticateRequest } from './paymentServer';
+import { getSupabaseServer, authenticateRequest } from './supabaseServer';
 import { sendApplicationEmail } from './resendClient';
 import { renderEmployeeIdCardTemplate } from './emailTemplates';
 
