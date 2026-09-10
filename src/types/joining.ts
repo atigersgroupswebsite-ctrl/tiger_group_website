@@ -156,8 +156,28 @@ export interface JoiningFormData {
   documents: Record<DocumentCategory, UploadedDocument>;
   declarations: DeclarationsInfo;
   customFields?: Record<string, any>;
-  status: 'DRAFT' | 'SUBMITTED';
-  submissionStatus?: 'DRAFT' | 'SUBMITTED';
+  fieldCorrections?: Record<string, any>;
+  candidateAuthUserId?: string;
+  status:
+    | 'DRAFT'
+    | 'IN_PROGRESS'
+    | 'SUBMITTED'
+    | 'UNDER_REVIEW'
+    | 'REUPLOAD_REQUIRED'
+    | 'RESUBMITTED'
+    | 'VERIFIED'
+    | 'APPROVED'
+    | 'REJECTED';
+  submissionStatus?:
+    | 'DRAFT'
+    | 'IN_PROGRESS'
+    | 'SUBMITTED'
+    | 'UNDER_REVIEW'
+    | 'REUPLOAD_REQUIRED'
+    | 'RESUBMITTED'
+    | 'VERIFIED'
+    | 'APPROVED'
+    | 'REJECTED';
   submittedAt?: string;
 }
 

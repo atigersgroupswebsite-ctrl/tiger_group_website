@@ -8,9 +8,9 @@
 //   - Idempotent execution prevents duplicate credit or receipt dispatches
 // ==============================================================================
 
-import type { VercelReq, VercelRes } from '../_utils.ts';
-import { parseRawBody, sendResponse } from '../_utils.ts';
-import { webhookHandler } from '../../src/server/paymentServer.ts';
+import type { VercelReq, VercelRes } from '../_utils';
+import { parseRawBody, sendResponse } from '../_utils';
+import { webhookHandler } from '../../src/server/paymentServer';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   if (req.method !== 'POST') {

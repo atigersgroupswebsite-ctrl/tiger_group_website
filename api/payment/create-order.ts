@@ -9,9 +9,9 @@
 //   - Interacts with Supabase create_or_get_pending_payment RPC
 // ==============================================================================
 
-import type { VercelReq, VercelRes } from '../_utils.ts';
-import { parseBody, sendResponse } from '../_utils.ts';
-import { createPaymentOrderHandler } from '../../src/server/paymentServer.ts';
+import type { VercelReq, VercelRes } from '../_utils';
+import { parseBody, sendResponse } from '../_utils';
+import { createPaymentOrderHandler } from '../../src/server/paymentServer';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   // CORS / Preflight handling

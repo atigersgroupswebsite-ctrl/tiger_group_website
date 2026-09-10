@@ -12,8 +12,8 @@
 
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { sendPaymentReceiptEmail } from './paymentEmailService.ts';
-import type { PaymentReceiptData } from '../utils/paymentReceiptGenerator.ts';
+import { sendPaymentReceiptEmail } from './paymentEmailService';
+import type { PaymentReceiptData } from '../utils/paymentReceiptGenerator';
 
 let _supabaseServer: any = null;
 

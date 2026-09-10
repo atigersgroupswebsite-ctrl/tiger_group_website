@@ -5,9 +5,9 @@
 // Security: Requires active SUPER_ADMIN or COORDINATOR authorization
 // ==============================================================================
 
-import type { VercelReq, VercelRes } from '../../_utils.ts';
-import { parseBody, sendResponse } from '../../_utils.ts';
-import { sendEmployeeIdCardServerHandler } from '../../../src/server/employeeEmailService.ts';
+import type { VercelReq, VercelRes } from '../../_utils';
+import { parseBody, sendResponse } from '../../_utils';
+import { sendEmployeeIdCardServerHandler } from '../../../src/server/employeeEmailService';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   if (req.method === 'OPTIONS') {

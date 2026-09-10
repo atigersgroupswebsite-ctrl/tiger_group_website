@@ -45,7 +45,11 @@ export type JoiningSubmissionStatus =
   | 'DRAFT'
   | 'IN_PROGRESS'
   | 'SUBMITTED'
+  | 'UNDER_REVIEW'
+  | 'REUPLOAD_REQUIRED'
+  | 'RESUBMITTED'
   | 'VERIFIED'
+  | 'APPROVED'
   | 'REJECTED';
 
 export type DocumentType =
@@ -104,6 +108,34 @@ export type NotificationType =
 export interface Database {
   public: {
     Tables: {
+      candidate_profiles: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string | null;
+          phone: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          email: string;
+          full_name?: string | null;
+          phone?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          full_name?: string | null;
+          phone?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
       applications: {
         Row: {
           id: string;
@@ -358,6 +390,8 @@ export interface Database {
           candidate_signature_path: string | null;
           photo_path: string | null;
           father_name: string | null;
+          candidate_auth_user_id: string | null;
+          field_corrections: Record<string, any>;
           custom_fields: Record<string, any>;
           submission_status: JoiningSubmissionStatus;
           submitted_at: string | null;
@@ -368,6 +402,8 @@ export interface Database {
           id?: string;
           application_id?: string | null;
           user_id?: string | null;
+          candidate_auth_user_id?: string | null;
+          field_corrections?: Record<string, any>;
           candidate_name?: string | null;
           joining_reference?: string | null;
           company_id?: string | null;
@@ -425,6 +461,8 @@ export interface Database {
           id?: string;
           application_id?: string | null;
           user_id?: string | null;
+          candidate_auth_user_id?: string | null;
+          field_corrections?: Record<string, any>;
           candidate_name?: string | null;
           joining_reference?: string | null;
           company_id?: string | null;
@@ -647,6 +685,9 @@ export interface Database {
           uploaded_at: string;
           verified_at: string | null;
           verified_by: string | null;
+          rejected_at: string | null;
+          rejected_by: string | null;
+          is_current: boolean;
         };
         Insert: {
           id?: string;
@@ -663,6 +704,9 @@ export interface Database {
           uploaded_at?: string;
           verified_at?: string | null;
           verified_by?: string | null;
+          rejected_at?: string | null;
+          rejected_by?: string | null;
+          is_current?: boolean;
         };
         Update: {
           id?: string;
@@ -679,6 +723,9 @@ export interface Database {
           uploaded_at?: string;
           verified_at?: string | null;
           verified_by?: string | null;
+          rejected_at?: string | null;
+          rejected_by?: string | null;
+          is_current?: boolean;
         };
         Relationships: [];
       };
@@ -1253,6 +1300,26 @@ export interface Database {
           setting?: Json;
           error?: string;
         };
+      };
+      get_candidate_joining_dossiers: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      candidate_reupload_document: {
+        Args: {
+          p_doc_id: string;
+          p_storage_path: string;
+          p_original_file_name: string;
+          p_mime_type: string;
+          p_file_size: number;
+        };
+        Returns: Json;
+      };
+      candidate_resubmit_joining_form: {
+        Args: {
+          p_form_id: string;
+        };
+        Returns: Json;
       };
     };
     Enums: {

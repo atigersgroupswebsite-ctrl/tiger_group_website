@@ -13,6 +13,7 @@ import { FamilyTable } from './FamilyTable';
 import { DocumentUploader } from './DocumentUploader';
 import { DeclarationSection } from './DeclarationSection';
 import { ReviewSection } from './ReviewSection';
+import { supabase } from '../../lib/supabaseClient';
 
 import { INITIAL_JOINING_FORM_DATA, JOINING_STEPS } from '../../data/mockJoiningData';
 import type {
@@ -98,8 +99,8 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
     }
   });
 
-  const candidateEmail = formData.personal?.emailId?.trim();
-  const [emailEntered, setEmailEntered] = useState<boolean>(() => Boolean(candidateEmail));
+  const [candidateAuthUser, setCandidateAuthUser] = useState<any>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
 
   // Single authoritative source of truth for submission state
   const isSubmitted = formData.status === 'SUBMITTED' || formData.submissionStatus === 'SUBMITTED';
@@ -138,27 +139,41 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
   const [configMap, setConfigMap] = useState<Record<string, JoiningFieldConfig>>({});
 
   const handleEmailContinue = (email: string) => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setCandidateAuthUser(user);
+      }
+    });
     setFormData((prev) => ({
       ...prev,
       personal: { ...prev.personal, emailId: email },
       userEmail: email
     }));
-    setEmailEntered(true);
     window.scrollTo({ top: 120, behavior: 'smooth' });
   };
 
-  const handleReset = () => {
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('Sign out notice:', e);
+    }
+    setCandidateAuthUser(null);
+  };
+
+  const handleReset = async () => {
     try {
       localStorage.removeItem(DRAFT_STORAGE_KEY);
       localStorage.removeItem('ATG_JOINING_UPLOAD_SESSION');
+      await supabase.auth.signOut();
     } catch (e) {
       console.warn('Draft cleanup notice:', e);
     }
+    setCandidateAuthUser(null);
     setFormData(INITIAL_JOINING_FORM_DATA);
     setCurrentStep(1);
     setCompletedSteps([1]);
     setShowSuccessScreen(false);
-    setEmailEntered(false);
     window.scrollTo({ top: 120, behavior: 'smooth' });
   };
 
@@ -178,6 +193,42 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
       }
     };
     loadFieldConfigs();
+
+    // Check if candidate already has an active authenticated session
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!isMounted) return;
+      if (user?.email) {
+        setCandidateAuthUser(user);
+        setFormData((prev) => ({
+          ...prev,
+          personal: {
+            ...prev.personal,
+            emailId: prev.personal?.emailId || user.email!
+          },
+          userEmail: prev.userEmail || user.email!
+        }));
+      } else {
+        setCandidateAuthUser(null);
+      }
+      setIsCheckingAuth(false);
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+      if (session?.user?.email) {
+        setCandidateAuthUser(session.user);
+        setFormData((prev) => ({
+          ...prev,
+          personal: {
+            ...prev.personal,
+            emailId: prev.personal?.emailId || session.user.email!
+          },
+          userEmail: prev.userEmail || session.user.email!
+        }));
+      } else {
+        setCandidateAuthUser(null);
+      }
+    });
 
     const loadRemoteDossier = async () => {
       if (!applicationId) {
@@ -264,6 +315,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
 
     return () => {
       isMounted = false;
+      authListener?.subscription.unsubscribe();
     };
   }, [applicationId]);
 
@@ -795,8 +847,23 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
     );
   }
 
-  // Public Email Entry Gate: Candidate enters email first before filling form
-  if (!emailEntered && !isSubmitted) {
+  // Check auth state: if auth check in progress, show session loading
+  if (isCheckingAuth) {
+    return (
+      <div style={{ textAlign: 'center', padding: '4rem 1rem', background: '#ffffff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
+        <Loader2 size={36} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-midnight-navy)', margin: '0 auto 1.25rem auto' }} />
+        <h3 style={{ color: 'var(--color-midnight-navy)', fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+          CHECKING CANDIDATE ACCESS
+        </h3>
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', margin: 0 }}>
+          Verifying secure candidate account credentials...
+        </p>
+      </div>
+    );
+  }
+
+  // Candidate Account Creation Gate: Candidate MUST have an active Supabase Auth account
+  if (!candidateAuthUser && !isSubmitted) {
     return (
       <CandidateEmailEntry
         initialEmail={formData.personal?.emailId || ''}
@@ -810,6 +877,52 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
 
   return (
     <div className="joining-layout">
+      {candidateAuthUser && (
+        <div style={{
+          gridColumn: '1 / -1',
+          marginBottom: '1rem',
+          padding: '0.65rem 1.25rem',
+          backgroundColor: '#F8FAFC',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+          fontSize: '0.8125rem'
+        }}>
+          <span style={{ color: 'var(--color-midnight-navy)', fontWeight: 600 }}>
+            Candidate Session: <strong>{candidateAuthUser.email}</strong>
+          </span>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <a
+              href="/joining/portal"
+              style={{
+                color: 'var(--color-midnight-navy)',
+                fontWeight: 700,
+                textDecoration: 'underline'
+              }}
+            >
+              My Joining Dossier(s) &rarr;
+            </a>
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#DC2626',
+                cursor: 'pointer',
+                fontWeight: 600,
+                padding: 0
+              }}
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
       {/* Step Progress Bar & Sidebar */}
       <FormProgress
         currentStep={currentStep}

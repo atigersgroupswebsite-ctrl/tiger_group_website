@@ -148,6 +148,24 @@ export async function createJobSeekerApplication(
       };
     }
 
+    // Asynchronously trigger Resend email notification
+    try {
+      fetch('/api/enquiries/notify-job-seeker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationNumber: data.application_number,
+          fullName: trimmedName,
+          email: trimmedEmail,
+          mobile: mobileNorm.normalized,
+          desiredCompany: trimmedCompany,
+          designation: trimmedDesignation
+        })
+      }).catch((e) => console.warn('[createJobSeekerApplication] Email notification notice:', e));
+    } catch {
+      // Non-blocking
+    }
+
     return {
       success: true,
       applicationId: data.id,
@@ -255,6 +273,24 @@ export async function createEmployerEnquiry(
         success: false,
         error: 'Employer enquiry was submitted but failed to return confirmation ID.'
       };
+    }
+
+    // Asynchronously trigger Resend email notification
+    try {
+      fetch('/api/enquiries/notify-employer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enquiryNumber: data.enquiry_number || 'EMP-ENQUIRY',
+          companyName: trimmedCompany,
+          email: trimmedEmail,
+          phone: phoneNorm.normalized,
+          jobRole: trimmedRole,
+          employeesRequired
+        })
+      }).catch((e) => console.warn('[createEmployerEnquiry] Email notification notice:', e));
+    } catch {
+      // Non-blocking
     }
 
     return {

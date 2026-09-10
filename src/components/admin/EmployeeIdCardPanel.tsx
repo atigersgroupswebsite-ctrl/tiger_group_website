@@ -336,11 +336,13 @@ export const EmployeeIdCardPanel: React.FC<EmployeeIdCardPanelProps> = ({
         throw new Error(res.error || 'Failed to send ID card email.');
       }
 
+      if (res.simulated) {
+        throw new Error('Email was not sent: RESEND_API_KEY is not configured in the server environment.');
+      }
+
       setStatusMessage({
         type: 'success',
-        text: res.simulated
-          ? `ID Card email delivery simulated to ${employee.email} (SMTP not configured in local environment). Activity logged.`
-          : `Official Employee ID Card successfully dispatched to ${employee.email}. Activity logged.`
+        text: `Official Employee ID Card successfully dispatched to ${employee.email}. Activity logged.`
       });
 
       // Refresh latest file record

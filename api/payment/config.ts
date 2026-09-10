@@ -5,9 +5,9 @@
 // Brand: A TIGER GROUPS — A TIGER GLOBAL Career Solution & Consultancy
 // ==============================================================================
 
-import type { VercelReq, VercelRes } from '../_utils.ts';
-import { sendResponse } from '../_utils.ts';
-import { getPaymentConfigHandler } from '../../src/server/paymentServer.ts';
+import type { VercelReq, VercelRes } from '../_utils';
+import { sendResponse } from '../_utils';
+import { getPaymentConfigHandler } from '../../src/server/paymentServer';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   // CORS / Preflight handling

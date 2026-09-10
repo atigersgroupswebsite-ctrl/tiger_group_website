@@ -7,6 +7,8 @@ import { ScrollReveal } from '../components/common/ScrollReveal';
 
 export const Contact: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -20,9 +22,32 @@ export const Contact: React.FC = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    if (loading) return;
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch('/api/contact/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        setErrorMessage(json.error || 'Failed to submit contact message. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      setSubmitted(true);
+      setLoading(false);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Network error submitting inquiry.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -244,8 +269,29 @@ export const Contact: React.FC = () => {
                       onChange={handleChange}
                     />
 
-                    <Button type="submit" variant="primary" size="lg" style={{ width: '100%' }} icon={<Send size={16} />}>
-                      SEND MESSAGE
+                    {errorMessage && (
+                      <div style={{
+                        padding: '10px 14px',
+                        backgroundColor: '#FEF2F2',
+                        border: '1px solid #F87171',
+                        borderRadius: 'var(--radius-md)',
+                        color: '#991B1B',
+                        fontSize: 'var(--text-sm)',
+                        marginBottom: 'var(--space-4)'
+                      }}>
+                        {errorMessage}
+                      </div>
+                    )}
+
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="lg"
+                      style={{ width: '100%' }}
+                      disabled={loading}
+                      icon={<Send size={16} />}
+                    >
+                      {loading ? 'SENDING INQUIRY...' : 'SEND MESSAGE'}
                     </Button>
                   </form>
                 )}

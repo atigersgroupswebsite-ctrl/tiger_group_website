@@ -8,8 +8,8 @@
 //   - Audits delivery in activity_logs
 // ==============================================================================
 
-import nodemailer from 'nodemailer';
-import { getPaymentReceiptPdfBuffer, type PaymentReceiptData } from '../utils/paymentReceiptGenerator.ts';
+import { sendApplicationEmail } from './resendClient';
+import { getPaymentReceiptPdfBuffer, type PaymentReceiptData } from '../utils/paymentReceiptGenerator';
 
 export interface SendReceiptEmailResult {
   success: boolean;
@@ -24,37 +24,10 @@ export interface SendReceiptEmailResult {
 export async function sendPaymentReceiptEmail(
   receiptData: PaymentReceiptData
 ): Promise<SendReceiptEmailResult> {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const from = process.env.SMTP_FROM || '"A Tiger Global" <no-reply@atigergroup.com>';
+  const pdfBuffer = getPaymentReceiptPdfBuffer(receiptData);
+  const pdfFilename = `${receiptData.receiptNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}_Payment_Receipt.pdf`;
 
-  // If SMTP is not configured in current environment, simulate email dispatch safely
-  if (!host || !user || !pass) {
-    console.log(
-      `[PAYMENT_EMAIL] SMTP credentials not configured. Simulating delivery to ${receiptData.candidateEmail} for ${receiptData.receiptNumber}.`
-    );
-    return {
-      success: true,
-      simulated: true,
-      messageId: `simulated-${Date.now()}@atigergroup.local`
-    };
-  }
-
-  try {
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false }
-    });
-
-    const pdfBuffer = getPaymentReceiptPdfBuffer(receiptData);
-    const pdfFilename = `${receiptData.receiptNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}_Payment_Receipt.pdf`;
-
-    const htmlContent = `
+  const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6;">
         <div style="background-color: #192a56; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
           <h2 style="color: #ffffff; margin: 0; font-size: 20px; letter-spacing: 0.5px;">A TIGER GLOBAL</h2>
@@ -102,8 +75,8 @@ export async function sendPaymentReceiptEmail(
       </div>
     `;
 
-    const info = await transporter.sendMail({
-      from,
+  try {
+    const dispatchRes = await sendApplicationEmail({
       to: receiptData.candidateEmail,
       subject: `A Tiger Global — Payment Receipt | ${receiptData.applicationNumber}`,
       html: htmlContent,
@@ -116,13 +89,21 @@ export async function sendPaymentReceiptEmail(
       ]
     });
 
-    console.log(`[PAYMENT_EMAIL] Receipt sent to ${receiptData.candidateEmail}, messageId: ${info.messageId}`);
-    return { success: true, messageId: info.messageId };
+    if (!dispatchRes.success) {
+      return { success: false, error: dispatchRes.error || 'Failed to dispatch payment receipt email.' };
+    }
+
+    return {
+      success: true,
+      messageId: dispatchRes.messageId,
+      simulated: dispatchRes.simulated
+    };
   } catch (err: any) {
     console.error('[PAYMENT_EMAIL] Delivery failed:', err);
     return {
       success: false,
-      error: err.message || 'SMTP delivery failed'
+      error: err.message || 'Email delivery failed'
     };
   }
 }
+

@@ -285,9 +285,14 @@ export async function rejectCandidateDocument(
       success?: boolean;
       error?: string;
       document_id?: string;
+      document_label?: string;
       verification_status?: string;
       rejection_reason?: string;
       rejected_at?: string;
+      joining_form_id?: string;
+      joining_reference?: string;
+      candidate_name?: string;
+      candidate_email?: string;
     };
     if (!res?.success) {
       return { success: false, error: res?.error || 'Rejection failed.' };
@@ -302,6 +307,28 @@ export async function rejectCandidateDocument(
         .eq('metadata->>document_id', docId);
     } catch {
       // Non-critical audit attribution
+    }
+
+    // Asynchronously dispatch document rejection action email to candidate
+    if (res.candidate_email) {
+      try {
+        fetch('/api/joining/send-rejection-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            candidateName: res.candidate_name || 'Candidate',
+            candidateEmail: res.candidate_email,
+            joiningReference: res.joining_reference || 'JOIN-REFERENCE',
+            documentLabel: res.document_label || 'Submitted Document',
+            rejectionReason: res.rejection_reason || trimmed,
+            loginUrl: `${window.location.origin}/joining/login`
+          })
+        }).catch((emailErr) => {
+          console.warn('[EMAIL_DISPATCH_NOTICE] Non-blocking rejection email error:', emailErr);
+        });
+      } catch (e) {
+        console.warn('[EMAIL_DISPATCH_NOTICE] Failed to initiate rejection email request:', e);
+      }
     }
 
     return {

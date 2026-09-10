@@ -3,14 +3,15 @@
 // Description: Server-side email delivery service for Employee Identity Cards
 // Brand: A TIGER GROUPS — A TIGER GLOBAL Career Solution & Consultancy
 // Security:
-//   - Private SMTP credentials remain strictly server-side (process.env.SMTP_*)
+//   - Dispatches via Resend API with SMTP fallback
 //   - Never exposes secrets in VITE_* or client bundles
 //   - Uses authoritative employee.email (no arbitrary recipient spoofing)
 //   - Logs delivery audit trail via activity system (EMPLOYEE_ID_CARD_SENT)
 // ==============================================================================
 
-import nodemailer from 'nodemailer';
-import { getSupabaseServer, authenticateRequest } from './paymentServer.ts';
+import { getSupabaseServer, authenticateRequest } from './paymentServer';
+import { sendApplicationEmail } from './resendClient';
+import { renderEmployeeIdCardTemplate } from './emailTemplates';
 
 export interface SendEmployeeIdCardEmailPayload {
   employeeId: string;
@@ -29,6 +30,7 @@ export interface SendIdCardEmailResult {
   success: boolean;
   messageId?: string;
   simulated?: boolean;
+  provider?: string;
   error?: string;
 }
 
@@ -42,7 +44,7 @@ function isValidEmail(email: string): boolean {
 
 /**
  * Server-side function to send the Employee Identity Card as a PDF attachment.
- * Uses real SMTP credentials. Never fakes success.
+ * Uses Resend API with SMTP fallback. Never fakes success.
  */
 export async function sendEmployeeIdCardEmail(
   payload: SendEmployeeIdCardEmailPayload
@@ -55,137 +57,72 @@ export async function sendEmployeeIdCardEmail(
     };
   }
 
-  const host = typeof process !== 'undefined' ? process.env?.SMTP_HOST : undefined;
-  const port = typeof process !== 'undefined' ? Number(process.env?.SMTP_PORT || 587) : 587;
-  const user = typeof process !== 'undefined' ? process.env?.SMTP_USER : undefined;
-  const pass = typeof process !== 'undefined' ? process.env?.SMTP_PASS : undefined;
-  const from = typeof process !== 'undefined' ? (process.env?.SMTP_FROM || '"A Tiger Global" <hr@atigergroup.com>') : '"A Tiger Global" <hr@atigergroup.com>';
+  // Format clean, employee-specific filename e.g. ATG-7566-Shoaib-Sheikh-ID-Card.pdf
+  const safeName = (payload.candidateName || 'Employee').replace(/[^a-zA-Z0-9]/g, '-');
+  const safeCode = (payload.employeeCode || 'ATG-EMP').replace(/[^a-zA-Z0-9]/g, '-');
+  const attachmentFilename = `${safeCode}-${safeName}-ID-Card.pdf`;
 
-  const subject = `Your Employee Identity Card — ${payload.employeeCode} | A TIGER GLOBAL`;
-  const attachmentFilename = `ID_Card_${payload.employeeCode.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+  // Render template
+  const template = renderEmployeeIdCardTemplate({
+    candidateName: payload.candidateName,
+    employeeCode: payload.employeeCode,
+    designation: payload.designation,
+    department: payload.department,
+    location: payload.location
+  });
 
-  // 2. Validate SMTP configuration
-  if (!host || !user || !pass) {
-    const errorMsg = 'SMTP credentials (SMTP_HOST / SMTP_USER / SMTP_PASS) are not configured on the server. Email delivery could not be completed.';
-    console.warn(`[EMPLOYEE_ID_CARD_EMAIL] ${errorMsg}`);
+  // 2. Dispatch via unified Resend Client
+  const dispatchRes = await sendApplicationEmail({
+    to: payload.recipientEmail.trim(),
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+    attachments: [
+      {
+        filename: attachmentFilename,
+        content: Buffer.from(payload.pdfBuffer),
+        contentType: 'application/pdf'
+      }
+    ]
+  });
+
+  if (!dispatchRes.success) {
     return {
       success: false,
-      error: errorMsg
+      error: dispatchRes.error || 'Failed to dispatch ID Card email via Resend.'
     };
   }
 
-  // 3. Real SMTP Dispatch
+  // 3. Audit Log in public.activity_logs
+  const supabase = getSupabaseServer();
   try {
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false }
+    await supabase.from('activity_logs').insert({
+      admin_user_id: payload.adminUserId || null,
+      entity_type: 'EMPLOYEE',
+      entity_id: payload.employeeId,
+      action: 'EMPLOYEE_ID_CARD_SENT',
+      description: `Dispatched Employee Identity Card to ${payload.recipientEmail}`,
+      metadata: {
+        employeeId: payload.employeeId,
+        recipientEmail: payload.recipientEmail,
+        employeeCode: payload.employeeCode,
+        fileId: payload.fileId || null,
+        messageId: dispatchRes.messageId,
+        provider: dispatchRes.provider,
+        simulated: dispatchRes.simulated || false,
+        timestamp: new Date().toISOString()
+      }
     });
-
-    const htmlBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6;">
-        <div style="background-color: #0F1B38; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-          <h2 style="color: #ffffff; margin: 0; font-size: 20px; letter-spacing: 0.5px;">A TIGER GLOBAL</h2>
-          <p style="color: #c5a059; margin: 5px 0 0; font-size: 12px; font-weight: bold; text-transform: uppercase;">
-            Career Solution & Consultancy
-          </p>
-        </div>
-        <div style="padding: 24px; border: 1px solid #e2e8f0; border-top: none; background: #ffffff;">
-          <h3 style="color: #0F1B38; margin-top: 0;">Official Employee Identity Card</h3>
-          <p>Dear <strong>${payload.candidateName}</strong>,</p>
-          <p>
-            Congratulations on your onboarding. Please find attached your official <strong>Employee Identity Card</strong> issued under A TIGER GLOBAL Career Solution & Consultancy.
-          </p>
-
-          <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; background-color: #F8FAFC; border-radius: 6px; overflow: hidden;">
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 10px 14px; color: #64748b;">Employee Name:</td>
-              <td style="padding: 10px 14px; font-weight: bold; text-align: right; color: #0F1B38;">${payload.candidateName}</td>
-            </tr>
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 10px 14px; color: #64748b;">Employee Code:</td>
-              <td style="padding: 10px 14px; font-weight: bold; text-align: right; color: #0F1B38; font-family: monospace;">${payload.employeeCode}</td>
-            </tr>
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 10px 14px; color: #64748b;">Designation:</td>
-              <td style="padding: 10px 14px; text-align: right; color: #0F1B38;">${payload.designation || 'Associate'}</td>
-            </tr>
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 10px 14px; color: #64748b;">Department:</td>
-              <td style="padding: 10px 14px; text-align: right; color: #0F1B38;">${payload.department || 'Operations'}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 14px; color: #64748b;">Location:</td>
-              <td style="padding: 10px 14px; text-align: right; color: #0F1B38;">${payload.location || 'Nagpur, Maharashtra'}</td>
-            </tr>
-          </table>
-
-          <p style="font-size: 13px; color: #475569;">
-            You may print or retain this digital document for work authorization and corporate identification purposes.
-          </p>
-
-          <p style="margin-top: 24px; margin-bottom: 0;">
-            Warm regards,<br>
-            <strong>Human Resources & Administration</strong><br>
-            A TIGER GLOBAL Career Solution & Consultancy
-          </p>
-        </div>
-        <div style="background-color: #f8fafc; padding: 12px; text-align: center; font-size: 11px; color: #94a3b8; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
-          This is an official administrative correspondence. Please do not reply directly to this email.
-        </div>
-      </div>
-    `;
-
-    const info = await transporter.sendMail({
-      from,
-      to: payload.recipientEmail,
-      subject,
-      html: htmlBody,
-      attachments: [
-        {
-          filename: attachmentFilename,
-          content: Buffer.from(payload.pdfBuffer),
-          contentType: 'application/pdf'
-        }
-      ]
-    });
-
-    // 4. Audit Log (EMPLOYEE_ID_CARD_SENT) - Only after real delivery succeeds
-    const supabase = getSupabaseServer();
-    try {
-      await supabase.from('activity_logs').insert({
-        admin_user_id: payload.adminUserId || null,
-        entity_type: 'EMPLOYEE',
-        entity_id: payload.employeeId,
-        action: 'EMPLOYEE_ID_CARD_SENT',
-        description: `Dispatched Employee Identity Card to ${payload.recipientEmail}`,
-        metadata: {
-          employeeId: payload.employeeId,
-          recipientEmail: payload.recipientEmail,
-          employeeCode: payload.employeeCode,
-          fileId: payload.fileId || null,
-          messageId: info.messageId,
-          timestamp: new Date().toISOString()
-        }
-      });
-    } catch (logErr) {
-      console.warn('[sendEmployeeIdCardEmail] Activity log error:', logErr);
-    }
-
-    return {
-      success: true,
-      messageId: info.messageId,
-      simulated: false
-    };
-  } catch (err: any) {
-    console.error('[sendEmployeeIdCardEmail] Delivery failed:', err);
-    return {
-      success: false,
-      error: err?.message || 'Failed to dispatch email via SMTP server.'
-    };
+  } catch (logErr: any) {
+    console.warn('[sendEmployeeIdCardEmail] Activity log insertion error:', logErr.message);
   }
+
+  return {
+    success: true,
+    messageId: dispatchRes.messageId,
+    simulated: dispatchRes.simulated,
+    provider: dispatchRes.provider
+  };
 }
 
 /**
@@ -256,7 +193,7 @@ export async function sendEmployeeIdCardServerHandler(
     .from('generated_files')
     .select('*')
     .eq('file_type', 'ID_CARD_PDF')
-    .order('created_at', { ascending: false })
+    .order('generated_at', { ascending: false })
     .limit(1);
 
   if (employee.joining_form_id) {
@@ -305,7 +242,7 @@ export async function sendEmployeeIdCardServerHandler(
 
   const pdfBuffer = Buffer.from(await blob.arrayBuffer());
 
-  // 6. Send Email using server-side Nodemailer
+  // 6. Send Email using server-side Resend Client
   const sendRes = await sendEmployeeIdCardEmail({
     employeeId: employee.id,
     recipientEmail: employee.email, // Authoritative!
@@ -324,7 +261,7 @@ export async function sendEmployeeIdCardServerHandler(
       status: 500,
       data: {
         success: false,
-        error: sendRes.error || 'Failed to dispatch email through SMTP server.'
+        error: sendRes.error || 'Failed to dispatch email through email service.'
       }
     };
   }

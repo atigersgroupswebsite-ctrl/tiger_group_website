@@ -9,9 +9,9 @@
 //   - Atomic completion via Supabase complete_verified_payment RPC
 // ==============================================================================
 
-import type { VercelReq, VercelRes } from '../_utils.ts';
-import { parseBody, sendResponse } from '../_utils.ts';
-import { verifyPaymentHandler } from '../../src/server/paymentServer.ts';
+import type { VercelReq, VercelRes } from '../_utils';
+import { parseBody, sendResponse } from '../_utils';
+import { verifyPaymentHandler } from '../../src/server/paymentServer';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   // CORS / Preflight handling

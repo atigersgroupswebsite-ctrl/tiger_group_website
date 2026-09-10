@@ -43,7 +43,7 @@ export function paymentApiPlugin(): Plugin {
               listAdminUsersHandler,
               inviteAdminUserHandler,
               toggleAdminStatusHandler
-            } = await import('./adminServer.ts');
+            } = await import('./adminServer');
 
             if (url === '/api/admin/users' && method === 'GET') {
               const result = await listAdminUsersHandler(authHeader);
@@ -77,7 +77,7 @@ export function paymentApiPlugin(): Plugin {
           try {
             const rawBody = await parseRequestBody(req);
             const body = JSON.parse(rawBody || '{}');
-            const { sendEmployeeIdCardServerHandler } = await import('./employeeEmailService.ts');
+            const { sendEmployeeIdCardServerHandler } = await import('./employeeEmailService');
             const result = await sendEmployeeIdCardServerHandler(body, authHeader);
             return sendJsonResponse(res, result.status || 200, result.data);
           } catch (empErr: any) {
@@ -86,17 +86,134 @@ export function paymentApiPlugin(): Plugin {
           }
         }
 
+        // Handle Candidate Account Creation via Supabase Auth Admin
+        if (url === '/api/candidate/register' && req.method?.toUpperCase() === 'POST') {
+          try {
+            const rawBody = await parseRequestBody(req);
+            const body = JSON.parse(rawBody || '{}');
+            const { registerCandidateServerHandler } = await import('./candidateAccountService');
+            const result = await registerCandidateServerHandler(body);
+            return sendJsonResponse(res, result.status || 200, result.data);
+          } catch (candRegErr: any) {
+            console.error('[API_CANDIDATE_REGISTER_ERROR]', candRegErr);
+            return sendJsonResponse(res, 500, { success: false, error: candRegErr.message || 'Failed to create candidate account' });
+          }
+        }
+
         // Handle Public Joining Operations (e.g. Send Confirmation / Receipt Email)
         if (url === '/api/joining/send-receipt' && req.method?.toUpperCase() === 'POST') {
           try {
             const rawBody = await parseRequestBody(req);
             const body = JSON.parse(rawBody || '{}');
-            const { sendJoiningReceiptServerHandler } = await import('./joiningEmailService.ts');
+            const { sendJoiningReceiptServerHandler } = await import('./joiningEmailService');
             const result = await sendJoiningReceiptServerHandler(body);
             return sendJsonResponse(res, result.status || 200, result.data);
           } catch (joinEmailErr: any) {
             console.error('[API_JOINING_SEND_RECEIPT_ERROR]', joinEmailErr);
             return sendJsonResponse(res, 500, { success: false, error: joinEmailErr.message || 'Failed to dispatch joining receipt' });
+          }
+        }
+
+        // Handle Document Rejection Action Email Notification
+        if (url === '/api/joining/send-rejection-email' && req.method?.toUpperCase() === 'POST') {
+          try {
+            const rawBody = await parseRequestBody(req);
+            const body = JSON.parse(rawBody || '{}');
+            const { sendDocumentRejectionEmailServerHandler } = await import('./joiningRejectionEmailService');
+            const result = await sendDocumentRejectionEmailServerHandler(body);
+            return sendJsonResponse(res, result.status || 200, result.data);
+          } catch (rejEmailErr: any) {
+            console.error('[API_JOINING_SEND_REJECTION_EMAIL_ERROR]', rejEmailErr);
+            return sendJsonResponse(res, 500, { success: false, error: rejEmailErr.message || 'Failed to dispatch rejection email' });
+          }
+        }
+
+        // Handle Public Contact Us Submission
+        if (url === '/api/contact/submit' && req.method?.toUpperCase() === 'POST') {
+          try {
+            const rawBody = await parseRequestBody(req);
+            const body = JSON.parse(rawBody || '{}');
+            const { submitContactFormHandler } = await import('./contactService');
+            const result = await submitContactFormHandler(body);
+            return sendJsonResponse(res, result.status || 200, result.data);
+          } catch (contactErr: any) {
+            console.error('[API_CONTACT_SUBMIT_ERROR]', contactErr);
+            return sendJsonResponse(res, 500, { success: false, error: contactErr.message || 'Failed to submit contact message' });
+          }
+        }
+
+        // Handle Job Seeker Enquiry Admin Email Notification
+        if (url === '/api/enquiries/notify-job-seeker' && req.method?.toUpperCase() === 'POST') {
+          try {
+            const rawBody = await parseRequestBody(req);
+            const body = JSON.parse(rawBody || '{}');
+            const { sendJobSeekerEnquiryNotificationServerHandler } = await import('./enquiryNotificationService');
+            const result = await sendJobSeekerEnquiryNotificationServerHandler(body);
+            return sendJsonResponse(res, result.status || 200, result.data);
+          } catch (notifErr: any) {
+            console.error('[API_ENQUIRY_JOB_SEEKER_ERROR]', notifErr);
+            return sendJsonResponse(res, 500, { success: false, error: notifErr.message || 'Failed to dispatch enquiry notification' });
+          }
+        }
+
+        // Handle Employer Enquiry Admin Email Notification
+        if (url === '/api/enquiries/notify-employer' && req.method?.toUpperCase() === 'POST') {
+          try {
+            const rawBody = await parseRequestBody(req);
+            const body = JSON.parse(rawBody || '{}');
+            const { sendEmployerEnquiryNotificationServerHandler } = await import('./enquiryNotificationService');
+            const result = await sendEmployerEnquiryNotificationServerHandler(body);
+            return sendJsonResponse(res, result.status || 200, result.data);
+          } catch (notifErr: any) {
+            console.error('[API_ENQUIRY_EMPLOYER_ERROR]', notifErr);
+            return sendJsonResponse(res, 500, { success: false, error: notifErr.message || 'Failed to dispatch employer notification' });
+          }
+        }
+
+        // Handle Privileged Admin Email Send Test
+        if (url === '/api/admin/email/send-test' && req.method?.toUpperCase() === 'POST') {
+          const authHeader = req.headers['authorization'];
+          try {
+            const rawBody = await parseRequestBody(req);
+            const body = JSON.parse(rawBody || '{}');
+            const { authenticateRequest, getSupabaseServer } = await import('./paymentServer');
+            const auth = await authenticateRequest(authHeader);
+            if (!auth.authenticated || !auth.user) {
+              return sendJsonResponse(res, 401, { success: false, error: 'Unauthorized: Admin authentication required' });
+            }
+
+            const supabase = getSupabaseServer();
+            const { data: adminProfile } = await supabase
+              .from('admin_profiles')
+              .select('id, role, active')
+              .eq('id', auth.user.id)
+              .maybeSingle();
+
+            if (!adminProfile || !adminProfile.active || adminProfile.role !== 'SUPER_ADMIN') {
+              return sendJsonResponse(res, 403, { success: false, error: 'Forbidden: Only active SUPER_ADMIN can trigger test emails' });
+            }
+
+            const { sendApplicationEmail, getEmailConfig } = await import('./resendClient');
+            const config = getEmailConfig();
+            const recipient = body.recipientEmail?.trim() || auth.user.email;
+
+            const sendRes = await sendApplicationEmail({
+              to: recipient,
+              subject: `[TEST] A TIGER GLOBAL Resend Integration Test (${new Date().toLocaleTimeString()})`,
+              html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b;">
+                <h2 style="color: #0F1B38;">A TIGER GLOBAL Email Integration Test</h2>
+                <p>This test email confirms that your Resend / Custom SMTP integration is properly configured.</p>
+                <p><strong>Configured Sender:</strong> ${config.defaultFrom}</p>
+                <p><strong>Provider:</strong> ${config.hasApiKey ? 'Resend REST API' : (config.hasSmtp ? 'Resend SMTP' : 'Simulated Delivery')}</p>
+                <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
+              </div>`,
+              text: `A TIGER GLOBAL Email Integration Test\nSender: ${config.defaultFrom}\nTimestamp: ${new Date().toISOString()}`
+            });
+
+            return sendJsonResponse(res, sendRes.success ? 200 : 500, sendRes);
+          } catch (testErr: any) {
+            console.error('[API_ADMIN_TEST_EMAIL_ERROR]', testErr);
+            return sendJsonResponse(res, 500, { success: false, error: testErr.message || 'Failed to dispatch test email' });
           }
         }
 
@@ -118,7 +235,7 @@ export function paymentApiPlugin(): Plugin {
             webhookHandler,
             recordOfflinePaymentHandler,
             resendReceiptEmailHandler
-          } = await import('./paymentServer.ts');
+          } = await import('./paymentServer');
 
           // 1. GET /api/payment/config?appId=...
           if (normalizedUrl.startsWith('/api/payment/config') && method === 'GET') {

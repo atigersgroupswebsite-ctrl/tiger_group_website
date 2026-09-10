@@ -413,7 +413,7 @@ export function buildJoiningFormDataFromDb(params: BuildJoiningFormDataParams): 
     };
   }
 
-  const resolvedStatus = (formRecord?.submission_status === 'SUBMITTED' ? 'SUBMITTED' : 'DRAFT') as 'DRAFT' | 'SUBMITTED';
+  const resolvedStatus = (formRecord?.submission_status || 'DRAFT') as any;
   const candidateName = formRecord?.candidate_name || applicationRecord?.full_name || '';
   const candidateEmail = formRecord?.email || applicationRecord?.email || '';
 
@@ -422,6 +422,8 @@ export function buildJoiningFormDataFromDb(params: BuildJoiningFormDataParams): 
     formId: formRecord?.id || undefined,
     joiningReference: formRecord?.joining_reference || (applicationRecord ? `APP-${applicationRecord.application_number}` : 'JOIN-PENDING'),
     userEmail: candidateEmail,
+    candidateAuthUserId: formRecord?.candidate_auth_user_id || formRecord?.user_id || undefined,
+    fieldCorrections: formRecord?.field_corrections || {},
     currentStep: resolvedStatus === 'SUBMITTED' ? 8 : 1,
     status: resolvedStatus,
     submissionStatus: resolvedStatus,
@@ -987,3 +989,203 @@ export async function removeCandidateDocument(
     return { success: false, error: err.message || 'Document removal failed.' };
   }
 }
+
+/**
+ * Registers a new candidate account using the server endpoint (Supabase Auth Admin)
+ * and immediately authenticates the candidate session.
+ */
+export async function registerCandidateAccount(payload: {
+  email: string;
+  password: string;
+  fullName?: string;
+  phone?: string;
+}): Promise<{ success: boolean; userId?: string; code?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/candidate/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        code: data.code || 'REGISTRATION_FAILED',
+        error: data.error || 'Failed to create candidate account.'
+      };
+    }
+
+    // Automatically sign in candidate to establish client session
+    const { error: signInErr } = await supabase.auth.signInWithPassword({
+      email: payload.email.trim().toLowerCase(),
+      password: payload.password
+    });
+
+    if (signInErr) {
+      return {
+        success: true,
+        userId: data.userId,
+        error: 'Account created. Please log in with your credentials.'
+      };
+    }
+
+    return {
+      success: true,
+      userId: data.userId
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      code: 'NETWORK_ERROR',
+      error: err.message || 'Unable to connect to authentication server.'
+    };
+  }
+}
+
+/**
+ * Retrieves all joining dossiers authorized for the current candidate session.
+ */
+export async function getCandidateJoiningDossiers(): Promise<JoiningServiceResult<any[]>> {
+  if (!isSupabaseConfigured) {
+    return { success: true, data: [] };
+  }
+
+  try {
+    const sessionRes = await getCandidateSession();
+    if (!sessionRes.authenticated) {
+      return { success: false, accessDenied: true, error: 'Authentication required.' };
+    }
+
+    const { data, error } = await supabase.rpc('get_candidate_joining_dossiers');
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: (data as any[]) || [] };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to fetch candidate dossiers.' };
+  }
+}
+
+/**
+ * Controlled document re-upload by candidate.
+ * Strictly allowed only if document status is currently REJECTED.
+ * Preserves old record (is_current = false) and creates new current document.
+ */
+export async function candidateReuploadDocument(
+  docId: string,
+  storagePath: string,
+  fileName: string,
+  mimeType: string,
+  fileSize: number
+): Promise<{ success: boolean; newDocId?: string; error?: string }> {
+  if (!isSupabaseConfigured) {
+    return { success: true, newDocId: 'mock_new_doc' };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('candidate_reupload_document', {
+      p_doc_id: docId,
+      p_storage_path: storagePath,
+      p_original_file_name: fileName,
+      p_mime_type: mimeType,
+      p_file_size: fileSize
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const res = data as { success?: boolean; new_document_id?: string; error?: string };
+    if (!res?.success) {
+      return { success: false, error: res?.error || 'Re-upload failed.' };
+    }
+
+    return { success: true, newDocId: res.new_document_id };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to submit document replacement.' };
+  }
+}
+
+/**
+ * Candidate resubmission of corrected joining form for administrative review.
+ */
+export async function candidateResubmitJoiningForm(
+  formId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    return { success: true };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('candidate_resubmit_joining_form', {
+      p_form_id: formId
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const res = data as { success?: boolean; error?: string };
+    if (!res?.success) {
+      return { success: false, error: res?.error || 'Resubmission failed.' };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to resubmit joining dossier.' };
+  }
+}
+
+/**
+ * Retrieves the full dossier details along with active and historical documents
+ * for the authenticated candidate's workspace.
+ */
+export async function getCandidateDossierDetails(
+  formId: string
+): Promise<JoiningServiceResult<{ form: any; documents: any[] }>> {
+  if (!isSupabaseConfigured) {
+    return { success: true, data: { form: {}, documents: [] } };
+  }
+
+  try {
+    const sessionRes = await getCandidateSession();
+    if (!sessionRes.authenticated) {
+      return { success: false, accessDenied: true, error: 'Authentication required.' };
+    }
+
+    // Query joining form (RLS enforces caller ownership)
+    const { data: form, error: formErr } = await supabase
+      .from('joining_forms')
+      .select('*')
+      .eq('id', formId)
+      .maybeSingle();
+
+    if (formErr || !form) {
+      return { success: false, notFound: true, error: 'Joining dossier not found or access denied.' };
+    }
+
+    // Query all documents (both current and historical)
+    const { data: docList, error: docErr } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('joining_form_id', formId)
+      .order('uploaded_at', { ascending: false });
+
+    if (docErr) {
+      return { success: false, error: docErr.message };
+    }
+
+    return {
+      success: true,
+      data: {
+        form,
+        documents: docList || []
+      }
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to load dossier details.' };
+  }
+}
+

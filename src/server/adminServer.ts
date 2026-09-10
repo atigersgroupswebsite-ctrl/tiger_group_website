@@ -9,8 +9,8 @@
 //   - Prevents self-deactivation of the active SUPER_ADMIN
 // ==============================================================================
 
-import { getSupabaseServer, authenticateRequest } from './paymentServer.ts';
-import type { AdminRole } from '../types/database.ts';
+import { getSupabaseServer, authenticateRequest } from './paymentServer';
+import type { AdminRole } from '../types/database';
 
 export interface AdminDirectoryUser {
   id: string;

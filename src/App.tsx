@@ -68,6 +68,9 @@ import { ConsultancyPolicyPage } from './pages/ConsultancyPolicyPage';
 import { LegalDocumentsPage } from './pages/LegalDocumentsPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { EmployeeVerificationPage } from './pages/EmployeeVerificationPage';
+import { CandidateLoginPage } from './pages/CandidateLoginPage';
+import { CandidatePortalPage } from './pages/CandidatePortalPage';
+import { CandidateResetPasswordPage } from './pages/CandidateResetPasswordPage';
 
 export const App: React.FC = () => {
   return (
@@ -136,7 +139,11 @@ export const App: React.FC = () => {
             <Route path="/for-employers" element={<Employers />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
-            <Route path="/joining/access" element={<Navigate to="/joining" replace />} />
+            <Route path="/joining/access" element={<Navigate to="/joining/login" replace />} />
+            <Route path="/joining/login" element={<CandidateLoginPage />} />
+            <Route path="/joining/portal" element={<CandidatePortalPage />} />
+            <Route path="/joining/reset-password" element={<CandidateResetPasswordPage />} />
+            <Route path="/joining/forgot-password" element={<CandidateResetPasswordPage />} />
             <Route path="/joining/payment" element={<CandidatePaymentPage />} />
             <Route path="/joining" element={<Joining />} />
             <Route path="/terms-and-conditions" element={<TermsAndConditionsPage />} />
