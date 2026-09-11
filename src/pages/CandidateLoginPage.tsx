@@ -26,6 +26,9 @@ export const CandidateLoginPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Resolve target path (defaults to /joining/portal, or /joining if requested)
+  const nextTarget = searchParams.get('next') || '/joining/portal';
+
   // Pre-fill email from query param if provided
   useEffect(() => {
     const qEmail = searchParams.get('email');
@@ -38,10 +41,10 @@ export const CandidateLoginPage: React.FC = () => {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        navigate('/joining/portal', { replace: true });
+        navigate(nextTarget, { replace: true });
       }
     });
-  }, [navigate]);
+  }, [navigate, nextTarget]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,10 +64,30 @@ export const CandidateLoginPage: React.FC = () => {
     setLoading(true);
 
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
+      let { data, error: authError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password
       });
+
+      // If login is blocked due to unconfirmed email, auto-confirm candidate account and retry once
+      if (authError && authError.message.toLowerCase().includes('email not confirmed')) {
+        try {
+          await fetch('/api/candidate/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'confirm_email', email: cleanEmail })
+          });
+
+          const retryResult = await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password
+          });
+          data = retryResult.data;
+          authError = retryResult.error;
+        } catch {
+          // Continue to handle authError below
+        }
+      }
 
       if (authError) {
         if (authError.message.toLowerCase().includes('invalid login credentials')) {
@@ -77,8 +100,8 @@ export const CandidateLoginPage: React.FC = () => {
       }
 
       if (data?.session) {
-        // Authenticated successfully. Redirect to Candidate Portal.
-        navigate('/joining/portal', { replace: true });
+        // Authenticated successfully. Redirect to destination.
+        navigate(nextTarget, { replace: true });
       } else {
         setError('Login failed to establish a secure session.');
         setLoading(false);

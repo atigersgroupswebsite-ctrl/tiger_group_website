@@ -106,7 +106,11 @@ export function paymentApiPlugin(): Plugin {
           try {
             const rawBody = await parseRequestBody(req);
             const body = JSON.parse(rawBody || '{}');
-            const { registerCandidateServerHandler } = await import('./candidateAccountService');
+            const { registerCandidateServerHandler, confirmCandidateEmailServerHandler } = await import('./candidateAccountService');
+            if (body?.action === 'confirm_email' && body?.email) {
+              const result = await confirmCandidateEmailServerHandler(body.email);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
             const result = await registerCandidateServerHandler(body);
             return sendJsonResponse(res, result.status || 200, result.data);
           } catch (candRegErr: any) {

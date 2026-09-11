@@ -1250,9 +1250,10 @@ export interface Database {
       };
       create_or_get_pending_payment: {
         Args: {
-          p_app_id: string;
-          p_purpose: string;
-          p_amount: number;
+          p_app_id?: string | null;
+          p_purpose?: string;
+          p_amount?: number;
+          p_joining_form_id?: string | null;
         };
         Returns: Json;
       };

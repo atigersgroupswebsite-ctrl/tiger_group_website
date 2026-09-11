@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { CheckCircle, Download, Eye, FileText, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
+import { CheckCircle, Download, Eye, FileText, ArrowRight, Loader2, RefreshCw, CreditCard, AlertCircle } from 'lucide-react';
 import { Button } from '../common/Button';
 import type { JoiningFormData } from '../../types/joining';
 import { downloadJoiningPacketPdf } from '../../services/joiningPdfGenerator';
+import { createPaymentOrder, launchCashfreeCheckout } from '../../services/paymentService';
 
 interface FormSuccessProps {
   formData: JoiningFormData;
@@ -16,6 +17,49 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
   onReset
 }) => {
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const handleProceedPayment = async () => {
+    if (isProcessingPayment) return;
+    setPaymentError(null);
+    setIsProcessingPayment(true);
+
+    try {
+      const targetJoiningFormId = formData.formId;
+      const targetApplicationId = formData.applicationId;
+
+      if (!targetJoiningFormId && !targetApplicationId) {
+        throw new Error('No valid dossier reference found to initiate payment.');
+      }
+
+      const res = await createPaymentOrder({
+        joiningFormId: targetJoiningFormId,
+        applicationId: targetApplicationId
+      });
+
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to initiate payment with Cashfree. Please try again.');
+      }
+
+      if (res.alreadyPaid) {
+        alert('Payment has already been successfully recorded for this dossier.');
+        setIsProcessingPayment(false);
+        return;
+      }
+
+      if (!res.payment_session_id) {
+        throw new Error('Cashfree payment session was not established. Please retry.');
+      }
+
+      // Launch Cashfree V3 SDK checkout in sandbox mode
+      await launchCashfreeCheckout(res.payment_session_id);
+    } catch (err: any) {
+      console.error('[JOINING_PAYMENT_ERROR]', err);
+      setPaymentError(err.message || 'Payment initiation failed. Please try again.');
+      setIsProcessingPayment(false);
+    }
+  };
 
   const handleDownloadPacket = async () => {
     setIsDownloading(true);
@@ -166,6 +210,71 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
             Please retain your Joining Reference for all future HR correspondence and reporting day onboarding verification.
           </span>
         </div>
+      </div>
+
+      {/* Payment Action Section */}
+      <div
+        style={{
+          marginBottom: 'var(--space-6)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '0.75rem'
+        }}
+      >
+        {paymentError && (
+          <div
+            style={{
+              padding: '0.75rem 1.25rem',
+              backgroundColor: '#FEF2F2',
+              border: '1px solid #F87171',
+              borderRadius: 'var(--radius-lg)',
+              color: '#991B1B',
+              fontSize: '0.85rem',
+              maxWidth: '540px',
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              textAlign: 'left'
+            }}
+          >
+            <AlertCircle size={18} style={{ flexShrink: 0 }} />
+            <span>{paymentError}</span>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={handleProceedPayment}
+          disabled={isProcessingPayment}
+          className="btn btn-navy btn-md"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            fontWeight: 800,
+            padding: '0.8rem 1.8rem',
+            fontSize: '0.9rem',
+            letterSpacing: '0.03em',
+            boxShadow: '0 4px 14px rgba(25, 42, 86, 0.2)',
+            cursor: isProcessingPayment ? 'not-allowed' : 'pointer',
+            opacity: isProcessingPayment ? 0.75 : 1
+          }}
+        >
+          {isProcessingPayment ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              <span>CONNECTING TO CASHFREE...</span>
+            </>
+          ) : (
+            <>
+              <CreditCard size={16} />
+              <span>PAY REGISTRATION & VERIFICATION FEE (₹500)</span>
+            </>
+          )}
+        </button>
       </div>
 
       {/* Action Buttons */}

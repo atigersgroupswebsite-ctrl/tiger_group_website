@@ -6,7 +6,10 @@
 
 import type { VercelReq, VercelRes } from '../_utils.js';
 import { parseBody, sendResponse } from '../_utils.js';
-import { registerCandidateServerHandler } from '../../src/server/candidateAccountService.js';
+import {
+  registerCandidateServerHandler,
+  confirmCandidateEmailServerHandler
+} from '../../src/server/candidateAccountService.js';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   if (req.method === 'OPTIONS') {
@@ -22,6 +25,10 @@ export default async function handler(req: VercelReq, res: VercelRes) {
 
   try {
     const body = await parseBody(req);
+    if (body?.action === 'confirm_email' && body?.email) {
+      const result = await confirmCandidateEmailServerHandler(body.email);
+      return sendResponse(res, result.status ?? 200, result.data);
+    }
     const result = await registerCandidateServerHandler(body);
     return sendResponse(res, result.status ?? 200, result.data);
   } catch (err: any) {

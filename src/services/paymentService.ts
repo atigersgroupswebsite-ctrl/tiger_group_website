@@ -139,15 +139,39 @@ export async function getPaymentConfig(applicationId: string): Promise<PaymentCo
   }
 }
 
+export interface CreateOrderParams {
+  applicationId?: string;
+  joiningFormId?: string;
+  purpose?: string;
+  amount?: number;
+}
+
 /**
  * Initiates order creation on the server with Cashfree Sandbox.
+ * Supports either applicationId or standalone joiningFormId.
  */
 export async function createPaymentOrder(
-  applicationId: string,
+  params: string | CreateOrderParams,
   purpose = 'REGISTRATION',
   amount = 500
 ): Promise<CreateOrderResponse> {
   try {
+    let bodyPayload: CreateOrderParams;
+    if (typeof params === 'string') {
+      bodyPayload = { applicationId: params, purpose, amount };
+    } else {
+      bodyPayload = {
+        applicationId: params.applicationId,
+        joiningFormId: params.joiningFormId,
+        purpose: params.purpose || purpose,
+        amount: params.amount || amount
+      };
+    }
+
+    if (!bodyPayload.applicationId && !bodyPayload.joiningFormId) {
+      return { success: false, error: 'Either applicationId or joiningFormId is required to create a payment order.' };
+    }
+
     const authHeader = await getAuthHeader();
     const res = await fetch('/api/payment/create-order', {
       method: 'POST',
@@ -155,7 +179,7 @@ export async function createPaymentOrder(
         'Content-Type': 'application/json',
         Authorization: authHeader
       },
-      body: JSON.stringify({ applicationId, purpose, amount })
+      body: JSON.stringify(bodyPayload)
     });
     return await res.json();
   } catch (err: any) {

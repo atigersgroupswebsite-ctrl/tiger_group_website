@@ -999,7 +999,7 @@ export async function registerCandidateAccount(payload: {
   password: string;
   fullName?: string;
   phone?: string;
-}): Promise<{ success: boolean; userId?: string; code?: string; error?: string }> {
+}): Promise<{ success: boolean; user?: any; userId?: string; code?: string; error?: string }> {
   try {
     const res = await fetch('/api/candidate/register', {
       method: 'POST',
@@ -1016,23 +1016,47 @@ export async function registerCandidateAccount(payload: {
       };
     }
 
+    const cleanEmail = payload.email.trim().toLowerCase();
+
     // Automatically sign in candidate to establish client session
-    const { error: signInErr } = await supabase.auth.signInWithPassword({
-      email: payload.email.trim().toLowerCase(),
+    let { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
       password: payload.password
     });
 
+    // If sign in is blocked due to unconfirmed email, request confirmation and retry once
+    if (signInErr && signInErr.message.toLowerCase().includes('email not confirmed')) {
+      try {
+        await fetch('/api/candidate/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'confirm_email', email: cleanEmail })
+        });
+
+        const retryResult = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: payload.password
+        });
+        signInData = retryResult.data;
+        signInErr = retryResult.error;
+      } catch {
+        // Continue to check signInErr below
+      }
+    }
+
     if (signInErr) {
       return {
-        success: true,
+        success: false,
+        code: 'SIGNIN_FAILED',
         userId: data.userId,
-        error: 'Account created. Please log in with your credentials.'
+        error: signInErr.message || 'Account created, but sign-in failed. Please log in with your credentials.'
       };
     }
 
     return {
       success: true,
-      userId: data.userId
+      userId: data.userId || signInData?.user?.id,
+      user: signInData?.user
     };
   } catch (err: any) {
     return {

@@ -264,6 +264,14 @@ export const CandidatePortalPage: React.FC = () => {
               </div>
 
               <Button
+                variant="navy"
+                size="sm"
+                onClick={() => navigate('/joining')}
+              >
+                Open Joining Form
+              </Button>
+
+              <Button
                 variant="outline"
                 size="sm"
                 icon={<LogOut size={14} />}

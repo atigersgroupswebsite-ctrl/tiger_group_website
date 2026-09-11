@@ -138,12 +138,16 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [configMap, setConfigMap] = useState<Record<string, JoiningFieldConfig>>({});
 
-  const handleEmailContinue = (email: string) => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setCandidateAuthUser(user);
-      }
-    });
+  const handleEmailContinue = (email: string, user?: any) => {
+    if (user) {
+      setCandidateAuthUser(user);
+    } else {
+      supabase.auth.getUser().then(({ data: { user: fetchedUser } }) => {
+        if (fetchedUser) {
+          setCandidateAuthUser(fetchedUser);
+        }
+      });
+    }
     setFormData((prev) => ({
       ...prev,
       personal: { ...prev.personal, emailId: email },
@@ -231,7 +235,9 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
     });
 
     const loadRemoteDossier = async () => {
-      if (!applicationId) {
+      // Check if we have an applicationId or an authenticated candidate session
+      const hasSession = Boolean(candidateAuthUser);
+      if (!applicationId && !hasSession) {
         setIsLoadingDossier(false);
         return;
       }
@@ -240,11 +246,11 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
       setLoadError(null);
 
       try {
-        const res = await getJoiningForm(applicationId);
+        const res = await getJoiningForm(applicationId || null);
         if (!isMounted) return;
 
         if (!res.success || !res.data) {
-          setLoadError(res.error || 'Unable to load joining dossier.');
+          // If standalone candidate without an existing saved dossier, continue with current state
           setIsLoadingDossier(false);
           return;
         }
@@ -261,7 +267,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
         }
 
         // Local Storage Migration Check (PART 36)
-        const migrationKey = `ATG_JOINING_MIGRATED_${applicationId}`;
+        const migrationKey = `ATG_JOINING_MIGRATED_${applicationId || candidateAuthUser?.id || 'standalone'}`;
         const hasMigrated = localStorage.getItem(migrationKey) === 'true';
         let finalData = dbData;
 
@@ -285,8 +291,9 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
                   emergencyContacts: (localParsed.emergencyContacts && localParsed.emergencyContacts.length > 0) ? localParsed.emergencyContacts : dbData.emergencyContacts,
                   declarations: { ...dbData.declarations, ...localParsed.declarations }
                 };
-                // Persist migrated draft to Supabase
-                await saveJoiningDraft(applicationId, finalData);
+                if (applicationId) {
+                  await saveJoiningDraft(applicationId, finalData);
+                }
               }
             } catch (err) {
               console.warn('Draft migration parse warning:', err);
@@ -295,14 +302,16 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
           localStorage.setItem(migrationKey, 'true');
         }
 
-        setFormData(finalData);
-        if (finalData.currentStep && finalData.currentStep > 1) {
-          setCurrentStep(finalData.currentStep);
-          setCompletedSteps(Array.from({ length: finalData.currentStep }, (_, i) => i + 1));
+        if (finalData.formId || finalData.joiningReference || (finalData.personal?.employeeName && finalData.personal.employeeName.length > 0)) {
+          setFormData(finalData);
+          if (finalData.currentStep && finalData.currentStep > 1) {
+            setCurrentStep(finalData.currentStep);
+            setCompletedSteps(Array.from({ length: finalData.currentStep }, (_, i) => i + 1));
+          }
         }
       } catch (err: any) {
         if (isMounted) {
-          setLoadError(err.message || 'Failed to connect to recruitment registry.');
+          console.warn('Could not load remote dossier for candidate:', err);
         }
       } finally {
         if (isMounted) {
@@ -317,7 +326,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
       isMounted = false;
       authListener?.subscription.unsubscribe();
     };
-  }, [applicationId]);
+  }, [applicationId, candidateAuthUser?.id]);
 
   // Auto-sync draft to localStorage on changes with 600ms debounce
   useEffect(() => {

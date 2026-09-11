@@ -160,10 +160,23 @@ export async function dispatchPostPaymentNotifications(paymentId: string) {
     }
 
     const app = payment.applications as any;
-    const candidateEmail = app?.email;
-    const candidateName = app?.full_name || 'Candidate';
-    const applicationNumber = app?.application_number || 'ATG-APP';
+    let candidateEmail = app?.email;
+    let candidateName = app?.full_name || 'Candidate';
+    let applicationNumber = app?.application_number || 'ATG-APP';
     const receiptNumber = payment.receipt_number || payment.payment_reference;
+
+    if (!candidateEmail && payment.joining_form_id) {
+      const { data: jf } = await supabase
+        .from('joining_forms')
+        .select('candidate_name, email, joining_reference')
+        .eq('id', payment.joining_form_id)
+        .maybeSingle();
+      if (jf) {
+        candidateEmail = jf.email;
+        candidateName = jf.candidate_name || 'Candidate';
+        applicationNumber = jf.joining_reference || 'JOIN-CONFIRMED';
+      }
+    }
 
     if (!candidateEmail || !resendApiKey) {
       console.log('[POST_PAYMENT] Skipping email dispatch: candidateEmail or RESEND_API_KEY missing.');
@@ -378,14 +391,14 @@ export async function getPaymentConfigHandler(appId: string, authHeader?: string
  * Handler: POST /api/payment/create-order
  */
 export async function createPaymentOrderHandler(
-  body: { applicationId: string; purpose?: string; amount?: number },
+  body: { applicationId?: string; joiningFormId?: string; purpose?: string; amount?: number },
   authHeader?: string,
   reqHeaders?: Record<string, string | string[] | undefined>
 ) {
-  const { applicationId, purpose = 'REGISTRATION' } = body;
+  const { applicationId, joiningFormId, purpose = 'REGISTRATION' } = body;
 
-  if (!applicationId) {
-    return { status: 400, data: { success: false, error: 'Application ID is required' } };
+  if (!applicationId && !joiningFormId) {
+    return { status: 400, data: { success: false, error: 'Application ID or Joining Form ID is required' } };
   }
 
   const auth = await authenticateRequest(authHeader);
@@ -394,58 +407,200 @@ export async function createPaymentOrderHandler(
   }
 
   const supabase = getSupabaseServer();
-
-  // 1. Fetch application
-  const { data: app, error: appErr } = await supabase
-    .from('applications')
-    .select('id, application_number, full_name, email, mobile, status, joining_access_enabled')
-    .eq('id', applicationId)
-    .single();
-
-  if (appErr || !app) {
-    return { status: 404, data: { success: false, error: 'Application not found' } };
-  }
-
-  // 2. Security authorization
-  const candidateEmail = auth.user.email?.toLowerCase().trim();
-  const isCandidate = app.email.toLowerCase().trim() === candidateEmail;
-
-  if (!isCandidate) {
-    const { data: adminProfile } = await supabase
-      .from('admin_profiles')
-      .select('role, active')
-      .eq('id', auth.user.id)
-      .eq('active', true)
-      .maybeSingle();
-
-    if (!adminProfile) {
-      return { status: 403, data: { success: false, error: 'Unauthorized to initiate payment for this candidate' } };
-    }
-  }
-
-  // 3. Check joining form submission status
-  const { data: joiningForm } = await supabase
-    .from('joining_forms')
-    .select('id, submission_status')
-    .eq('application_id', applicationId)
-    .maybeSingle();
-
-  // Authoritative amount strictly determined server-side (never trusts browser amount)
   const payableAmount = AUTHORITATIVE_JOINING_FEE;
 
-  // 4. Concurrency-safe initiation via create_or_get_pending_payment RPC
-  const { data: rpcRes, error: rpcErr } = await supabase.rpc('create_or_get_pending_payment', {
-    p_app_id: applicationId,
-    p_purpose: purpose,
-    p_amount: payableAmount,
-  });
+  let candidateName = 'Candidate';
+  let candidateEmail = '';
+  let candidatePhone = '9999999999';
+  let customerId = '';
+  let orderNote = '';
+  let paymentData: any = null;
 
-  if (rpcErr || !rpcRes) {
-    console.error('[CASHFREE_ORDER] create_or_get_pending_payment failed:', rpcErr);
-    return { status: 500, data: { success: false, error: rpcErr?.message || 'Payment initiation failed' } };
+  if (applicationId) {
+    // 1. Fetch application
+    const { data: app, error: appErr } = await supabase
+      .from('applications')
+      .select('id, application_number, full_name, email, mobile, status, joining_access_enabled')
+      .eq('id', applicationId)
+      .single();
+
+    if (appErr || !app) {
+      return { status: 404, data: { success: false, error: 'Application not found' } };
+    }
+
+    // 2. Security authorization
+    const candidateUserEmail = auth.user.email?.toLowerCase().trim();
+    const isCandidate = app.email.toLowerCase().trim() === candidateUserEmail;
+
+    if (!isCandidate) {
+      const { data: adminProfile } = await supabase
+        .from('admin_profiles')
+        .select('role, active')
+        .eq('id', auth.user.id)
+        .eq('active', true)
+        .maybeSingle();
+
+      if (!adminProfile) {
+        return { status: 403, data: { success: false, error: 'Unauthorized to initiate payment for this candidate' } };
+      }
+    }
+
+    // 3. Concurrency-safe initiation via create_or_get_pending_payment RPC
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('create_or_get_pending_payment', {
+      p_app_id: applicationId,
+      p_purpose: purpose,
+      p_amount: payableAmount,
+    });
+
+    if (rpcErr || !rpcRes) {
+      console.error('[CASHFREE_ORDER] create_or_get_pending_payment failed:', rpcErr);
+      return { status: 500, data: { success: false, error: rpcErr?.message || 'Payment initiation failed' } };
+    }
+
+    paymentData = rpcRes as any;
+
+    candidateName = app.full_name || 'Candidate';
+    candidateEmail = app.email;
+    candidatePhone = (app.mobile || '9999999999').replace(/[^0-9]/g, '').slice(-10) || '9999999999';
+    customerId = `cust_${app.id.replace(/-/g, '').slice(0, 20)}`;
+    orderNote = `Candidate Registration Fee • ${app.application_number}`;
+
+  } else if (joiningFormId) {
+    // Standalone Joining flow
+    // 1. Fetch joining form
+    const { data: joiningForm, error: jfErr } = await supabase
+      .from('joining_forms')
+      .select('id, application_id, candidate_name, email, mobile_number, candidate_auth_user_id, joining_reference, submission_status')
+      .eq('id', joiningFormId)
+      .single();
+
+    if (jfErr || !joiningForm) {
+      return { status: 404, data: { success: false, error: 'Joining Form record not found' } };
+    }
+
+    // 2. Security authorization: Verify candidate_auth_user_id matches authenticated Supabase user
+    const candidateAuthUserId = auth.user.id;
+    const isOwner = Boolean(joiningForm.candidate_auth_user_id && joiningForm.candidate_auth_user_id === candidateAuthUserId);
+
+    if (!isOwner) {
+      const { data: adminProfile } = await supabase
+        .from('admin_profiles')
+        .select('role, active')
+        .eq('id', auth.user.id)
+        .eq('active', true)
+        .maybeSingle();
+
+      if (!adminProfile) {
+        return { status: 403, data: { success: false, error: 'Unauthorized: Candidate ownership verification failed.' } };
+      }
+    }
+
+    // 3. Concurrency-safe initiation:
+    // Try RPC first (if migration with p_joining_form_id is active)
+    let rpcHandled = false;
+    try {
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('create_or_get_pending_payment', {
+        p_app_id: null,
+        p_purpose: purpose,
+        p_amount: payableAmount,
+        p_joining_form_id: joiningFormId
+      });
+      if (!rpcErr && rpcRes) {
+        paymentData = rpcRes;
+        rpcHandled = true;
+      }
+    } catch {
+      rpcHandled = false;
+    }
+
+    if (!rpcHandled) {
+      // Idempotency check: First, check if already successfully paid
+      const { data: existingSuccess } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('joining_form_id', joiningFormId)
+        .eq('purpose', purpose)
+        .eq('status', 'SUCCESS')
+        .order('paid_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingSuccess) {
+        return {
+          status: 200,
+          data: {
+            success: true,
+            alreadyPaid: true,
+            paymentId: existingSuccess.id,
+            paymentReference: existingSuccess.payment_reference,
+            receiptNumber: existingSuccess.receipt_number,
+            amount: existingSuccess.amount,
+            currency: existingSuccess.currency,
+            status: 'SUCCESS',
+            paidAt: existingSuccess.paid_at,
+            gatewayPaymentId: existingSuccess.gateway_payment_id,
+          },
+        };
+      }
+
+      // Check if a recent PENDING payment exists (within 24 hours)
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: existingPending } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('joining_form_id', joiningFormId)
+        .eq('purpose', purpose)
+        .eq('status', 'PENDING')
+        .gt('created_at', twentyFourHoursAgo)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingPending) {
+        paymentData = {
+          payment_id: existingPending.id,
+          payment_reference: existingPending.payment_reference,
+          amount: existingPending.amount,
+          currency: existingPending.currency,
+          is_existing_success: false
+        };
+      } else {
+        const { data: newPayment, error: insertErr } = await supabase
+          .from('payments')
+          .insert({
+            application_id: joiningForm.application_id || null,
+            joining_form_id: joiningFormId,
+            amount: payableAmount,
+            currency: 'INR',
+            purpose: purpose,
+            payment_method: 'ONLINE',
+            gateway: 'CASHFREE',
+            status: 'PENDING'
+          })
+          .select('*')
+          .single();
+
+        if (insertErr || !newPayment) {
+          console.error('[CASHFREE_ORDER] Failed to insert standalone pending payment:', insertErr);
+          return { status: 500, data: { success: false, error: insertErr?.message || 'Payment initiation failed' } };
+        }
+
+        paymentData = {
+          payment_id: newPayment.id,
+          payment_reference: newPayment.payment_reference,
+          amount: newPayment.amount,
+          currency: newPayment.currency,
+          is_existing_success: false
+        };
+      }
+    }
+
+    candidateName = (joiningForm.candidate_name || 'Candidate').trim();
+    candidateEmail = (joiningForm.email || auth.user.email || '').trim().toLowerCase();
+    candidatePhone = (joiningForm.mobile_number || '9999999999').replace(/[^0-9]/g, '').slice(-10) || '9999999999';
+    customerId = `cand_${auth.user.id.replace(/-/g, '').slice(0, 20)}`;
+    orderNote = `Candidate Registration Fee • ${joiningForm.joining_reference || 'JOINING'}`;
   }
-
-  const paymentData = rpcRes as any;
 
   // If already paid, return the verified success record
   if (paymentData.is_existing_success) {
@@ -483,8 +638,7 @@ export async function createPaymentOrderHandler(
   const merchantOrderId = `ATG_CF_${cleanRef}_${Date.now()}`.slice(0, 45);
 
   const baseUrl = resolveSiteBaseUrl(reqHeaders);
-  const cleanPhone = (app.mobile || '9999999999').replace(/[^0-9]/g, '').slice(-10) || '9999999999';
-  const customerId = `cust_${app.id.replace(/-/g, '').slice(0, 20)}`;
+  const cleanPhone = (candidatePhone || '9999999999').replace(/[^0-9]/g, '').slice(-10) || '9999999999';
 
   const cfPayload = {
     order_id: merchantOrderId,
@@ -492,15 +646,15 @@ export async function createPaymentOrderHandler(
     order_currency: 'INR',
     customer_details: {
       customer_id: customerId,
-      customer_name: app.full_name || 'Candidate',
-      customer_email: app.email,
+      customer_name: candidateName || 'Candidate',
+      customer_email: candidateEmail,
       customer_phone: cleanPhone,
     },
     order_meta: {
       return_url: `${baseUrl}/payment/result?order_id={order_id}`,
       notify_url: `${baseUrl}/api/payment/webhook`,
     },
-    order_note: `Candidate Registration Fee • ${app.application_number}`,
+    order_note: orderNote,
   };
 
   let cfOrderResponse: any = null;
@@ -549,27 +703,36 @@ export async function createPaymentOrderHandler(
       status: 500,
       data: {
         success: false,
-        error: 'Cashfree did not return a valid payment session ID.',
+        error: 'Payment session ID missing from gateway response.',
       },
     };
   }
 
-  // 6. Update payment with generated Cashfree order ID, session, and joining_form_id
-  await supabase
-    .from('payments')
-    .update({
-      gateway_order_id: merchantOrderId,
-      gateway: 'CASHFREE',
-      joining_form_id: joiningForm?.id || null,
-    })
-    .eq('id', paymentData.payment_id);
+  // 6. Update payment record with gateway order ID
+  const paymentRecordId = paymentData.payment_id || paymentData.id;
+  if (paymentRecordId) {
+    const { error: updateErr } = await supabase
+      .from('payments')
+      .update({
+        gateway_order_id: merchantOrderId,
+        currency: 'INR',
+        amount: payableAmount,
+        payment_method: 'ONLINE',
+        gateway: 'CASHFREE',
+      })
+      .eq('id', paymentRecordId);
+
+    if (updateErr) {
+      console.warn('[CASHFREE_ORDER] Warning updating gateway order ID:', updateErr.message);
+    }
+  }
 
   return {
     status: 200,
     data: {
       success: true,
       alreadyPaid: false,
-      paymentId: paymentData.payment_id,
+      paymentId: paymentRecordId,
       paymentReference: paymentData.payment_reference,
       orderId: merchantOrderId,
       cfOrderId: cfOrderId,
@@ -578,9 +741,9 @@ export async function createPaymentOrderHandler(
       currency: 'INR',
       environment: 'SANDBOX',
       candidate: {
-        name: app.full_name,
-        email: app.email,
-        mobile: app.mobile,
+        name: candidateName,
+        email: candidateEmail,
+        mobile: candidatePhone,
       },
     },
   };

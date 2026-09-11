@@ -100,14 +100,14 @@ export const AuthCallbackPage: React.FC = () => {
             navigate(nextUrl, { replace: true });
           } else {
             subscription.unsubscribe();
-            setErrorMsg('Unable to establish an authenticated session. The magic link may have expired or already been used.');
+            setErrorMsg('Unable to establish an authenticated session. Please log in with your candidate email and password.');
             setIsProcessing(false);
           }
         }, 4000);
 
       } catch (err: unknown) {
         if (isMounted) {
-          setErrorMsg(err instanceof Error ? err.message : 'Authentication failed. Please request a new magic link.');
+          setErrorMsg(err instanceof Error ? err.message : 'Authentication failed. Please log in with your candidate email and password.');
           setIsProcessing(false);
         }
       }
@@ -225,7 +225,7 @@ export const AuthCallbackPage: React.FC = () => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <Link
-                  to="/joining/access"
+                  to="/joining/login"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -240,12 +240,12 @@ export const AuthCallbackPage: React.FC = () => {
                     textDecoration: 'none'
                   }}
                 >
-                  <span>REQUEST A NEW LINK</span>
+                  <span>GO TO CANDIDATE LOGIN</span>
                   <ArrowRight size={16} />
                 </Link>
 
                 <Link
-                  to="/"
+                  to="/joining"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -258,6 +258,26 @@ export const AuthCallbackPage: React.FC = () => {
                     borderRadius: '8px',
                     fontSize: '0.85rem',
                     fontWeight: 700,
+                    textDecoration: 'none'
+                  }}
+                >
+                  <span>OPEN JOINING FORM</span>
+                </Link>
+
+                <Link
+                  to="/"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                    minHeight: '40px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    color: '#64748B',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
                     textDecoration: 'none'
                   }}
                 >

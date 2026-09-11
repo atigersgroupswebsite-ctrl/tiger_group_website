@@ -17,7 +17,7 @@ import { registerCandidateAccount } from '../../services/joiningService';
 
 interface CandidateEmailEntryProps {
   initialEmail?: string;
-  onContinue: (email: string) => void;
+  onContinue: (email: string, user?: any) => void;
 }
 
 export const CandidateEmailEntry: React.FC<CandidateEmailEntryProps> = ({
@@ -103,7 +103,7 @@ export const CandidateEmailEntry: React.FC<CandidateEmailEntryProps> = ({
       }
 
       // Account created and authenticated successfully
-      onContinue(cleanEmail);
+      onContinue(cleanEmail, res.user);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred. Please try again.');
       setIsSubmitting(false);
@@ -196,7 +196,7 @@ export const CandidateEmailEntry: React.FC<CandidateEmailEntryProps> = ({
             type="button"
             variant="primary"
             size="sm"
-            onClick={() => navigate(`/joining/login?email=${encodeURIComponent(email)}`)}
+            onClick={() => navigate(`/joining/login?email=${encodeURIComponent(email)}&next=/joining`)}
             style={{ width: '100%', justifyContent: 'center' }}
           >
             LOG IN TO CANDIDATE ACCOUNT &rarr;
@@ -489,7 +489,7 @@ export const CandidateEmailEntry: React.FC<CandidateEmailEntryProps> = ({
           Already have a candidate account?{' '}
           <button
             type="button"
-            onClick={() => navigate('/joining/login')}
+            onClick={() => navigate('/joining/login?next=/joining')}
             style={{
               background: 'none',
               border: 'none',
