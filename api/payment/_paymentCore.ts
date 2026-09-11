@@ -470,7 +470,7 @@ export async function createPaymentOrderHandler(
     // 1. Fetch joining form
     const { data: joiningForm, error: jfErr } = await supabase
       .from('joining_forms')
-      .select('id, application_id, candidate_name, email, mobile_number, candidate_auth_user_id, joining_reference, submission_status')
+      .select('id, application_id, candidate_name, email, employee_contact_number, other_contact_number, candidate_auth_user_id, joining_reference, submission_status')
       .eq('id', joiningFormId)
       .single();
 
@@ -597,7 +597,7 @@ export async function createPaymentOrderHandler(
 
     candidateName = (joiningForm.candidate_name || 'Candidate').trim();
     candidateEmail = (joiningForm.email || auth.user.email || '').trim().toLowerCase();
-    candidatePhone = (joiningForm.mobile_number || '9999999999').replace(/[^0-9]/g, '').slice(-10) || '9999999999';
+    candidatePhone = (joiningForm.employee_contact_number || joiningForm.other_contact_number || '9999999999').replace(/[^0-9]/g, '').slice(-10) || '9999999999';
     customerId = `cand_${auth.user.id.replace(/-/g, '').slice(0, 20)}`;
     orderNote = `Candidate Registration Fee • ${joiningForm.joining_reference || 'JOINING'}`;
   }

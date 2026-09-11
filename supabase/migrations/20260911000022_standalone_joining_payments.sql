@@ -35,7 +35,7 @@ BEGIN
       RAISE EXCEPTION 'Application with ID % not found.', p_app_id;
     END IF;
   ELSE
-    SELECT id, joining_reference, candidate_name, email, mobile_number, application_id
+    SELECT id, joining_reference, candidate_name, email, employee_contact_number, application_id
     INTO v_joining
     FROM public.joining_forms
     WHERE id = p_joining_form_id;
@@ -172,3 +172,5 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.create_or_get_pending_payment(UUID, TEXT, NUMERIC, UUID) TO authenticated, service_role, anon;

@@ -33,10 +33,11 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
         throw new Error('No valid dossier reference found to initiate payment.');
       }
 
-      const res = await createPaymentOrder({
-        joiningFormId: targetJoiningFormId,
-        applicationId: targetApplicationId
-      });
+      const res = await createPaymentOrder(
+        targetJoiningFormId
+          ? { joiningFormId: targetJoiningFormId }
+          : { applicationId: targetApplicationId }
+      );
 
       if (!res.success) {
         throw new Error(res.error || 'Failed to initiate payment with Cashfree. Please try again.');

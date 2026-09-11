@@ -753,6 +753,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
 
       const submittedData: JoiningFormData = {
         ...formData,
+        formId: res.data.formId || formData.formId,
         status: 'SUBMITTED',
         submissionStatus: 'SUBMITTED',
         submittedAt: finalSubmittedAt,
