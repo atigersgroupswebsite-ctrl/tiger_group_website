@@ -59,6 +59,8 @@ export interface VerifyPaymentResponse {
   gatewayOrderId?: string;
   gatewayPaymentId?: string;
   candidateName?: string;
+  referenceSlipNumber?: string;
+  referenceSlipDownloadUrl?: string;
   message?: string;
   error?: string;
 }
@@ -234,6 +236,52 @@ export async function recordOfflinePayment(payload: {
     return await res.json();
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to record offline payment' };
+  }
+}
+
+/**
+ * Fetches and triggers browser download of the candidate's official 2-page Reference Slip PDF.
+ */
+export async function downloadReferenceSlipPdf(params: {
+  paymentId?: string;
+  joiningFormId?: string;
+  applicationId?: string;
+  signedUrl?: string;
+  fileName?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    let url = params.signedUrl;
+
+    if (!url) {
+      const q = new URLSearchParams();
+      if (params.paymentId) q.set('paymentId', params.paymentId);
+      if (params.joiningFormId) q.set('joiningFormId', params.joiningFormId);
+      if (params.applicationId) q.set('applicationId', params.applicationId);
+
+      const res = await fetch(`/api/payment/reference-slip?${q.toString()}`);
+      const data = await res.json();
+      if (!data.success || !data.signedUrl) {
+        throw new Error(data.error || 'Unable to retrieve Reference Slip download URL.');
+      }
+      url = data.signedUrl;
+    }
+
+    if (url) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = params.fileName || 'REFERENCE-SLIP.pdf';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return { success: true };
+    }
+
+    return { success: false, error: 'No download URL available.' };
+  } catch (err: any) {
+    console.error('[downloadReferenceSlipPdf] Error:', err);
+    return { success: false, error: err.message || 'Failed to download Reference Slip.' };
   }
 }
 

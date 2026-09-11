@@ -69,6 +69,7 @@ import { ConsultancyPolicyPage } from './pages/ConsultancyPolicyPage';
 import { LegalDocumentsPage } from './pages/LegalDocumentsPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { EmployeeVerificationPage } from './pages/EmployeeVerificationPage';
+import { PublicVerificationPage } from './pages/PublicVerificationPage';
 import { CandidateLoginPage } from './pages/CandidateLoginPage';
 import { CandidatePortalPage } from './pages/CandidatePortalPage';
 import { CandidateResetPasswordPage } from './pages/CandidateResetPasswordPage';
@@ -156,6 +157,8 @@ export const App: React.FC = () => {
             <Route path="/policy" element={<TermsAndConditionsPage />} />
             <Route path="/verify/employee/:token" element={<EmployeeVerificationPage />} />
             <Route path="/verify/employee" element={<EmployeeVerificationPage />} />
+            <Route path="/verify/:token" element={<PublicVerificationPage />} />
+            <Route path="/verify" element={<PublicVerificationPage />} />
 
             {/* Public 404 Fallback - Only catches non-admin URLs */}
             <Route path="*" element={<Home />} />

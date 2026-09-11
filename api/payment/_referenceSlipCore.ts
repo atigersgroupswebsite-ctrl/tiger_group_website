@@ -1,137 +1,37 @@
 // ==============================================================================
-// File: src/services/referenceSlipPdfGenerator.ts
-// Description: Dedicated Dynamic 2-Page Vector PDF Generator for Reference Slip & Consultancy Return
-// Authority: Faithfully preserves client master: refrence slip.pdf (vector synthesized, no background overlay)
-// Brand: A TIGER GLOBAL Career Solution & Consultancy / A Tiger Group's
+// File: api/payment/_referenceSlipCore.ts
+// Description: Server-Side 2-Page Dynamic Reference Slip & Consultancy Return PDF Generator
+// Environment: Pure Node.js Serverless Runtime (pdf-lib, qrcode) — Zero Browser / DOM Globals
+// Authority: Preserves client master: refrence slip.pdf (vector synthesized, no background overlay)
 // Layout:
-//   Page 1: Employee Reference Slip (Candidate KYC, Photo, Admin & Company Result)
-//   Page 2: Consultancy Return Form (Demographics, 10 Official Terms, Acceptance, Signature)
-// Security & Storage:
-//   - Synthesizes clean 2-page vector PDF via pdf-lib without loading master template overlay
+//   Page 1: Employee Reference Slip (KYC Demographics, Photo, Admin Details, QR Verification Cardlet)
+//   Page 2: Consultancy Return Form (Demographics, 10 Official Policy Terms with Rs 500 clause, Acceptance)
+// Security:
+//   - Cryptographic non-guessable verification token (atg_ref_<uuid_hex>)
+//   - Encodes permanent public URL: https://www.atigerglobal.com/verify/<token>
 //   - Persists into private 'generated-documents' Supabase bucket
-//   - Records audit trail in public.generated_files ledger with versioning
-//   - Never exposes permanent public URLs (authenticated signed URLs only)
+//   - Records audit trail in public.generated_files ledger
 // ==============================================================================
 
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import QRCode from 'qrcode';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
-import { persistGeneratedDocument, getGeneratedDocumentSignedUrl } from './filePersistenceService';
-import { logActivity } from './activityService';
-import type { ReferenceSlipDetailData } from './referenceSlipService';
+import { getSupabaseServer } from './_paymentCore.js';
 
-export interface GenerateReferenceSlipPdfResult {
+export interface EnsureReferenceSlipResult {
   success: boolean;
-  blob?: Blob;
+  slip?: any;
+  pdfBuffer?: Buffer;
   signedUrl?: string;
   storagePath?: string;
   fileId?: string;
-  version?: number;
-  pdfBytes?: Uint8Array;
+  verificationToken?: string;
   error?: string;
 }
 
-/**
- * Checks if Uint8Array contains a sub-sequence of bytes
- */
-function containsSubsequence(source: Uint8Array, target: number[]): boolean {
-  if (source.length < target.length) return false;
-  for (let i = 0; i <= source.length - target.length; i++) {
-    let match = true;
-    for (let j = 0; j < target.length; j++) {
-      if (source[i + j] !== target[j]) {
-        match = false;
-        break;
-      }
-    }
-    if (match) return true;
-  }
-  return false;
-}
+// ------------------------------------------------------------------------------
+// Utility Helpers
+// ------------------------------------------------------------------------------
 
-/**
- * Validates and converts image source (DataUrl, Storage Path, or HTTP URL) into verified Uint8Array bytes.
- * Guarded against truncated or corrupt PNG/JPEG mock data to prevent parser CPU loops.
- */
-async function resolveImageBytes(
-  source?: string | null
-): Promise<{ bytes: Uint8Array; isPng: boolean } | null> {
-  if (!source) return null;
-
-  try {
-    let rawBytes: Uint8Array | null = null;
-
-    // 1. Data URL
-    if (source.startsWith('data:')) {
-      const base64 = source.split(',')[1];
-      if (!base64) return null;
-      const binary = atob(base64);
-      rawBytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        rawBytes[i] = binary.charCodeAt(i);
-      }
-    }
-    // 2. Supabase Storage Path (e.g., candidate-documents/photo.jpg or generated-documents/...)
-    else if (isSupabaseConfigured && !source.startsWith('http://') && !source.startsWith('https://')) {
-      let bucket = 'candidate-documents';
-      let filePath = source;
-      if (source.startsWith('candidate-documents/')) {
-        bucket = 'candidate-documents';
-        filePath = source.replace(/^candidate-documents\//, '');
-      } else if (source.startsWith('generated-documents/')) {
-        bucket = 'generated-documents';
-        filePath = source.replace(/^generated-documents\//, '');
-      }
-
-      const { data, error } = await supabase.storage.from(bucket).download(filePath);
-      if (!error && data) {
-        const arrayBuf = await data.arrayBuffer();
-        rawBytes = new Uint8Array(arrayBuf);
-      }
-    }
-    // 3. HTTP / HTTPS URL
-    else if (source.startsWith('http://') || source.startsWith('https://')) {
-      const resp = await fetch(source);
-      if (resp.ok) {
-        const arrayBuf = await resp.arrayBuffer();
-        rawBytes = new Uint8Array(arrayBuf);
-      }
-    }
-
-    if (!rawBytes || rawBytes.length < 16) return null;
-
-    // Strict integrity verification to avoid UPNG parser infinite loops on truncated files
-    const isPng =
-      rawBytes[0] === 0x89 &&
-      rawBytes[1] === 0x50 &&
-      rawBytes[2] === 0x4e &&
-      rawBytes[3] === 0x47 &&
-      containsSubsequence(rawBytes, [0x49, 0x45, 0x4e, 0x44]); // 'IEND'
-
-    const isJpg =
-      rawBytes[0] === 0xff &&
-      rawBytes[1] === 0xd8 &&
-      containsSubsequence(rawBytes, [0xff, 0xd9]); // EOI
-
-    if (isPng) {
-      return { bytes: rawBytes, isPng: true };
-    }
-    if (isJpg) {
-      return { bytes: rawBytes, isPng: false };
-    }
-
-    // Invalid or corrupt image format
-    console.warn('[resolveImageBytes] Image skipped: missing valid PNG IEND or JPEG EOI markers.');
-    return null;
-  } catch (err) {
-    console.warn('[resolveImageBytes] Failed to resolve image:', err);
-    return null;
-  }
-}
-
-/**
- * Formats ISO date (YYYY-MM-DD) to printable Indian format: DD / MM / YYYY
- */
 function formatDisplayDate(dateStr?: string | null): string {
   if (!dateStr) return '—';
   try {
@@ -146,9 +46,6 @@ function formatDisplayDate(dateStr?: string | null): string {
   }
 }
 
-/**
- * Splits text into lines fitting within maxWidth based on pdf-lib font metrics
- */
 function wrapText(
   text: string,
   maxWidth: number,
@@ -176,12 +73,107 @@ function wrapText(
 }
 
 /**
- * Generates the official 2-page dynamic Reference Slip & Consultancy Return PDF.
- * Pure vector generation: Does NOT overlay onto a master PDF.
+ * Generates an authoritative Reference Number in the format: ATG/REF/YYYY/XXXXXX
  */
-export async function buildDynamicReferenceSlipPdf(
-  detail: ReferenceSlipDetailData
-): Promise<Uint8Array> {
+async function generateAuthoritativeRefNumber(supabase: any): Promise<string> {
+  const year = new Date().getFullYear();
+  try {
+    const { count, error } = await supabase
+      .from('reference_slips')
+      .select('id', { count: 'exact', head: true });
+
+    const seq = error || count === null ? Math.floor(1000 + Math.random() * 9000) : (count + 1);
+    const padded = String(seq).padStart(6, '0');
+    return `ATG/REF/${year}/${padded}`;
+  } catch {
+    const random = Math.floor(100000 + Math.random() * 900000);
+    return `ATG/REF/${year}/${random}`;
+  }
+}
+
+/**
+ * Resolves candidate demographic and document details from Joining Form or Application
+ */
+async function resolveCandidateInfo(
+  supabase: any,
+  applicationId?: string | null,
+  joiningFormId?: string | null
+): Promise<any | null> {
+  if (joiningFormId) {
+    const { data: jf } = await supabase
+      .from('joining_forms')
+      .select('*')
+      .eq('id', joiningFormId)
+      .maybeSingle();
+
+    if (jf) {
+      const addr = [jf.current_address_line1, jf.current_address_line2, jf.current_city, jf.current_state, jf.current_pincode]
+        .filter(Boolean)
+        .join(', ') || 'Nagpur, Maharashtra';
+
+      return {
+        sourceType: 'JOINING_FORM',
+        sourceId: jf.id,
+        sourceReference: jf.joining_reference || `JOIN-${new Date().getFullYear()}-000001`,
+        fullName: jf.candidate_name || 'Candidate',
+        fatherName: jf.father_name || jf.emergency_contact_name || '—',
+        mobile: jf.employee_contact_number || '—',
+        email: jf.email || '',
+        address: addr,
+        dob: jf.date_of_birth,
+        gender: jf.gender,
+        aadhaarNumber: jf.aadhaar_number,
+        panNumber: jf.pan_number,
+        positionApplied: jf.position_applied || 'Consultant / Executive',
+        expectedJoiningDate: jf.expected_joining_date,
+        photoPath: jf.candidate_photo_path
+      };
+    }
+  }
+
+  if (applicationId) {
+    const { data: app } = await supabase
+      .from('applications')
+      .select('*')
+      .eq('id', applicationId)
+      .maybeSingle();
+
+    if (app) {
+      return {
+        sourceType: 'APPLICATION',
+        sourceId: app.id,
+        sourceReference: app.application_number || `INQ-${new Date().getFullYear()}-000001`,
+        fullName: app.full_name || 'Candidate',
+        fatherName: app.father_name || '—',
+        mobile: app.mobile || '—',
+        email: app.email || '',
+        address: app.address || 'Nagpur, Maharashtra',
+        dob: app.dob,
+        gender: app.gender,
+        aadhaarNumber: app.aadhaar_number,
+        panNumber: app.pan_number,
+        positionApplied: app.position_applied || 'Consultant / Executive',
+        expectedJoiningDate: app.expected_joining_date,
+        photoPath: app.photo_url
+      };
+    }
+  }
+
+  return null;
+}
+
+// ------------------------------------------------------------------------------
+// Core Vector PDF Generation
+// ------------------------------------------------------------------------------
+
+export async function build2PageReferenceSlipPdf(params: {
+  slip: any;
+  candidate: any;
+  verificationToken: string;
+  candidatePhotoBytes?: Buffer | null;
+}): Promise<Buffer> {
+  const { slip, candidate, verificationToken, candidatePhotoBytes } = params;
+
   const pdfDoc = await PDFDocument.create();
 
   // Typography
@@ -201,49 +193,35 @@ export async function buildDynamicReferenceSlipPdf(
   const green = rgb(0.08, 0.5, 0.24);
   const red = rgb(0.8, 0.1, 0.1);
 
-  // Standard A4 Dimensions
+  // A4 Dimensions
   const PAGE_WIDTH = 595.28;
   const PAGE_HEIGHT = 841.89;
   const MARGIN_X = 36;
   const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_X * 2; // 523.28
 
-  const { slip, candidate } = detail;
-
-  // Resolve candidate photo if available
+  // Embed Candidate Photo if available
   let candidatePhoto: any = null;
-  if (candidate.photoUrl) {
+  if (candidatePhotoBytes && candidatePhotoBytes.length > 32) {
     try {
-      const resolved = await resolveImageBytes(candidate.photoUrl);
-      if (resolved) {
-        candidatePhoto = resolved.isPng
-          ? await pdfDoc.embedPng(resolved.bytes)
-          : await pdfDoc.embedJpg(resolved.bytes);
-      }
-    } catch (photoErr) {
-      console.warn('[buildDynamicReferenceSlipPdf] Could not embed candidate photo:', photoErr);
+      const isPng = candidatePhotoBytes[0] === 0x89 && candidatePhotoBytes[1] === 0x50;
+      candidatePhoto = isPng
+        ? await pdfDoc.embedPng(candidatePhotoBytes)
+        : await pdfDoc.embedJpg(candidatePhotoBytes);
+    } catch {
+      // Photo parsing skipped safely
     }
   }
 
   // Generate Permanent Public Verification QR Code
   // CRITICAL: Strictly production domain, never localhost or Vercel preview
-  const verificationToken = (slip as any).verification_token || `atg_ref_${slip.id.replace(/-/g, '')}`;
   const publicVerifyUrl = `https://www.atigerglobal.com/verify/${verificationToken}`;
-  let qrImage: any = null;
-  try {
-    const qrDataUrl = await QRCode.toDataURL(publicVerifyUrl, {
-      errorCorrectionLevel: 'M',
-      margin: 1,
-      width: 200,
-    });
-    const qrBinary = atob(qrDataUrl.split(',')[1]);
-    const qrBytes = new Uint8Array(qrBinary.length);
-    for (let i = 0; i < qrBinary.length; i++) {
-      qrBytes[i] = qrBinary.charCodeAt(i);
-    }
-    qrImage = await pdfDoc.embedPng(qrBytes);
-  } catch (qrErr) {
-    console.warn('[buildDynamicReferenceSlipPdf] QR generation skipped:', qrErr);
-  }
+  const qrDataUrl = await QRCode.toDataURL(publicVerifyUrl, {
+    errorCorrectionLevel: 'M',
+    margin: 1,
+    width: 200,
+  });
+  const qrPngBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
+  const qrImage = await pdfDoc.embedPng(qrPngBuffer);
 
   // ===========================================================================
   // PAGE 1: EMPLOYEE REFERENCE SLIP
@@ -258,7 +236,7 @@ export async function buildDynamicReferenceSlipPdf(
     height: PAGE_HEIGHT - 40,
     borderColor: navy,
     borderWidth: 1.5,
-    color: white
+    color: white,
   });
   page1.drawRectangle({
     x: 23,
@@ -266,7 +244,7 @@ export async function buildDynamicReferenceSlipPdf(
     width: PAGE_WIDTH - 46,
     height: PAGE_HEIGHT - 46,
     borderColor: gold,
-    borderWidth: 0.75
+    borderWidth: 0.75,
   });
 
   // Header Box - Brand Identity
@@ -275,35 +253,35 @@ export async function buildDynamicReferenceSlipPdf(
     y: 785,
     size: 20,
     font: helveticaBold,
-    color: navy
+    color: navy,
   });
   page1.drawText('CAREER SOLUTION & CONSULTANCY', {
     x: MARGIN_X,
     y: 770,
     size: 10,
     font: helveticaBold,
-    color: gold
+    color: gold,
   });
   page1.drawText('MANPOWER CONSULTANT | RECRUITMENT | PLACEMENT SERVICES', {
     x: MARGIN_X,
     y: 757,
     size: 7.5,
     font: helvetica,
-    color: textMuted
+    color: textMuted,
   });
   page1.drawText('OFF. PLOT NO. 440, BEHIND ROYAL CLUB, SUBHAN NAGAR, NAGPUR MH 440035', {
     x: MARGIN_X,
     y: 746,
     size: 7.5,
     font: helvetica,
-    color: textMuted
+    color: textMuted,
   });
   page1.drawText('PHONE: +91 8349353946 | EMAIL: ATIGERGLOBAL@GMAIL.COM | REG. NO.: 106157392603', {
     x: MARGIN_X,
     y: 735,
     size: 7,
     font: helvetica,
-    color: textMuted
+    color: textMuted,
   });
 
   // Right Reference Number & Date Box
@@ -318,28 +296,28 @@ export async function buildDynamicReferenceSlipPdf(
     height: refBoxH,
     borderColor: borderLight,
     borderWidth: 1,
-    color: bgLight
+    color: bgLight,
   });
   page1.drawText('REFERENCE NO.', {
     x: refBoxX + 8,
     y: refBoxY + 38,
     size: 7.5,
     font: helveticaBold,
-    color: textMuted
+    color: textMuted,
   });
   page1.drawText(slip.reference_number || 'ATG/REF/2026/000000', {
     x: refBoxX + 8,
     y: refBoxY + 25,
     size: 8.5,
     font: helveticaBold,
-    color: navy
+    color: navy,
   });
   page1.drawText(`DATE: ${formatDisplayDate(slip.date || slip.created_at)}`, {
     x: refBoxX + 8,
     y: refBoxY + 10,
     size: 8,
     font: helvetica,
-    color: darkSlate
+    color: darkSlate,
   });
 
   // Title Banner
@@ -349,14 +327,14 @@ export async function buildDynamicReferenceSlipPdf(
     y: bannerY,
     width: CONTENT_WIDTH,
     height: 24,
-    color: navy
+    color: navy,
   });
   page1.drawText('EMPLOYEE REFERENCE SLIP', {
     x: MARGIN_X + 175,
     y: bannerY + 7,
     size: 11.5,
     font: helveticaBold,
-    color: white
+    color: white,
   });
 
   // Certification Paragraph
@@ -370,7 +348,7 @@ export async function buildDynamicReferenceSlipPdf(
     y: introY - 11,
     size: 8,
     font: helveticaOblique,
-    color: textBody
+    color: textBody,
   });
 
   // Section 1: Candidate Details
@@ -380,14 +358,14 @@ export async function buildDynamicReferenceSlipPdf(
     y: sec1Y,
     width: CONTENT_WIDTH,
     height: 18,
-    color: rgb(0.92, 0.94, 0.97)
+    color: rgb(0.92, 0.94, 0.97),
   });
   page1.drawText('1. CANDIDATE DETAILS', {
     x: MARGIN_X + 8,
     y: sec1Y + 5,
     size: 9,
     font: helveticaBold,
-    color: navy
+    color: navy,
   });
 
   const candBoxY = 460;
@@ -398,7 +376,7 @@ export async function buildDynamicReferenceSlipPdf(
     width: CONTENT_WIDTH,
     height: candBoxH,
     borderColor: borderLight,
-    borderWidth: 1
+    borderWidth: 1,
   });
 
   const cRows = [
@@ -411,7 +389,7 @@ export async function buildDynamicReferenceSlipPdf(
     { label: '7. Aadhaar No.', val: candidate.aadhaarNumber || '—' },
     { label: '8. PAN', val: candidate.panNumber || '—' },
     { label: '9. Position Applied', val: candidate.positionApplied || slip.designation || 'Consultant / Executive', bold: true },
-    { label: '10. Expected Date of Joining', val: formatDisplayDate(candidate.expectedJoiningDate || slip.joining_date) || 'Immediate' }
+    { label: '10. Expected Date of Joining', val: formatDisplayDate(candidate.expectedJoiningDate || slip.joining_date) || 'Immediate' },
   ];
 
   let curY = candBoxY + candBoxH - 16;
@@ -427,14 +405,14 @@ export async function buildDynamicReferenceSlipPdf(
       y: curY,
       size: 8,
       font: helveticaBold,
-      color: darkSlate
+      color: darkSlate,
     });
     page1.drawText(':', {
       x: MARGIN_X + leftColWidth - 5,
       y: curY,
       size: 8,
       font: helveticaBold,
-      color: textMuted
+      color: textMuted,
     });
     const valText = String(r.val).substring(0, r.maxLen || 45);
     page1.drawText(valText, {
@@ -442,7 +420,7 @@ export async function buildDynamicReferenceSlipPdf(
       y: curY,
       size: 8,
       font: r.bold ? helveticaBold : helvetica,
-      color: r.bold ? navy : textBody
+      color: r.bold ? navy : textBody,
     });
     curY -= 17.5;
   });
@@ -455,7 +433,7 @@ export async function buildDynamicReferenceSlipPdf(
     height: photoH,
     borderColor: borderLight,
     borderWidth: 1,
-    color: bgLight
+    color: bgLight,
   });
 
   if (candidatePhoto) {
@@ -463,7 +441,7 @@ export async function buildDynamicReferenceSlipPdf(
       x: photoX + 1,
       y: photoY + 1,
       width: photoW - 2,
-      height: photoH - 2
+      height: photoH - 2,
     });
   } else {
     page1.drawText('PASSPORT SIZE', {
@@ -471,14 +449,14 @@ export async function buildDynamicReferenceSlipPdf(
       y: photoY + 65,
       size: 7.5,
       font: helvetica,
-      color: textMuted
+      color: textMuted,
     });
     page1.drawText('PHOTOGRAPH', {
       x: photoX + 20,
       y: photoY + 52,
       size: 7.5,
       font: helvetica,
-      color: textMuted
+      color: textMuted,
     });
   }
 
@@ -489,14 +467,14 @@ export async function buildDynamicReferenceSlipPdf(
     y: sec2Y,
     width: CONTENT_WIDTH,
     height: 18,
-    color: rgb(0.92, 0.94, 0.97)
+    color: rgb(0.92, 0.94, 0.97),
   });
   page1.drawText('2. FOR COMPANY USE ONLY', {
     x: MARGIN_X + 8,
     y: sec2Y + 5,
     size: 9,
     font: helveticaBold,
-    color: navy
+    color: navy,
   });
 
   const compBoxY = 328;
@@ -507,23 +485,21 @@ export async function buildDynamicReferenceSlipPdf(
     width: CONTENT_WIDTH,
     height: compBoxH,
     borderColor: borderLight,
-    borderWidth: 1
+    borderWidth: 1,
   });
 
   const compFields = [
     { l: '1. Date of Interview', v: formatDisplayDate(slip.interview_date), l2: '4. Department', v2: slip.department || '—' },
     { l: '2. Reporting Date', v: formatDisplayDate(slip.reporting_date), l2: '5. Designation', v2: slip.designation || '—' },
-    { l: '3. Reporting Time', v: slip.reporting_time || '—', l2: '6. Salary (CTC)', v2: slip.salary_ctc ? `INR ${slip.salary_ctc.toLocaleString('en-IN')} / Month` : '—' }
+    { l: '3. Reporting Time', v: slip.reporting_time || '—', l2: '6. Salary (CTC)', v2: slip.salary_ctc ? `INR ${Number(slip.salary_ctc).toLocaleString('en-IN')} / Month` : '—' },
   ];
 
   let compY = compBoxY + compBoxH - 22;
   compFields.forEach((cf) => {
-    // Col 1
     page1.drawText(cf.l, { x: MARGIN_X + 10, y: compY, size: 8, font: helveticaBold, color: darkSlate });
     page1.drawText(':', { x: MARGIN_X + 115, y: compY, size: 8, font: helveticaBold, color: textMuted });
     page1.drawText(String(cf.v), { x: MARGIN_X + 125, y: compY, size: 8, font: helvetica, color: textBody });
 
-    // Col 2
     page1.drawText(cf.l2, { x: MARGIN_X + 275, y: compY, size: 8, font: helveticaBold, color: darkSlate });
     page1.drawText(':', { x: MARGIN_X + 365, y: compY, size: 8, font: helveticaBold, color: textMuted });
     page1.drawText(String(cf.v2), { x: MARGIN_X + 375, y: compY, size: 8, font: helvetica, color: textBody });
@@ -531,7 +507,7 @@ export async function buildDynamicReferenceSlipPdf(
     compY -= 28;
   });
 
-  // Note & Signatures Area
+  // Note
   const noteY = 308;
   page1.drawText(
     'NOTE : This slip is valid for 15 days from the date of issue. This is an official reference slip and must be carried along with original documents.',
@@ -554,7 +530,7 @@ export async function buildDynamicReferenceSlipPdf(
     height: sealH,
     borderColor: borderLight,
     borderWidth: 1,
-    color: bgLight
+    color: bgLight,
   });
   page1.drawText('A TIGER GLOBAL', { x: MARGIN_X + 48, y: sealY + 44, size: 8, font: helveticaBold, color: gold });
   page1.drawText('CONSULTANCY SEAL', { x: MARGIN_X + 42, y: sealY + 30, size: 7.5, font: helveticaBold, color: navy });
@@ -570,45 +546,44 @@ export async function buildDynamicReferenceSlipPdf(
     height: sealH,
     borderColor: borderLight,
     borderWidth: 1,
-    color: bgLight
+    color: bgLight,
   });
 
-  if (qrImage) {
-    page1.drawImage(qrImage, {
-      x: qrBoxX + 6,
-      y: sealY + 6,
-      width: 53,
-      height: 53
-    });
-  }
+  // Draw QR Image inside center box
+  page1.drawImage(qrImage, {
+    x: qrBoxX + 6,
+    y: sealY + 6,
+    width: 53,
+    height: 53,
+  });
 
   page1.drawText('PUBLIC QR VERIFY', {
     x: qrBoxX + 64,
     y: sealY + 46,
     size: 7,
     font: helveticaBold,
-    color: navy
+    color: navy,
   });
   page1.drawText('Scan with camera to', {
     x: qrBoxX + 64,
     y: sealY + 34,
     size: 6,
     font: helvetica,
-    color: textMuted
+    color: textMuted,
   });
   page1.drawText('confirm authenticity', {
     x: qrBoxX + 64,
     y: sealY + 24,
     size: 6,
     font: helvetica,
-    color: textMuted
+    color: textMuted,
   });
   page1.drawText('atigerglobal.com', {
     x: qrBoxX + 64,
     y: sealY + 12,
     size: 6,
     font: helveticaBold,
-    color: gold
+    color: gold,
   });
 
   // Right Signatory Box
@@ -621,7 +596,7 @@ export async function buildDynamicReferenceSlipPdf(
     height: sealH,
     borderColor: borderLight,
     borderWidth: 1,
-    color: bgLight
+    color: bgLight,
   });
   page1.drawText('AUTHORIZED SIGNATORY', { x: sigBoxX + 28, y: sealY + 44, size: 8, font: helveticaBold, color: navy });
   page1.drawText('A TIGER GLOBAL CAREER SOLUTION', { x: sigBoxX + 12, y: sealY + 28, size: 7, font: helvetica, color: textBody });
@@ -634,14 +609,14 @@ export async function buildDynamicReferenceSlipPdf(
     y: sec3Y,
     width: CONTENT_WIDTH,
     height: 18,
-    color: rgb(0.92, 0.94, 0.97)
+    color: rgb(0.92, 0.94, 0.97),
   });
   page1.drawText('3. TO BE FILLED BY COMPANY', {
     x: MARGIN_X + 8,
     y: sec3Y + 5,
     size: 9,
     font: helveticaBold,
-    color: navy
+    color: navy,
   });
 
   const ackBoxY = 40;
@@ -652,7 +627,7 @@ export async function buildDynamicReferenceSlipPdf(
     width: CONTENT_WIDTH,
     height: ackBoxH,
     borderColor: borderLight,
-    borderWidth: 1
+    borderWidth: 1,
   });
 
   page1.drawText('We acknowledge that the above candidate has appeared for interview / joined.', {
@@ -660,7 +635,7 @@ export async function buildDynamicReferenceSlipPdf(
     y: ackBoxY + ackBoxH - 18,
     size: 8,
     font: helveticaOblique,
-    color: textBody
+    color: textBody,
   });
 
   // Row 1: Interview By & HR Signature
@@ -669,14 +644,14 @@ export async function buildDynamicReferenceSlipPdf(
     y: ackBoxY + ackBoxH - 42,
     size: 8,
     font: helveticaBold,
-    color: darkSlate
+    color: darkSlate,
   });
   page1.drawText('HR Signature & Seal : ___________________________', {
     x: MARGIN_X + 265,
     y: ackBoxY + ackBoxH - 42,
     size: 8,
     font: helveticaBold,
-    color: darkSlate
+    color: darkSlate,
   });
 
   // Row 2: Result Checkboxes
@@ -690,28 +665,28 @@ export async function buildDynamicReferenceSlipPdf(
     y: ackBoxY + ackBoxH - 72,
     size: 8,
     font: helveticaBold,
-    color: darkSlate
+    color: darkSlate,
   });
   page1.drawText(`[ ${isSelected ? 'X' : '  '} ] SELECTED`, {
     x: MARGIN_X + 110,
     y: ackBoxY + ackBoxH - 72,
     size: 8.5,
     font: helveticaBold,
-    color: isSelected ? green : darkSlate
+    color: isSelected ? green : darkSlate,
   });
   page1.drawText(`[ ${isHold ? 'X' : '  '} ] HOLD`, {
     x: MARGIN_X + 220,
     y: ackBoxY + ackBoxH - 72,
     size: 8.5,
     font: helveticaBold,
-    color: isHold ? gold : darkSlate
+    color: isHold ? gold : darkSlate,
   });
   page1.drawText(`[ ${isRejected ? 'X' : '  '} ] REJECTED`, {
     x: MARGIN_X + 310,
     y: ackBoxY + ackBoxH - 72,
     size: 8.5,
     font: helveticaBold,
-    color: isRejected ? red : darkSlate
+    color: isRejected ? red : darkSlate,
   });
 
   // Row 3: Joining Date & Remarks
@@ -720,14 +695,14 @@ export async function buildDynamicReferenceSlipPdf(
     y: ackBoxY + ackBoxH - 102,
     size: 8,
     font: helveticaBold,
-    color: darkSlate
+    color: darkSlate,
   });
   page1.drawText(`Selected Role : ${slip.selected_designation || '___________________________'}`, {
     x: MARGIN_X + 265,
     y: ackBoxY + ackBoxH - 102,
     size: 8,
     font: helveticaBold,
-    color: darkSlate
+    color: darkSlate,
   });
 
   page1.drawText(
@@ -737,7 +712,7 @@ export async function buildDynamicReferenceSlipPdf(
       y: ackBoxY + ackBoxH - 130,
       size: 8,
       font: helvetica,
-      color: textBody
+      color: textBody,
     }
   );
 
@@ -754,7 +729,7 @@ export async function buildDynamicReferenceSlipPdf(
     height: PAGE_HEIGHT - 40,
     borderColor: navy,
     borderWidth: 1.5,
-    color: white
+    color: white,
   });
   page2.drawRectangle({
     x: 23,
@@ -762,7 +737,7 @@ export async function buildDynamicReferenceSlipPdf(
     width: PAGE_WIDTH - 46,
     height: PAGE_HEIGHT - 46,
     borderColor: gold,
-    borderWidth: 0.75
+    borderWidth: 0.75,
   });
 
   // Header Box
@@ -771,14 +746,14 @@ export async function buildDynamicReferenceSlipPdf(
     y: 785,
     size: 18,
     font: helveticaBold,
-    color: navy
+    color: navy,
   });
   page2.drawText('CAREER SOLUTION & CONSULTANCY', {
     x: MARGIN_X,
     y: 770,
     size: 9.5,
     font: helveticaBold,
-    color: gold
+    color: gold,
   });
 
   // Banner
@@ -788,14 +763,14 @@ export async function buildDynamicReferenceSlipPdf(
     y: p2BannerY,
     width: CONTENT_WIDTH,
     height: 24,
-    color: navy
+    color: navy,
   });
   page2.drawText('CONSULTANCY RETURN FORM', {
     x: MARGIN_X + 175,
     y: p2BannerY + 7,
     size: 11.5,
     font: helveticaBold,
-    color: white
+    color: white,
   });
 
   // Candidate Summary Box (Left) & Photo Box (Right)
@@ -808,7 +783,7 @@ export async function buildDynamicReferenceSlipPdf(
     height: p2SummaryH,
     borderColor: borderLight,
     borderWidth: 1,
-    color: bgLight
+    color: bgLight,
   });
 
   const p2PhotoW = 60;
@@ -823,7 +798,7 @@ export async function buildDynamicReferenceSlipPdf(
     height: p2PhotoH,
     borderColor: borderLight,
     borderWidth: 1,
-    color: white
+    color: white,
   });
 
   if (candidatePhoto) {
@@ -831,7 +806,7 @@ export async function buildDynamicReferenceSlipPdf(
       x: p2PhotoX + 1,
       y: p2PhotoY + 1,
       width: p2PhotoW - 2,
-      height: p2PhotoH - 2
+      height: p2PhotoH - 2,
     });
   } else {
     page2.drawText('PHOTO', {
@@ -839,7 +814,7 @@ export async function buildDynamicReferenceSlipPdf(
       y: p2PhotoY + 32,
       size: 7,
       font: helvetica,
-      color: textMuted
+      color: textMuted,
     });
   }
 
@@ -863,13 +838,13 @@ export async function buildDynamicReferenceSlipPdf(
     y: policyTitleY,
     size: 10,
     font: helveticaBold,
-    color: navy
+    color: navy,
   });
   page2.drawLine({
     start: { x: MARGIN_X, y: policyTitleY - 4 },
     end: { x: MARGIN_X + 175, y: policyTitleY - 4 },
     thickness: 1.5,
-    color: gold
+    color: gold,
   });
 
   // The 10 Official Policy Points Preserved Verbatim from Master Format
@@ -883,7 +858,7 @@ export async function buildDynamicReferenceSlipPdf(
     { num: '7.', text: 'The registration fee is being charged to cover the joining process—including legal, civil, and police verifications, PF and ESIC registration, and digital banking verification—as well as to provide guidance and secure an excellent job for your otherwise uncertain career.' },
     { num: '8.', text: 'The registration and consultation fees you pay are for our consultancy services and are not remitted to the company we refer you to; joining that company is free of charge, and no money will be collected there. If anyone asks you for a fee, please inform us.\nNote: You are responsible for arranging your own accommodation and meals. However, if you wish to avail of food and lodging facilities provided by the company, a charge will apply, and you will be required to pay it.' },
     { num: '9.', text: "No fees of any kind are charged by the company you are placed with through A Tiger Global Career Solution & Consultancy. If anyone within that company asks you for any kind of fee, you may immediately lodge a complaint with A Tiger Global Career Solution & Consultancy and the concerned company's HOD." },
-    { num: '10.', text: 'Once registration is completed through Tiger Global Consultancy, it cannot be cancelled, and the consultancy fee will not be refunded.' }
+    { num: '10.', text: 'Once registration is completed through Tiger Global Consultancy, it cannot be cancelled, and the consultancy fee will not be refunded.' },
   ];
 
   let pY = 598;
@@ -893,7 +868,7 @@ export async function buildDynamicReferenceSlipPdf(
       y: pY,
       size: 7.5,
       font: helveticaBold,
-      color: navy
+      color: navy,
     });
     const lines = wrapText(pt.text, CONTENT_WIDTH - 20, helvetica, 7.5);
     lines.forEach((line, lIdx) => {
@@ -902,7 +877,7 @@ export async function buildDynamicReferenceSlipPdf(
         y: pY - lIdx * 10,
         size: 7.5,
         font: line.startsWith('Note:') ? helveticaOblique : helvetica,
-        color: line.startsWith('Note:') ? textMuted : textBody
+        color: line.startsWith('Note:') ? textMuted : textBody,
       });
     });
     pY -= lines.length * 10 + 7;
@@ -918,7 +893,7 @@ export async function buildDynamicReferenceSlipPdf(
     height: acceptH,
     borderColor: borderLight,
     borderWidth: 1,
-    color: bgLight
+    color: bgLight,
   });
 
   page2.drawText('Note: If you accept our terms and conditions, please let us know (Yes/No).', {
@@ -926,7 +901,7 @@ export async function buildDynamicReferenceSlipPdf(
     y: acceptY + 28,
     size: 7.8,
     font: helveticaOblique,
-    color: darkSlate
+    color: darkSlate,
   });
 
   page2.drawText('[ X ] YES, I ACCEPT ALL TERMS & CONDITIONS', {
@@ -934,7 +909,7 @@ export async function buildDynamicReferenceSlipPdf(
     y: acceptY + 12,
     size: 8.5,
     font: helveticaBold,
-    color: green
+    color: green,
   });
 
   page2.drawText('CANDIDATE SIGNATURE: __________________________', {
@@ -942,7 +917,7 @@ export async function buildDynamicReferenceSlipPdf(
     y: acceptY + 12,
     size: 8,
     font: helveticaBold,
-    color: darkSlate
+    color: darkSlate,
   });
 
   // Footer
@@ -951,78 +926,220 @@ export async function buildDynamicReferenceSlipPdf(
     y: 28,
     size: 7,
     font: helvetica,
-    color: textMuted
+    color: textMuted,
   });
 
-  return await pdfDoc.save();
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
 }
 
-/**
- * Generates the official 2-page Reference Slip & Consultancy Return PDF and persists it in Supabase storage
- */
-export async function generateAndPersistReferenceSlipPdf(
-  detail: ReferenceSlipDetailData,
-  adminUserId?: string | null
-): Promise<GenerateReferenceSlipPdfResult> {
+// ------------------------------------------------------------------------------
+// End-to-End Orchestrator: Ensure, Generate, Persist & Return Signed URL
+// ------------------------------------------------------------------------------
+
+export async function ensureReferenceSlipForPayment(
+  paymentId: string,
+  options?: { forceRegenerate?: boolean }
+): Promise<EnsureReferenceSlipResult> {
+  const supabase = getSupabaseServer();
+
   try {
-    const { slip, candidate } = detail;
+    // 1. Fetch Payment Record
+    const { data: payment, error: pErr } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('id', paymentId)
+      .maybeSingle();
 
-    // 1. Build the dynamic vector PDF (no master overlay)
-    const pdfBytes = await buildDynamicReferenceSlipPdf(detail);
-
-    // Create Blob
-    const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
-
-    // Format safe candidate filename e.g. JOIN-2026-000123-REFERENCE-SLIP.pdf
-    const sourceRef = candidate.sourceReference
-      ? candidate.sourceReference.replace(/[^a-zA-Z0-9_-]/g, '_')
-      : `REF-${slip.reference_number.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-    const fileName = `${sourceRef}-REFERENCE-SLIP.pdf`;
-
-    // 2. Persist in Supabase private bucket 'generated-documents'
-    const persistRes = await persistGeneratedDocument({
-      applicationId: slip.application_id || undefined,
-      joiningFormId: slip.joining_form_id || undefined,
-      fileType: 'REFERENCE_SLIP_PDF',
-      blob,
-      fileName,
-      generatedBy: adminUserId || null
-    });
-
-    if (!persistRes.success || !persistRes.storagePath) {
-      throw new Error(persistRes.error || 'Failed to persist generated Reference Slip PDF in private storage.');
+    if (pErr || !payment) {
+      return { success: false, error: pErr?.message || `Payment ${paymentId} not found.` };
     }
 
-    // 3. Generate signed URL for authorized preview
-    const { url: signedUrl } = await getGeneratedDocumentSignedUrl(persistRes.storagePath, 3600);
+    const { joining_form_id, application_id } = payment;
+    if (!joining_form_id && !application_id) {
+      return { success: false, error: 'Payment does not link to a joining_form_id or application_id.' };
+    }
 
-    // 4. Log audit trail in activity_logs
-    await logActivity({
-      entityType: 'REFERENCE_SLIP',
-      entityId: slip.id,
-      applicationId: slip.application_id || undefined,
-      action: 'GENERATED_PDF',
-      metadata: {
-        referenceNumber: slip.reference_number,
-        fileId: persistRes.fileId,
-        storagePath: persistRes.storagePath,
-        fileSize: pdfBytes.length
+    // 2. Resolve Candidate Information
+    const candidate = await resolveCandidateInfo(supabase, application_id, joining_form_id);
+    if (!candidate) {
+      return { success: false, error: 'Failed to resolve candidate KYC records from database.' };
+    }
+
+    // 3. Find or Create Reference Slip Record in public.reference_slips
+    let slipQuery = supabase.from('reference_slips').select('*');
+    if (joining_form_id) {
+      slipQuery = slipQuery.eq('joining_form_id', joining_form_id);
+    } else {
+      slipQuery = slipQuery.eq('application_id', application_id);
+    }
+
+    const { data: existingSlips } = await slipQuery.order('created_at', { ascending: false }).limit(1);
+    let slip = existingSlips?.[0] || null;
+
+    if (!slip) {
+      const refNumber = await generateAuthoritativeRefNumber(supabase);
+      const insertPayload: any = {
+        application_id: application_id || null,
+        joining_form_id: joining_form_id || null,
+        reference_number: refNumber,
+        date: new Date().toISOString().split('T')[0],
+        interview_result: 'SELECTED',
+        designation: candidate.positionApplied || 'Consultant / Executive',
+        remarks: 'Official reference slip authorized upon verified payment completion.',
+      };
+
+      const { data: inserted, error: insErr } = await supabase
+        .from('reference_slips')
+        .insert(insertPayload)
+        .select('*')
+        .single();
+
+      if (insErr || !inserted) {
+        return { success: false, error: insErr?.message || 'Failed to insert reference slip record.' };
       }
+      slip = inserted;
+
+      // Ensure consultancy_returns row exists
+      let crQuery = supabase.from('consultancy_returns').select('id');
+      if (joining_form_id) crQuery = crQuery.eq('joining_form_id', joining_form_id);
+      else crQuery = crQuery.eq('application_id', application_id);
+      const { data: existingCr } = await crQuery.maybeSingle();
+
+      if (!existingCr) {
+        await supabase.from('consultancy_returns').insert({
+          application_id: application_id || null,
+          joining_form_id: joining_form_id || null,
+          candidate_acceptance: true,
+        });
+      }
+    }
+
+    // Cryptographic Non-Guessable Verification Token (atg_ref_ + UUID hex)
+    const verificationToken = slip.verification_token || `atg_ref_${slip.id.replace(/-/g, '')}`;
+
+    // 4. Check if Generated PDF already exists in public.generated_files
+    let genQuery = supabase
+      .from('generated_files')
+      .select('*')
+      .eq('file_type', 'REFERENCE_SLIP_PDF');
+
+    if (joining_form_id) genQuery = genQuery.eq('joining_form_id', joining_form_id);
+    else genQuery = genQuery.eq('application_id', application_id);
+
+    const { data: genFiles } = await genQuery.order('version', { ascending: false }).limit(1);
+    const existingGenFile = genFiles?.[0];
+
+    if (existingGenFile?.storage_path && !options?.forceRegenerate) {
+      // Re-use existing file and generate fresh signed URL (valid 24 hours)
+      const { data: signData } = await supabase.storage
+        .from('generated-documents')
+        .createSignedUrl(existingGenFile.storage_path, 86400);
+
+      // Also retrieve bytes if needed for email
+      const { data: fileBlob } = await supabase.storage
+        .from('generated-documents')
+        .download(existingGenFile.storage_path);
+
+      let pdfBuffer: Buffer | undefined;
+      if (fileBlob) {
+        const ab = await fileBlob.arrayBuffer();
+        pdfBuffer = Buffer.from(ab);
+      }
+
+      return {
+        success: true,
+        slip,
+        pdfBuffer,
+        signedUrl: signData?.signedUrl || undefined,
+        storagePath: existingGenFile.storage_path,
+        fileId: existingGenFile.id,
+        verificationToken,
+      };
+    }
+
+    // 5. Download Candidate Photo Bytes from Storage (if available)
+    let photoBytes: Buffer | null = null;
+    if (candidate.photoPath) {
+      try {
+        let cleanPath = candidate.photoPath;
+        let bucket = 'candidate-documents';
+        if (cleanPath.startsWith('candidate-documents/')) {
+          cleanPath = cleanPath.replace(/^candidate-documents\//, '');
+        }
+        const { data: photoData } = await supabase.storage.from(bucket).download(cleanPath);
+        if (photoData) {
+          const ab = await photoData.arrayBuffer();
+          photoBytes = Buffer.from(ab);
+        }
+      } catch {
+        // Photo download skipped safely
+      }
+    }
+
+    // 6. Build the 2-Page Vector PDF
+    const pdfBuffer = await build2PageReferenceSlipPdf({
+      slip,
+      candidate,
+      verificationToken,
+      candidatePhotoBytes: photoBytes,
     });
+
+    // 7. Persist to Supabase Storage 'generated-documents'
+    const safeRef = candidate.sourceReference.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `${safeRef}-REFERENCE-SLIP.pdf`;
+    const storagePath = `reference-slips/${fileName}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from('generated-documents')
+      .upload(storagePath, pdfBuffer, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+
+    if (uploadErr) {
+      console.error('[REFERENCE_SLIP_CORE] Storage upload error:', uploadErr);
+    }
+
+    // 8. Insert or Update in public.generated_files ledger
+    let fileId: string | undefined;
+    const nextVersion = existingGenFile ? (existingGenFile.version || 1) + 1 : 1;
+
+    const { data: insertedFile, error: fileErr } = await supabase
+      .from('generated_files')
+      .insert({
+        application_id: application_id || null,
+        joining_form_id: joining_form_id || null,
+        file_type: 'REFERENCE_SLIP_PDF',
+        file_name: fileName,
+        storage_path: storagePath,
+        file_size: pdfBuffer.length,
+        mime_type: 'application/pdf',
+        version: nextVersion,
+      })
+      .select('id')
+      .single();
+
+    if (!fileErr && insertedFile) {
+      fileId = insertedFile.id;
+    }
+
+    // 9. Generate 24-Hour Signed Download URL
+    const { data: signData } = await supabase.storage
+      .from('generated-documents')
+      .createSignedUrl(storagePath, 86400);
 
     return {
       success: true,
-      blob,
-      signedUrl: signedUrl || undefined,
-      storagePath: persistRes.storagePath,
-      fileId: persistRes.fileId,
-      pdfBytes
+      slip,
+      pdfBuffer,
+      signedUrl: signData?.signedUrl || undefined,
+      storagePath,
+      fileId,
+      verificationToken,
     };
   } catch (err: any) {
-    console.error('[generateAndPersistReferenceSlipPdf] Error:', err);
-    return {
-      success: false,
-      error: err.message || 'Failed to generate and persist Reference Slip PDF.'
-    };
+    console.error('[REFERENCE_SLIP_CORE] Error:', err);
+    return { success: false, error: err?.message || 'Failed to ensure reference slip for payment.' };
   }
 }

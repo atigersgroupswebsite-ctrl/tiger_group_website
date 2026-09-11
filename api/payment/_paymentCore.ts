@@ -13,6 +13,7 @@
 
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { ensureReferenceSlipForPayment } from './_referenceSlipCore.js';
 
 // ------------------------------------------------------------------------------
 // Configuration & Environment (Server-Only)
@@ -187,123 +188,85 @@ export async function dispatchPostPaymentNotifications(paymentId: string) {
     const fromName = process.env.RESEND_FROM_NAME || 'A TIGER GLOBAL';
     const defaultFrom = `"${fromName}" <${fromEmail}>`;
 
-    // 2. Dispatch Payment Receipt Email
-    const receiptHtml = `
+    // 2. Ensure Reference Slip 2-Page PDF is generated and persisted in private storage
+    const refSlipRes = await ensureReferenceSlipForPayment(paymentId);
+    const safeRef = applicationNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const refSlipNumber = refSlipRes.slip?.reference_number || 'ATG-REF';
+
+    // 3. Dispatch Candidate Confirmation Email with 2-Page Reference Slip attached
+    const candidateSubject = `Your Official Reference Slip & Payment Confirmation – A TIGER GLOBAL (${applicationNumber})`;
+    const candidateHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6;">
-        <div style="background-color: #192a56; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-          <h2 style="color: #ffffff; margin: 0; font-size: 20px; letter-spacing: 0.5px;">A TIGER GLOBAL</h2>
-          <p style="color: #c5a059; margin: 5px 0 0; font-size: 12px; font-weight: bold;">CAREER SOLUTION & CONSULTANCY</p>
+        <div style="background-color: #0f172a; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+          <h2 style="color: #ffffff; margin: 0; font-size: 22px; letter-spacing: 0.5px;">A TIGER GLOBAL</h2>
+          <p style="color: #c5a059; margin: 5px 0 0; font-size: 13px; font-weight: bold; letter-spacing: 1px;">CAREER SOLUTION & CONSULTANCY</p>
         </div>
         <div style="padding: 24px; border: 1px solid #e2e8f0; border-top: none; background: #ffffff;">
-          <h3 style="color: #166534; margin-top: 0;">Payment Received Successfully</h3>
+          <h3 style="color: #166534; margin-top: 0; font-size: 18px;">Payment Verified & Official Reference Slip Issued</h3>
           <p>Dear <strong>${candidateName}</strong>,</p>
-          <p>Thank you for completing your registration fee payment for Application <strong>${applicationNumber}</strong>.</p>
+          <p>We are pleased to confirm that your registration fee payment has been successfully verified. Your official <strong>2-Page Employee Reference Slip & Consultancy Return Form</strong> has been generated and is attached to this email as a PDF document.</p>
           
-          <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; background: #f8fafc; border-radius: 6px;">
             <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 8px 0; color: #64748b;">Receipt Number:</td>
-              <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #192a56;">${receiptNumber}</td>
+              <td style="padding: 10px 14px; color: #64748b;">Reference Slip No:</td>
+              <td style="padding: 10px 14px; font-weight: bold; text-align: right; color: #0f172a;">${refSlipNumber}</td>
             </tr>
             <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 8px 0; color: #64748b;">Payment Reference:</td>
-              <td style="padding: 8px 0; font-weight: bold; text-align: right;">${payment.payment_reference}</td>
+              <td style="padding: 10px 14px; color: #64748b;">Receipt Number:</td>
+              <td style="padding: 10px 14px; font-weight: bold; text-align: right; color: #0f172a;">${receiptNumber}</td>
             </tr>
             <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 8px 0; color: #64748b;">Amount Paid:</td>
-              <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #192a56;">INR ${Number(payment.amount).toFixed(2)}</td>
+              <td style="padding: 10px 14px; color: #64748b;">Application / Dossier:</td>
+              <td style="padding: 10px 14px; font-weight: bold; text-align: right; color: #0f172a;">${applicationNumber}</td>
             </tr>
             <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 8px 0; color: #64748b;">Purpose:</td>
-              <td style="padding: 8px 0; text-align: right;">${payment.purpose}</td>
+              <td style="padding: 10px 14px; color: #64748b;">Payment Reference:</td>
+              <td style="padding: 10px 14px; font-family: monospace; font-weight: bold; text-align: right;">${payment.payment_reference}</td>
             </tr>
-            ${payment.gateway_payment_id ? `
             <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 8px 0; color: #64748b;">Transaction ID:</td>
-              <td style="padding: 8px 0; font-family: monospace; text-align: right;">${payment.gateway_payment_id}</td>
-            </tr>` : ''}
+              <td style="padding: 10px 14px; color: #64748b;">Amount Paid:</td>
+              <td style="padding: 10px 14px; font-weight: bold; text-align: right; color: #166534;">INR ${Number(payment.amount).toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 14px; color: #64748b;">Verification Status:</td>
+              <td style="padding: 10px 14px; font-weight: bold; text-align: right; color: #166534;">VERIFIED & ACTIVE</td>
+            </tr>
           </table>
 
-          <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 20px 0; font-size: 12px; color: #92400e;">
-            <strong>Consultancy Policy:</strong> As per A Tiger Global Consultancy terms, Rs. 500 has been collected for initial registration/verification. The remaining Rs. 500 will be coordinated after 1 month of active placement.
+          <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px; margin: 20px 0; font-size: 13px; color: #1e40af;">
+            <strong>Important Next Steps:</strong> Please print and carry this official Reference Slip along with your original identity & qualification documents when reporting to your assigned orientation. The embedded QR code enables instant authenticity verification by authorized company HR officers.
           </div>
 
-          <p style="margin-bottom: 0;">Regards,<br><strong>Onboarding & Accounts Division</strong><br>A Tiger Global</p>
+          <p style="margin-bottom: 0;">Warm regards,<br><strong>Onboarding & Placement Division</strong><br>A Tiger Global Career Solution & Consultancy</p>
         </div>
         <div style="background-color: #f8fafc; padding: 12px; text-align: center; font-size: 11px; color: #94a3b8; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
-          This is an automated operational notification. Please do not reply directly to this email.
+          This is an automated transactional confirmation. Ref: ${refSlipNumber} | GSTIN: 27DIFPA0273P1Z4
         </div>
       </div>
     `;
 
-    const receiptResult = await sendViaResend({
+    const attachments = refSlipRes.pdfBuffer ? [
+      {
+        filename: `${safeRef}-REFERENCE-SLIP.pdf`,
+        content: refSlipRes.pdfBuffer.toString('base64'),
+      }
+    ] : [];
+
+    const emailResult = await sendViaResend({
       apiKey: resendApiKey,
       from: defaultFrom,
       to: candidateEmail,
-      subject: `A Tiger Global — Payment Receipt | ${applicationNumber}`,
-      html: receiptHtml,
+      subject: candidateSubject,
+      html: candidateHtml,
+      attachments,
     });
 
     if (app?.id) {
       await supabase.from('activity_logs').insert({
         application_id: app.id,
-        action: receiptResult.success ? 'PAYMENT_RECEIPT_EMAIL_SENT' : 'PAYMENT_RECEIPT_EMAIL_FAILED',
-        description: `Payment receipt email ${receiptResult.success ? 'sent' : 'failed'} to ${candidateEmail} for receipt ${receiptNumber}`,
+        action: emailResult.success ? 'REFERENCE_SLIP_EMAIL_SENT' : 'REFERENCE_SLIP_EMAIL_FAILED',
+        description: `Reference Slip confirmation email ${emailResult.success ? 'sent' : 'failed'} to ${candidateEmail} for reference ${refSlipNumber}`,
       });
-    }
-
-    // 3. Check for existing Reference Slip PDF in storage
-    let fileQuery = supabase
-      .from('generated_files')
-      .select('*')
-      .eq('file_type', 'REFERENCE_SLIP_PDF');
-
-    if (payment.joining_form_id) {
-      fileQuery = fileQuery.eq('joining_form_id', payment.joining_form_id);
-    } else if (payment.application_id) {
-      fileQuery = fileQuery.eq('application_id', payment.application_id);
-    }
-
-    const { data: genFiles } = await fileQuery.order('version', { ascending: false }).limit(1);
-    const latestFile = genFiles?.[0];
-
-    if (latestFile?.storage_path) {
-      const { data: fileData } = await supabase.storage
-        .from('generated-documents')
-        .download(latestFile.storage_path);
-
-      if (fileData) {
-        const ab = await fileData.arrayBuffer();
-        const base64Content = Buffer.from(ab).toString('base64');
-        const safeRef = applicationNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
-
-        await sendViaResend({
-          apiKey: resendApiKey,
-          from: defaultFrom,
-          to: candidateEmail,
-          subject: `Your Reference Slip – A TIGER GLOBAL (${applicationNumber})`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6;">
-              <div style="background-color: #0f172a; padding: 24px; text-align: center; color: #ffffff;">
-                <h2 style="margin: 0; font-size: 20px;">A TIGER GLOBAL</h2>
-                <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8;">Career Solution & Consultancy</p>
-              </div>
-              <div style="padding: 24px; background: #ffffff; border: 1px solid #e2e8f0;">
-                <h3 style="color: #0f172a; margin-top: 0;">Official Reference Slip</h3>
-                <p>Dear <strong>${candidateName}</strong>,</p>
-                <p>Your registration fee payment has been confirmed. Please find your official Reference Slip attached to this email.</p>
-                <p>Please print and carry this reference slip when reporting to your assigned orientation.</p>
-                <p>Regards,<br><strong>A TIGER GLOBAL Team</strong></p>
-              </div>
-            </div>
-          `,
-          attachments: [
-            {
-              filename: `${safeRef}-REFERENCE-SLIP.pdf`,
-              content: base64Content,
-            },
-          ],
-        });
-      }
     }
   } catch (err: any) {
     console.warn('[POST_PAYMENT] Handled notification error (payment success preserved):', err?.message);
@@ -1021,6 +984,19 @@ export async function verifyPaymentHandler(
       await dispatchPostPaymentNotifications(paymentRecord.id);
     }
 
+    // Ensure candidate reference slip exists and signed URL is ready for immediate download
+    let refSlipNumber: string | undefined;
+    let refSlipDownloadUrl: string | undefined;
+    try {
+      const refSlipRes = await ensureReferenceSlipForPayment(paymentRecord.id);
+      if (refSlipRes.success) {
+        refSlipNumber = refSlipRes.slip?.reference_number;
+        refSlipDownloadUrl = refSlipRes.signedUrl;
+      }
+    } catch (refErr: any) {
+      console.warn('[CASHFREE_VERIFY] Reference slip retrieval non-blocking notice:', refErr?.message);
+    }
+
     return {
       status: 200,
       data: {
@@ -1035,6 +1011,8 @@ export async function verifyPaymentHandler(
         gatewayOrderId: orderId,
         gatewayPaymentId: gatewayPaymentId,
         candidateName: verifiedPayment.candidate_name,
+        referenceSlipNumber: refSlipNumber,
+        referenceSlipDownloadUrl: refSlipDownloadUrl,
       },
     };
   }

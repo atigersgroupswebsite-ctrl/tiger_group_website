@@ -40,8 +40,7 @@ import {
   candidateResubmitJoiningForm,
   uploadCandidateDocument
 } from '../services/joiningService';
-import { createPaymentOrder, launchCashfreeCheckout } from '../services/paymentService';
-import { downloadPaymentReceiptPdf } from '../utils/paymentReceiptGenerator';
+import { createPaymentOrder, launchCashfreeCheckout, downloadReferenceSlipPdf } from '../services/paymentService';
 import type { DocumentCategory } from '../types/joining';
 
 export const CandidatePortalPage: React.FC = () => {
@@ -169,24 +168,29 @@ export const CandidatePortalPage: React.FC = () => {
     }
   };
 
-  const handleDownloadReceipt = () => {
-    if (!paymentRecord || !selectedDossier) return;
-    downloadPaymentReceiptPdf({
-      applicationNumber: selectedDossier.joining_reference || 'ATG-JOIN',
-      paymentReference: paymentRecord.payment_reference || 'N/A',
-      receiptNumber: paymentRecord.receipt_number || paymentRecord.payment_reference || 'REC',
-      candidateName: selectedDossier.candidate_name || candidateName || 'Candidate',
-      candidateEmail: selectedDossier.email || candidateEmail,
-      paymentPurpose: 'Candidate Registration & Dossier Verification Fee',
-      amount: Number(paymentRecord.amount) || 500,
-      currency: paymentRecord.currency || 'INR',
-      paymentDate: paymentRecord.paid_at || paymentRecord.created_at || new Date().toISOString(),
-      paymentStatus: 'SUCCESS',
-      paymentMethod: paymentRecord.payment_method || 'ONLINE / CASHFREE (SANDBOX)',
-      gateway: paymentRecord.gateway || 'CASHFREE',
-      gatewayOrderId: paymentRecord.gateway_order_id,
-      gatewayPaymentId: paymentRecord.gateway_payment_id
+  const [downloadingSlip, setDownloadingSlip] = useState(false);
+
+  const handleDownloadReferenceSlip = async () => {
+    if (!selectedDossierId) return;
+    setDownloadingSlip(true);
+    setActionNotice(null);
+
+    const safeRef = (selectedDossier?.joining_reference || 'JOIN').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `${safeRef}-REFERENCE-SLIP.pdf`;
+
+    const res = await downloadReferenceSlipPdf({
+      joiningFormId: selectedDossierId,
+      paymentId: paymentRecord?.id,
+      fileName,
     });
+
+    if (!res.success) {
+      setActionNotice({
+        type: 'error',
+        message: res.error || 'Unable to download Reference Slip. Please contact support if the issue persists.'
+      });
+    }
+    setDownloadingSlip(false);
   };
 
   // Handle Logout
@@ -654,10 +658,11 @@ export const CandidatePortalPage: React.FC = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      icon={<Download size={15} />}
-                      onClick={handleDownloadReceipt}
+                      icon={downloadingSlip ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                      onClick={handleDownloadReferenceSlip}
+                      disabled={downloadingSlip}
                     >
-                      Download Receipt
+                      {downloadingSlip ? 'Downloading...' : 'Download Reference Slip (PDF)'}
                     </Button>
                   ) : (
                     <Button

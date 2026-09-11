@@ -23,8 +23,7 @@ import {
   RotateCcw,
   FileCheck
 } from 'lucide-react';
-import { verifyPaymentWithServer, type VerifyPaymentResponse } from '../services/paymentService';
-import { downloadPaymentReceiptPdf, type PaymentReceiptData } from '../utils/paymentReceiptGenerator';
+import { verifyPaymentWithServer, downloadReferenceSlipPdf, type VerifyPaymentResponse } from '../services/paymentService';
 
 export const PaymentResultPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -62,27 +61,26 @@ export const PaymentResultPage: React.FC = () => {
     checkStatus();
   }, [checkStatus]);
 
-  const handleDownloadReceipt = () => {
+  const [downloadingSlip, setDownloadingSlip] = useState(false);
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+
+  const handleDownloadReferenceSlip = async () => {
     if (!verificationData || verificationData.paymentStatus !== 'SUCCESS') return;
+    setDownloadingSlip(true);
+    setDownloadNotice(null);
 
-    const receiptPayload: PaymentReceiptData = {
-      applicationNumber: verificationData.applicationNumber || 'ATG',
-      paymentReference: verificationData.paymentReference || 'N/A',
-      receiptNumber: verificationData.receiptNumber || verificationData.paymentReference || 'REC',
-      candidateName: verificationData.candidateName || 'Candidate',
-      candidateEmail: '',
-      paymentPurpose: 'Candidate Registration & Dossier Verification Fee',
-      amount: verificationData.amount || 500,
-      currency: verificationData.currency || 'INR',
-      paymentDate: verificationData.paidAt || new Date().toISOString(),
-      paymentStatus: 'SUCCESS',
-      paymentMethod: 'ONLINE / CASHFREE (SANDBOX)',
-      gateway: 'CASHFREE',
-      gatewayOrderId: verificationData.gatewayOrderId || orderId,
-      gatewayPaymentId: verificationData.gatewayPaymentId
-    };
+    const safeRef = (verificationData.applicationNumber || verificationData.paymentReference || 'ATG').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `${safeRef}-REFERENCE-SLIP.pdf`;
 
-    downloadPaymentReceiptPdf(receiptPayload);
+    const res = await downloadReferenceSlipPdf({
+      signedUrl: verificationData.referenceSlipDownloadUrl,
+      fileName,
+    });
+
+    if (!res.success) {
+      setDownloadNotice(res.error || 'Unable to download Reference Slip automatically. You can also access it in your Candidate Portal.');
+    }
+    setDownloadingSlip(false);
   };
 
   return (
@@ -154,69 +152,87 @@ export const PaymentResultPage: React.FC = () => {
               <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center mx-auto mb-3">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold">Payment Verified Successfully!</h2>
+              <h2 className="text-xl sm:text-2xl font-bold">Payment Successful</h2>
               <p className="text-emerald-100 text-sm mt-1">
-                Your dossier registration fee has been received and confirmed.
+                Your dossier registration fee has been received and verified.
               </p>
             </div>
 
             <div className="p-6 sm:p-8 space-y-6">
-              {/* Receipt Details Grid */}
+              {/* Receipt & Payment Verification Grid */}
               <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-3">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Receipt Number</span>
-                  <span className="font-mono font-semibold text-slate-900">
-                    {verificationData.receiptNumber || 'N/A'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Payment Reference</span>
-                  <span className="font-mono font-medium text-slate-700">
+                  <span className="font-mono font-bold text-slate-900">
                     {verificationData.paymentReference || 'N/A'}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Gateway Order ID</span>
-                  <span className="font-mono text-xs text-slate-600">
-                    {verificationData.gatewayOrderId || orderId}
+                <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-2.5">
+                  <span className="text-slate-500">Receipt Number</span>
+                  <span className="font-mono font-semibold text-slate-800">
+                    {verificationData.receiptNumber || 'N/A'}
                   </span>
                 </div>
-                {verificationData.gatewayPaymentId && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500">Cashfree Txn ID</span>
-                    <span className="font-mono text-xs text-slate-600">
-                      {verificationData.gatewayPaymentId}
+                <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-2.5">
+                  <span className="text-slate-500">Amount Paid</span>
+                  <span className="text-base font-bold text-emerald-700">
+                    ₹{Number(verificationData.amount || 500).toFixed(2)} {verificationData.currency || 'INR'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-2.5">
+                  <span className="text-slate-500">Verified Status</span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    PAID &amp; VERIFIED
+                  </span>
+                </div>
+                {verificationData.referenceSlipNumber && (
+                  <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-2.5">
+                    <span className="text-slate-500">Reference Slip No.</span>
+                    <span className="font-mono text-xs font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded">
+                      {verificationData.referenceSlipNumber}
                     </span>
                   </div>
                 )}
-                <div className="border-t border-slate-200 pt-3 flex justify-between items-center">
-                  <span className="text-slate-700 font-medium">Amount Paid</span>
-                  <span className="text-lg font-bold text-emerald-700">
-                    ₹{verificationData.amount || 500}.00 {verificationData.currency || 'INR'}
-                  </span>
-                </div>
+                {verificationData.gatewayPaymentId && (
+                  <div className="flex justify-between items-center text-xs text-slate-400 border-t border-slate-200 pt-2.5">
+                    <span>Cashfree Txn ID</span>
+                    <span className="font-mono">{verificationData.gatewayPaymentId}</span>
+                  </div>
+                )}
               </div>
 
-              {/* Reference Slip Automated Generation Callout */}
+              {/* Reference Slip Callout */}
               <div className="rounded-xl p-4 bg-blue-50 border border-blue-200 flex items-start gap-3">
-                <FileCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <FileCheck className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
                 <div className="text-sm">
-                  <span className="font-semibold text-blue-900">Official Reference Slip Generated: </span>
+                  <span className="font-bold text-blue-900">Official Reference Slip Issued: </span>
                   <span className="text-blue-800">
-                    Your dynamic Reference Slip has been automatically prepared and queued to your registered email via Resend.
+                    Your candidate-specific 2-Page Reference Slip &amp; Consultancy Return Form has been verified and attached to your confirmation email. Carry this document when reporting to orientation.
                   </span>
                 </div>
               </div>
 
-              {/* Actions */}
+              {downloadNotice && (
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                  {downloadNotice}
+                </div>
+              )}
+
+              {/* Candidate Actions */}
               <div className="space-y-3 pt-2">
                 <button
                   type="button"
-                  onClick={handleDownloadReceipt}
-                  className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm"
+                  onClick={handleDownloadReferenceSlip}
+                  disabled={downloadingSlip}
+                  className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm"
                 >
-                  <Download className="w-4 h-4" />
-                  Download Payment Receipt (PDF)
+                  {downloadingSlip ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                  {downloadingSlip ? 'Downloading Reference Slip...' : 'Download Reference Slip (PDF)'}
                 </button>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
