@@ -12,7 +12,7 @@
 
 import type { VercelReq, VercelRes } from '../_utils';
 import { parseBody, sendResponse } from '../_utils';
-import { createPaymentOrderHandler } from '../../src/server/paymentServer';
+import { createPaymentOrderHandler } from './_paymentCore';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   // CORS / Preflight handling

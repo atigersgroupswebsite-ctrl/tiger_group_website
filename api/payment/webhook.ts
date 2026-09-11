@@ -10,7 +10,7 @@
 
 import type { VercelReq, VercelRes } from '../_utils';
 import { parseRawBody, sendResponse } from '../_utils';
-import { webhookHandler } from '../../src/server/paymentServer';
+import { webhookHandler } from './_paymentCore';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   if (req.method !== 'POST') {

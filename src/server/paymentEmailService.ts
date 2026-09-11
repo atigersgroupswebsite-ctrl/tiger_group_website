@@ -9,7 +9,7 @@
 // ==============================================================================
 
 import { sendApplicationEmail } from './resendClient';
-import { getPaymentReceiptPdfBuffer, type PaymentReceiptData } from '../utils/paymentReceiptGenerator';
+import type { PaymentReceiptData } from '../utils/paymentReceiptGenerator';
 
 export interface SendReceiptEmailResult {
   success: boolean;
@@ -24,8 +24,20 @@ export interface SendReceiptEmailResult {
 export async function sendPaymentReceiptEmail(
   receiptData: PaymentReceiptData
 ): Promise<SendReceiptEmailResult> {
-  const pdfBuffer = getPaymentReceiptPdfBuffer(receiptData);
-  const pdfFilename = `${receiptData.receiptNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}_Payment_Receipt.pdf`;
+  const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+
+  try {
+    const { getPaymentReceiptPdfBuffer } = await import('../utils/paymentReceiptGenerator');
+    const pdfBuffer = getPaymentReceiptPdfBuffer(receiptData);
+    const pdfFilename = `${receiptData.receiptNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}_Payment_Receipt.pdf`;
+    attachments.push({
+      filename: pdfFilename,
+      content: Buffer.from(pdfBuffer),
+      contentType: 'application/pdf',
+    });
+  } catch (pdfErr: any) {
+    console.warn('[PAYMENT_EMAIL] PDF attachment skipped or failed, dispatching rich HTML receipt:', pdfErr?.message || pdfErr);
+  }
 
   const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; line-height: 1.6;">
@@ -80,13 +92,7 @@ export async function sendPaymentReceiptEmail(
       to: receiptData.candidateEmail,
       subject: `A Tiger Global — Payment Receipt | ${receiptData.applicationNumber}`,
       html: htmlContent,
-      attachments: [
-        {
-          filename: pdfFilename,
-          content: Buffer.from(pdfBuffer),
-          contentType: 'application/pdf'
-        }
-      ]
+      attachments: attachments.length > 0 ? attachments : undefined,
     });
 
     if (!dispatchRes.success) {
