@@ -9,8 +9,8 @@
 //   - Email failures never rollback database transactions
 // ==============================================================================
 
-import { sendApplicationEmail } from './resendClient';
-import { renderDocumentRejectionTemplate } from './emailTemplates';
+import { sendApplicationEmail } from './resendClient.js';
+import { renderDocumentRejectionTemplate } from './emailTemplates.js';
 
 export interface DocumentRejectionEmailRequest {
   candidateName: string;

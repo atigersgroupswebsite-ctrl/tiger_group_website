@@ -5,9 +5,9 @@
 // Security: Public endpoint, validates candidate email and parameters server-side
 // ==============================================================================
 
-import type { VercelReq, VercelRes } from '../_utils';
-import { parseBody, sendResponse } from '../_utils';
-import { sendJoiningReceiptServerHandler } from '../../src/server/joiningEmailService';
+import type { VercelReq, VercelRes } from '../_utils.js';
+import { parseBody, sendResponse } from '../_utils.js';
+import { sendJoiningReceiptServerHandler } from '../../src/server/joiningEmailService.js';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   if (req.method === 'OPTIONS') {

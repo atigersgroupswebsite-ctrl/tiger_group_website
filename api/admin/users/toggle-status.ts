@@ -5,9 +5,9 @@
 // Security: Requires active SUPER_ADMIN authorization
 // ==============================================================================
 
-import type { VercelReq, VercelRes } from '../../_utils';
-import { parseBody, sendResponse } from '../../_utils';
-import { toggleAdminStatusHandler } from '../../../src/server/adminServer';
+import type { VercelReq, VercelRes } from '../../_utils.js';
+import { parseBody, sendResponse } from '../../_utils.js';
+import { toggleAdminStatusHandler } from '../../../src/server/adminServer.js';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   if (req.method === 'OPTIONS') {

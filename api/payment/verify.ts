@@ -10,9 +10,9 @@
 //   - Automatically triggers Reference Slip and Resend receipt upon verified success
 // ==============================================================================
 
-import type { VercelReq, VercelRes } from '../_utils';
-import { parseBody, sendResponse } from '../_utils';
-import { verifyPaymentHandler } from './_paymentCore';
+import type { VercelReq, VercelRes } from '../_utils.js';
+import { parseBody, sendResponse } from '../_utils.js';
+import { verifyPaymentHandler } from './_paymentCore.js';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   // CORS / Preflight handling

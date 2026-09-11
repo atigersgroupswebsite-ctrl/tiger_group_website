@@ -4,9 +4,9 @@
 // Endpoint: POST /api/candidate/register
 // ==============================================================================
 
-import type { VercelReq, VercelRes } from '../_utils';
-import { parseBody, sendResponse } from '../_utils';
-import { registerCandidateServerHandler } from '../../src/server/candidateAccountService';
+import type { VercelReq, VercelRes } from '../_utils.js';
+import { parseBody, sendResponse } from '../_utils.js';
+import { registerCandidateServerHandler } from '../../src/server/candidateAccountService.js';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   if (req.method === 'OPTIONS') {

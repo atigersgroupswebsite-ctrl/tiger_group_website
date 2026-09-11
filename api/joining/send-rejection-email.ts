@@ -4,9 +4,9 @@
 // Endpoint: POST /api/joining/send-rejection-email
 // ==============================================================================
 
-import type { VercelReq, VercelRes } from '../_utils';
-import { parseBody, sendResponse } from '../_utils';
-import { sendDocumentRejectionEmailServerHandler } from '../../src/server/joiningRejectionEmailService';
+import type { VercelReq, VercelRes } from '../_utils.js';
+import { parseBody, sendResponse } from '../_utils.js';
+import { sendDocumentRejectionEmailServerHandler } from '../../src/server/joiningRejectionEmailService.js';
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   if (req.method === 'OPTIONS') {

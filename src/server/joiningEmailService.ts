@@ -5,8 +5,8 @@
 // Security: Server-only execution (Resend API with SMTP fallback)
 // ==============================================================================
 
-import { sendApplicationEmail } from './resendClient';
-import { renderJoiningReceiptTemplate } from './emailTemplates';
+import { sendApplicationEmail } from './resendClient.js';
+import { renderJoiningReceiptTemplate } from './emailTemplates.js';
 
 export interface JoiningReceiptRequest {
   candidateName: string;
