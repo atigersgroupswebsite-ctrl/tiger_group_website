@@ -49,7 +49,7 @@ export interface CreateOrderResponse {
 
 export interface VerifyPaymentResponse {
   success: boolean;
-  paymentStatus?: 'SUCCESS' | 'PENDING' | 'FAILED';
+  paymentStatus?: 'SUCCESS' | 'PENDING' | 'USER_DROPPED' | 'FAILED';
   paymentReference?: string;
   receiptNumber?: string;
   applicationNumber?: string;

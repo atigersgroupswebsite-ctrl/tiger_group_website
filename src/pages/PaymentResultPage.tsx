@@ -48,7 +48,7 @@ export const PaymentResultPage: React.FC = () => {
     try {
       const res = await verifyPaymentWithServer({ orderId });
       setVerificationData(res);
-      if (!res.success && res.paymentStatus !== 'PENDING' && res.paymentStatus !== 'FAILED') {
+      if (!res.success && res.paymentStatus !== 'PENDING' && res.paymentStatus !== 'FAILED' && res.paymentStatus !== 'USER_DROPPED') {
         setError(res.error || 'Unable to verify payment with server.');
       }
     } catch (err: any) {
@@ -263,6 +263,37 @@ export const PaymentResultPage: React.FC = () => {
                 className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors"
               >
                 Go to Portal
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* USER DROPPED State */}
+        {!loading && verificationData?.paymentStatus === 'USER_DROPPED' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-300 p-6 sm:p-8 text-center">
+            <div className="w-14 h-14 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center mx-auto mb-4">
+              <RotateCcw className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Checkout Cancelled — No funds charged</h2>
+            <p className="text-sm text-slate-600 max-w-md mx-auto mb-2">
+              {verificationData.message || 'You exited the Cashfree checkout window before completing the payment.'}
+            </p>
+            <p className="text-xs text-slate-400 mb-6">
+              Your Joining submission is securely saved and awaiting the ₹500 Registration &amp; Verification Fee.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                to="/joining/payment"
+                className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Resume Payment / Pay ₹500
+              </Link>
+              <Link
+                to="/joining/portal"
+                className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+              >
+                Return to Portal
               </Link>
             </div>
           </div>

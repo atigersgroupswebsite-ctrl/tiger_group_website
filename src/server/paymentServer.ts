@@ -531,6 +531,110 @@ export async function triggerPostPaymentReferenceSlip(paymentId: string) {
 }
 
 /**
+ * Resilient payment lookup:
+ * 1. Checks gateway_order_id directly
+ * 2. Checks internal payment ID directly
+ * 3. Fallback: Deterministic payment_reference extraction from ATG_CF_${cleanRef}_${timestamp}
+ * Automatically backfills gateway_order_id on the record using the trusted server-side client when found.
+ */
+export async function resolvePaymentRecord(
+  supabase: any,
+  targetOrderId?: string | null,
+  targetPaymentId?: string | null
+): Promise<{ data: any | null; error: any | null }> {
+  // 1. Direct gateway_order_id lookup
+  if (targetOrderId) {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('gateway_order_id', targetOrderId)
+      .maybeSingle();
+
+    if (data) {
+      return { data, error: null };
+    }
+    if (error) {
+      console.warn('[PAYMENT_LOOKUP] Error searching by gateway_order_id:', error.message);
+    }
+  }
+
+  // 2. Direct payment ID lookup
+  if (targetPaymentId) {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('id', targetPaymentId)
+      .maybeSingle();
+
+    if (data) {
+      if (targetOrderId && (!data.gateway_order_id || data.gateway_order_id !== targetOrderId)) {
+        await supabase
+          .from('payments')
+          .update({ gateway_order_id: targetOrderId })
+          .eq('id', data.id);
+        data.gateway_order_id = targetOrderId;
+      }
+      return { data, error: null };
+    }
+    if (error) {
+      console.warn('[PAYMENT_LOOKUP] Error searching by id:', error.message);
+    }
+  }
+
+  // 3. Resilient fallback: Deterministic extraction from order_id: ATG_CF_${paymentRef}_${timestamp}
+  if (targetOrderId && targetOrderId.startsWith('ATG_CF_')) {
+    const match = targetOrderId.match(/^ATG_CF_([A-Za-z0-9]+)_\d+$/);
+    if (match && match[1]) {
+      const rawRef = match[1]; // e.g. "PAY2026000012"
+      let formattedRef = rawRef;
+      if (rawRef.startsWith('PAY') && rawRef.length >= 13) {
+        // Formatted standard: PAY-YYYY-NNNNNN
+        formattedRef = `${rawRef.slice(0, 3)}-${rawRef.slice(3, 7)}-${rawRef.slice(7)}`;
+      }
+
+      // Try searching by formatted payment_reference
+      let { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('payment_reference', formattedRef)
+        .maybeSingle();
+
+      // Fallback search by rawRef if formatted did not match
+      if (!data && formattedRef !== rawRef) {
+        const fallbackRes = await supabase
+          .from('payments')
+          .select('*')
+          .eq('payment_reference', rawRef)
+          .maybeSingle();
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
+
+      if (data) {
+        // Backfill gateway_order_id if missing or mismatch
+        if (!data.gateway_order_id || data.gateway_order_id !== targetOrderId) {
+          try {
+            await supabase
+              .from('payments')
+              .update({ gateway_order_id: targetOrderId })
+              .eq('id', data.id);
+            data.gateway_order_id = targetOrderId;
+          } catch (updateErr: any) {
+            console.warn('[PAYMENT_LOOKUP] Non-critical: Failed to backfill gateway_order_id:', updateErr?.message);
+          }
+        }
+        return { data, error: null };
+      }
+      if (error) {
+        console.warn('[PAYMENT_LOOKUP] Error searching by payment_reference fallback:', error.message);
+      }
+    }
+  }
+
+  return { data: null, error: null };
+}
+
+/**
  * Handler: POST /api/payment/verify or GET /api/payment/verify?order_id=...
  * Server-side order verification via Cashfree Sandbox API
  * Checks authoritative Cashfree payment state and completes payment atomically in database.
@@ -559,15 +663,14 @@ export async function verifyPaymentHandler(
     }
   }
 
-  // 1. Locate payment in local database
-  let paymentQuery = getSupabaseServer().from('payments').select('*');
-  if (targetOrderId) {
-    paymentQuery = paymentQuery.eq('gateway_order_id', targetOrderId);
-  } else if (targetPaymentId) {
-    paymentQuery = paymentQuery.eq('id', targetPaymentId);
-  }
+  const supabase = getSupabaseServer();
 
-  const { data: paymentRecord, error: pErr } = await paymentQuery.maybeSingle();
+  // 1. Resilient lookup for payment in local database
+  const { data: paymentRecord, error: pErr } = await resolvePaymentRecord(
+    supabase,
+    targetOrderId,
+    targetPaymentId
+  );
 
   if (pErr || !paymentRecord) {
     console.error(`[CASHFREE_VERIFY] Payment record not found for order ${targetOrderId || targetPaymentId}:`, pErr);
@@ -646,20 +749,29 @@ export async function verifyPaymentHandler(
     };
   }
 
-  const orderStatus = cfOrder.order_status; // "PAID", "ACTIVE", "EXPIRED", "TERMINATED"
-  const successPayment = Array.isArray(cfPayments)
-    ? cfPayments.find((p: any) => p.payment_status === 'SUCCESS')
-    : null;
+  const orderStatus = cfOrder?.order_status; // "PAID", "ACTIVE", "EXPIRED", "TERMINATED"
+  const paymentsList = Array.isArray(cfPayments) ? cfPayments : [];
 
-  // 4. Handle State: SUCCESS / PAID
-  if (orderStatus === 'PAID' || successPayment) {
-    const gatewayPaymentId = String(successPayment?.cf_payment_id || cfOrder.cf_order_id || `cf_${Date.now()}`);
+  // Sort payment attempts by payment_time descending (latest attempt first)
+  const sortedAttempts = [...paymentsList].sort((a, b) => {
+    const tA = a.payment_time ? new Date(a.payment_time).getTime() : 0;
+    const tB = b.payment_time ? new Date(b.payment_time).getTime() : 0;
+    return tB - tA;
+  });
+
+  const successPayment = paymentsList.find((p: any) => p.payment_status === 'SUCCESS');
+  const latestAttempt = sortedAttempts[0] || null;
+
+  // 4. Authoritative Four-Outcome Classification:
+  // Rule 1: SUCCESS (order_status === PAID OR any successful payment attempt. SUCCESS always wins.)
+  if (orderStatus === 'PAID' || Boolean(successPayment)) {
+    const gatewayPaymentId = String(successPayment?.cf_payment_id || cfOrder?.cf_order_id || `cf_${Date.now()}`);
     const paymentMethodDesc = successPayment?.payment_group
       ? `CASHFREE_${String(successPayment.payment_group).toUpperCase()}`
       : 'CASHFREE';
 
     // Atomic database completion via complete_verified_payment RPC
-    const { data: rpcRes, error: rpcErr } = await getSupabaseServer().rpc('complete_verified_payment', {
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('complete_verified_payment', {
       p_payment_id: paymentRecord.id,
       p_gateway_order_id: orderId,
       p_gateway_payment_id: gatewayPaymentId,
@@ -673,39 +785,42 @@ export async function verifyPaymentHandler(
 
     const verifiedPayment = rpcRes as any;
 
-    // Ensure gateway is tagged as CASHFREE
-    await getSupabaseServer()
-      .from('payments')
-      .update({ gateway: 'CASHFREE' })
-      .eq('id', paymentRecord.id);
+    // Send notifications and documents ONLY if not already verified (idempotency guard)
+    if (!verifiedPayment.already_verified) {
+      // Ensure gateway is tagged as CASHFREE
+      await supabase
+        .from('payments')
+        .update({ gateway: 'CASHFREE' })
+        .eq('id', paymentRecord.id);
 
-    // 5. Asynchronous receipt email (email failure does NOT fail payment)
-    import('./paymentEmailService').then(({ sendPaymentReceiptEmail }) => {
-      const receiptData = {
-        applicationNumber: verifiedPayment.application_number,
-        paymentReference: verifiedPayment.payment_reference,
-        receiptNumber: verifiedPayment.receipt_number,
-        candidateName: verifiedPayment.candidate_name,
-        candidateEmail: verifiedPayment.candidate_email,
-        paymentPurpose: verifiedPayment.purpose,
-        amount: verifiedPayment.amount,
-        currency: verifiedPayment.currency,
-        paymentDate: verifiedPayment.paid_at,
-        paymentStatus: 'SUCCESS',
-        paymentMethod: paymentMethodDesc,
-        gateway: 'CASHFREE',
-        gatewayOrderId: orderId,
-        gatewayPaymentId: gatewayPaymentId
-      };
-      return sendPaymentReceiptEmail(receiptData);
-    }).catch((emailErr) => {
-      console.warn('[CASHFREE_VERIFY] Asynchronous receipt email error (ignored):', emailErr);
-    });
+      // Asynchronous receipt email (email failure does NOT fail payment)
+      import('./paymentEmailService').then(({ sendPaymentReceiptEmail }) => {
+        const receiptData = {
+          applicationNumber: verifiedPayment.application_number,
+          paymentReference: verifiedPayment.payment_reference,
+          receiptNumber: verifiedPayment.receipt_number,
+          candidateName: verifiedPayment.candidate_name,
+          candidateEmail: verifiedPayment.candidate_email,
+          paymentPurpose: verifiedPayment.purpose,
+          amount: verifiedPayment.amount,
+          currency: verifiedPayment.currency,
+          paymentDate: verifiedPayment.paid_at,
+          paymentStatus: 'SUCCESS',
+          paymentMethod: paymentMethodDesc,
+          gateway: 'CASHFREE',
+          gatewayOrderId: orderId,
+          gatewayPaymentId: gatewayPaymentId
+        };
+        return sendPaymentReceiptEmail(receiptData);
+      }).catch((emailErr) => {
+        console.warn('[CASHFREE_VERIFY] Asynchronous receipt email error (ignored):', emailErr);
+      });
 
-    // 6. Asynchronously trigger Reference Slip generation and Resend email
-    triggerPostPaymentReferenceSlip(paymentRecord.id).catch((refErr) => {
-      console.warn('[CASHFREE_VERIFY] Asynchronous Reference Slip error (ignored):', refErr);
-    });
+      // Asynchronously trigger Reference Slip generation and Resend email
+      triggerPostPaymentReferenceSlip(paymentRecord.id).catch((refErr) => {
+        console.warn('[CASHFREE_VERIFY] Asynchronous Reference Slip error (ignored):', refErr);
+      });
+    }
 
     return {
       status: 200,
@@ -725,36 +840,62 @@ export async function verifyPaymentHandler(
     };
   }
 
-  // 7. Handle State: PENDING / ACTIVE
-  if (orderStatus === 'ACTIVE') {
+  // Rule 2: USER_DROPPED
+  // Latest/current authoritative attempt is USER_DROPPED.
+  // Keep our DB payment PENDING (recoverable state).
+  if (latestAttempt?.payment_status === 'USER_DROPPED') {
     return {
       status: 200,
       data: {
-        success: true,
-        paymentStatus: 'PENDING',
+        success: false,
+        paymentStatus: 'USER_DROPPED',
         orderId,
-        message: 'Payment is pending or awaiting candidate completion in checkout.'
+        paymentReference: paymentRecord.payment_reference,
+        message: latestAttempt?.payment_message || 'Checkout was cancelled before completing payment. No funds were deducted.'
       }
     };
   }
 
-  // 8. Handle State: FAILED / EXPIRED
-  const failureReason = cfOrder.order_status === 'EXPIRED'
-    ? 'Cashfree order expired before payment'
-    : (successPayment?.payment_message || 'Payment not completed or failed at gateway');
+  // Rule 3: FAILED
+  // Latest/current authoritative attempt is FAILED or order is EXPIRED/TERMINATED.
+  if (
+    latestAttempt?.payment_status === 'FAILED' ||
+    latestAttempt?.payment_status === 'CANCELLED' ||
+    orderStatus === 'EXPIRED' ||
+    orderStatus === 'TERMINATED'
+  ) {
+    const failureReason = orderStatus === 'EXPIRED'
+      ? 'Cashfree order expired before payment'
+      : (latestAttempt?.payment_message || 'Payment not completed or failed at gateway');
 
-  await getSupabaseServer().rpc('mark_payment_failed', {
-    p_payment_id: paymentRecord.id,
-    p_reason: failureReason
-  });
+    await supabase.rpc('mark_payment_failed', {
+      p_payment_id: paymentRecord.id,
+      p_reason: failureReason
+    });
 
+    return {
+      status: 200,
+      data: {
+        success: false,
+        paymentStatus: 'FAILED',
+        orderId,
+        paymentReference: paymentRecord.payment_reference,
+        error: failureReason
+      }
+    };
+  }
+
+  // Rule 4: PENDING (Default fallback)
+  // Transaction still awaiting completion (e.g. orderStatus === 'ACTIVE' or latestAttempt?.payment_status === 'PENDING').
+  // Keep DB payment PENDING.
   return {
     status: 200,
     data: {
-      success: false,
-      paymentStatus: 'FAILED',
+      success: true,
+      paymentStatus: 'PENDING',
       orderId,
-      error: failureReason
+      paymentReference: paymentRecord.payment_reference,
+      message: 'Payment is pending or awaiting candidate completion in checkout.'
     }
   };
 }
@@ -842,52 +983,59 @@ export async function webhookHandler(
     return { status: 200, data: { received: true, note: 'No order_id in event payload' } };
   }
 
-  // 2. Locate payment record by orderId
-  const { data: paymentRecord } = await getSupabaseServer()
-    .from('payments')
-    .select('id, status, payment_reference')
-    .eq('gateway_order_id', orderId)
-    .maybeSingle();
+  const supabase = getSupabaseServer();
+
+  // 1. Resilient lookup for payment record
+  const { data: paymentRecord } = await resolvePaymentRecord(supabase, orderId);
 
   if (!paymentRecord) {
     console.warn(`[CASHFREE_WEBHOOK] No payment record found for order_id: ${orderId}`);
     return { status: 200, data: { received: true, note: 'Payment record not found' } };
   }
 
-  // 3. IDEMPOTENCY: If already marked SUCCESS, acknowledge immediately
+  // 2. IDEMPOTENCY: If already marked SUCCESS, acknowledge immediately
   if (paymentRecord.status === 'SUCCESS') {
     console.log(`[CASHFREE_WEBHOOK] Payment ${paymentRecord.id} already marked SUCCESS. Idempotent return.`);
     return { status: 200, data: { received: true, idempotent: true } };
   }
 
-  // 4. Process SUCCESS
+  // 3. Process SUCCESS (SUCCESS always wins)
   if (paymentStatus === 'SUCCESS' || eventType === 'PAYMENT_SUCCESS_WEBHOOK' || eventType === 'ORDER_PAID_WEBHOOK') {
     const gatewayPaymentId = String(cfPaymentId || `cf_hook_${Date.now()}`);
 
-    await getSupabaseServer().rpc('complete_verified_payment', {
+    const { data: rpcRes } = await supabase.rpc('complete_verified_payment', {
       p_payment_id: paymentRecord.id,
       p_gateway_order_id: orderId,
       p_gateway_payment_id: gatewayPaymentId,
       p_payment_method: 'CASHFREE'
     });
 
-    await getSupabaseServer()
-      .from('payments')
-      .update({ gateway: 'CASHFREE' })
-      .eq('id', paymentRecord.id);
+    const verified = rpcRes as any;
+    if (verified && !verified.already_verified) {
+      await supabase
+        .from('payments')
+        .update({ gateway: 'CASHFREE' })
+        .eq('id', paymentRecord.id);
 
-    // Asynchronously generate candidate Reference Slip and dispatch via Resend
-    triggerPostPaymentReferenceSlip(paymentRecord.id).catch((refErr) => {
-      console.warn('[CASHFREE_WEBHOOK] Asynchronous Reference Slip error (ignored):', refErr);
-    });
+      // Asynchronously generate candidate Reference Slip and dispatch via Resend
+      triggerPostPaymentReferenceSlip(paymentRecord.id).catch((refErr) => {
+        console.warn('[CASHFREE_WEBHOOK] Asynchronous Reference Slip error (ignored):', refErr);
+      });
+    }
 
     return { status: 200, data: { received: true, processed: true } };
   }
 
-  // 5. Process FAILURE
+  // 4. Process USER_DROPPED (Keep DB payment PENDING)
+  if (paymentStatus === 'USER_DROPPED' || eventType === 'PAYMENT_USER_DROPPED_WEBHOOK') {
+    // Keep DB payment PENDING so candidate can resume checkout
+    return { status: 200, data: { received: true, user_dropped: true } };
+  }
+
+  // 5. Process FAILURE (Only if currently PENDING)
   if (paymentStatus === 'FAILED' || eventType === 'PAYMENT_FAILED_WEBHOOK') {
     if (paymentRecord.status === 'PENDING') {
-      await getSupabaseServer().rpc('mark_payment_failed', {
+      await supabase.rpc('mark_payment_failed', {
         p_payment_id: paymentRecord.id,
         p_reason: paymentData?.payment_message || 'Cashfree payment failed'
       });
