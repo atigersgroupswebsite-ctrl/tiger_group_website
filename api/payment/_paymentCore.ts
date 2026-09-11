@@ -920,3 +920,175 @@ export async function webhookHandler(
 
   return { status: 200, data: { received: true, event: eventType } };
 }
+
+/**
+ * Handler: POST /api/payment/record-offline
+ * Admin manual offline payment recording
+ */
+export async function recordOfflinePaymentHandler(
+  body: {
+    applicationId?: string;
+    joiningFormId?: string;
+    purpose: string;
+    amount: number;
+    receivedBy: string;
+    notes?: string;
+  },
+  authHeader?: string
+) {
+  const { applicationId, joiningFormId, purpose, amount, receivedBy, notes } = body;
+
+  if ((!applicationId && !joiningFormId) || !purpose || !amount || !receivedBy) {
+    return {
+      status: 400,
+      data: {
+        success: false,
+        error: 'Missing required offline payment fields (source reference, purpose, amount, or receivedBy)'
+      }
+    };
+  }
+
+  const auth = await authenticateRequest(authHeader);
+  if (!auth.authenticated || !auth.user) {
+    return { status: 401, data: { success: false, error: auth.error || 'Unauthorized' } };
+  }
+
+  const supabase = getSupabaseServer();
+
+  // Verify admin authorization & hardened role checks
+  const { data: adminProfile, error: profileErr } = await supabase
+    .from('admin_profiles')
+    .select('role, active')
+    .eq('id', auth.user.id)
+    .eq('active', true)
+    .maybeSingle();
+
+  if (profileErr || !adminProfile) {
+    return { status: 403, data: { success: false, error: 'Only authorized administrators can record offline payments.' } };
+  }
+
+  const allowedRoles = ['SUPER_ADMIN', 'COORDINATOR', 'ACCOUNTANT'];
+  if (!allowedRoles.includes(adminProfile.role)) {
+    return {
+      status: 403,
+      data: {
+        success: false,
+        error: `Role '${adminProfile.role}' is not authorized to record offline payments. Document Verifiers have read-only access.`
+      }
+    };
+  }
+
+  // To ensure has_admin_role in PostgreSQL RPC sees the user context, create user client or use supabase
+  const token = authHeader?.replace('Bearer ', '').trim();
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const userClient = token
+    ? createClient(supabaseUrl, process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '', {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${token}` } }
+      })
+    : supabase;
+
+  let rpcRes: any = null;
+  let rpcErr: any = null;
+
+  const rpcPayload = {
+    p_app_id: applicationId || null,
+    p_purpose: purpose,
+    p_amount: amount,
+    p_received_by: receivedBy,
+    p_notes: notes || undefined,
+    p_joining_form_id: joiningFormId || null
+  };
+
+  // Attempt RPC with user token context first (satisfies has_admin_role)
+  const userAttempt = await userClient.rpc('record_offline_payment', rpcPayload);
+  rpcRes = userAttempt.data;
+  rpcErr = userAttempt.error;
+
+  // If user client failed due to auth/headers, try with service client
+  if (rpcErr && userClient !== supabase) {
+    console.warn('[OFFLINE_PAYMENT] User client RPC attempt failed, falling back to service role client:', rpcErr.message);
+    const serviceAttempt = await supabase.rpc('record_offline_payment', rpcPayload);
+    if (!serviceAttempt.error) {
+      rpcRes = serviceAttempt.data;
+      rpcErr = null;
+    }
+  }
+
+  if (rpcErr || !rpcRes) {
+    console.error('[OFFLINE_PAYMENT] Failed to record offline payment:', rpcErr);
+    return { status: 500, data: { success: false, error: rpcErr?.message || 'Failed to record offline payment' } };
+  }
+
+  const paymentRecord = rpcRes as any;
+  const paymentId = paymentRecord?.payment_id || paymentRecord?.id;
+  if (paymentId) {
+    await dispatchPostPaymentNotifications(paymentId);
+  }
+
+  return { status: 200, data: rpcRes };
+}
+
+/**
+ * Handler: POST /api/payment/resend-receipt
+ * Admin or candidate action to resend the payment receipt email
+ */
+export async function resendReceiptEmailHandler(
+  body: { paymentId: string },
+  authHeader?: string
+) {
+  const { paymentId } = body;
+  if (!paymentId) {
+    return { status: 400, data: { success: false, error: 'Payment ID is required' } };
+  }
+
+  const auth = await authenticateRequest(authHeader);
+  if (!auth.authenticated || !auth.user) {
+    return { status: 401, data: { success: false, error: auth.error || 'Unauthorized' } };
+  }
+
+  const supabase = getSupabaseServer();
+
+  // Find payment and application
+  const { data: payment, error: pErr } = await supabase
+    .from('payments')
+    .select(`
+      id, payment_reference, receipt_number, amount, currency, purpose, status, paid_at,
+      payment_method, gateway, gateway_order_id, gateway_payment_id,
+      applications:application_id (id, application_number, full_name, email, mobile)
+    `)
+    .eq('id', paymentId)
+    .single();
+
+  if (pErr || !payment) {
+    return { status: 404, data: { success: false, error: 'Payment record not found' } };
+  }
+
+  if (payment.status !== 'SUCCESS') {
+    return { status: 400, data: { success: false, error: 'Receipt can only be sent for SUCCESS payments' } };
+  }
+
+  // Authorization: Must be the applicant OR an active admin
+  const app = payment.applications as any;
+  const userEmail = auth.user.email?.toLowerCase().trim();
+  const isApplicant = app?.email && app.email.toLowerCase().trim() === userEmail;
+
+  if (!isApplicant) {
+    const { data: adminProfile } = await supabase
+      .from('admin_profiles')
+      .select('role, active')
+      .eq('id', auth.user.id)
+      .eq('active', true)
+      .maybeSingle();
+
+    if (!adminProfile) {
+      return { status: 403, data: { success: false, error: 'Unauthorized to resend receipt for this payment' } };
+    }
+  }
+
+  // Dispatch receipt and reference slip using serverless-safe notification function
+  await dispatchPostPaymentNotifications(payment.id);
+
+  return { status: 200, data: { success: true } };
+}
+

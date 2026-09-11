@@ -4,11 +4,11 @@
 // Brand: A TIGER GROUPS — A TIGER GLOBAL Career Solution & Consultancy
 // ==============================================================================
 
-import { sendApplicationEmail, getEmailConfig } from './resendClient';
+import { sendApplicationEmail, getEmailConfig } from './resendClient.js';
 import {
   renderJobSeekerEnquiryTemplate,
   renderEmployerEnquiryTemplate
-} from './emailTemplates';
+} from './emailTemplates.js';
 
 export async function sendJobSeekerEnquiryNotificationServerHandler(payload: {
   applicationNumber: string;
