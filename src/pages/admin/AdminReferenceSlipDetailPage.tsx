@@ -765,6 +765,10 @@ export const AdminReferenceSlipDetailPage: React.FC = () => {
           referenceNumber={slip.reference_number}
           candidateName={candidate.fullName}
           sourceReference={candidate.sourceReference}
+          referenceSlipId={slip.id}
+          joiningFormId={slip.joining_form_id || undefined}
+          applicationId={slip.application_id || undefined}
+          candidateEmail={candidate.email}
           consultancyAccepted={consultancyReturn?.candidate_acceptance}
           acceptedAt={consultancyReturn?.accepted_at}
           generatedFile={latestFile}

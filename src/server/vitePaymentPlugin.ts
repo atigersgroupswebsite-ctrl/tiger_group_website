@@ -86,6 +86,21 @@ export function paymentApiPlugin(): Plugin {
           }
         }
 
+        // Handle Admin Reference Slip Email Dispatch
+        if (url === '/api/admin/reference-slips/send' && req.method?.toUpperCase() === 'POST') {
+          const authHeader = req.headers['authorization'];
+          try {
+            const rawBody = await parseRequestBody(req);
+            const body = JSON.parse(rawBody || '{}');
+            const { sendReferenceSlipServerHandler } = await import('./referenceSlipEmailService');
+            const result = await sendReferenceSlipServerHandler(body, authHeader);
+            return sendJsonResponse(res, result.status || 200, result.data);
+          } catch (refErr: any) {
+            console.error('[API_REFERENCE_SLIP_SEND_ERROR]', refErr);
+            return sendJsonResponse(res, 500, { success: false, error: refErr.message || 'Failed to dispatch Reference Slip' });
+          }
+        }
+
         // Handle Candidate Account Creation via Supabase Auth Admin
         if (url === '/api/candidate/register' && req.method?.toUpperCase() === 'POST') {
           try {

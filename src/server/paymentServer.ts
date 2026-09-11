@@ -263,6 +263,49 @@ export async function createPaymentOrderHandler(
 }
 
 /**
+ * Gateway-agnostic post-payment success handler.
+ * Generates the official Reference Slip (idempotently) and triggers automatic Resend email.
+ * Decoupled: Resend failure never reverses payment success.
+ */
+export async function triggerPostPaymentReferenceSlip(paymentId: string) {
+  try {
+    const { getOrCreateReferenceSlipForPayment } = await import('../services/referenceSlipService');
+    const refSlipRes = await getOrCreateReferenceSlipForPayment(paymentId);
+
+    if (!refSlipRes.success || !refSlipRes.data || !refSlipRes.candidateEmail) {
+      console.warn('[POST_PAYMENT_TRIGGER] Reference Slip notice:', refSlipRes.error);
+      return;
+    }
+
+    let pdfBytes = refSlipRes.pdfBytes;
+    if (!pdfBytes && refSlipRes.file?.storage_path) {
+      const { data: fileData } = await getSupabaseServer().storage
+        .from('generated-documents')
+        .download(refSlipRes.file.storage_path);
+      if (fileData) {
+        const ab = await fileData.arrayBuffer();
+        pdfBytes = new Uint8Array(ab);
+      }
+    }
+
+    if (pdfBytes) {
+      const { sendReferenceSlipEmail } = await import('./referenceSlipEmailService');
+      await sendReferenceSlipEmail({
+        recipientEmail: refSlipRes.candidateEmail,
+        candidateName: refSlipRes.candidateName || 'Candidate',
+        referenceNumber: refSlipRes.referenceNumber || refSlipRes.data.slip.reference_number,
+        sourceReference: refSlipRes.sourceReference || 'REF',
+        pdfBuffer: pdfBytes,
+        joiningFormId: refSlipRes.data.slip.joining_form_id,
+        applicationId: refSlipRes.data.slip.application_id
+      });
+    }
+  } catch (err: any) {
+    console.warn('[POST_PAYMENT_TRIGGER] Asynchronous Reference Slip trigger error (ignored, payment stays SUCCESS):', err?.message);
+  }
+}
+
+/**
  * Handler: POST /api/payments/verify
  * Cryptographic server-side signature verification & atomic database completion
  */
@@ -360,6 +403,11 @@ export async function verifyPaymentHandler(
     console.warn('[PAYMENT_VERIFY] Asynchronous receipt email error (ignored):', emailErr);
   });
 
+  // 4. Generate candidate Reference Slip and dispatch via Resend asynchronously
+  triggerPostPaymentReferenceSlip(paymentId).catch((refErr) => {
+    console.warn('[PAYMENT_VERIFY] Asynchronous Reference Slip error (ignored):', refErr);
+  });
+
   return {
     status: 200,
     data: {
@@ -452,6 +500,11 @@ export async function webhookHandler(rawBody: string, signatureHeader?: string |
       p_payment_method: paymentEntity?.method?.toUpperCase() || 'RAZORPAY'
     });
 
+    // Asynchronously generate candidate Reference Slip and dispatch via Resend
+    triggerPostPaymentReferenceSlip(paymentRecord.id).catch((refErr) => {
+      console.warn('[WEBHOOK] Asynchronous Reference Slip error (ignored):', refErr);
+    });
+
     return { status: 200, data: { received: true, processed: true } };
   }
 
@@ -540,6 +593,14 @@ export async function recordOfflinePaymentHandler(
   if (rpcErr || !rpcRes) {
     console.error('[OFFLINE_PAYMENT] Failed to record:', rpcErr);
     return { status: 500, data: { success: false, error: rpcErr?.message || 'Failed to record offline payment' } };
+  }
+
+  const paymentRecord = rpcRes as any;
+  const paymentId = paymentRecord?.payment_id || paymentRecord?.id;
+  if (paymentId) {
+    triggerPostPaymentReferenceSlip(paymentId).catch((refErr) => {
+      console.warn('[OFFLINE_PAYMENT] Asynchronous Reference Slip error (ignored):', refErr);
+    });
   }
 
   return { status: 200, data: rpcRes };

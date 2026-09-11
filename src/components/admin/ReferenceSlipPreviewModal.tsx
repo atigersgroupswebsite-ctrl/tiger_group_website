@@ -19,9 +19,12 @@ import {
   Clock,
   ShieldCheck,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  Download,
+  Mail
 } from 'lucide-react';
 import type { GeneratedFileRow } from '../../types/database';
+import { supabase } from '../../lib/supabaseClient';
 
 interface ReferenceSlipPreviewModalProps {
   isOpen: boolean;
@@ -30,6 +33,10 @@ interface ReferenceSlipPreviewModalProps {
   referenceNumber: string;
   candidateName: string;
   sourceReference: string;
+  referenceSlipId?: string;
+  joiningFormId?: string;
+  applicationId?: string;
+  candidateEmail?: string;
   consultancyAccepted?: boolean;
   acceptedAt?: string | null;
   generatedFile?: GeneratedFileRow | null;
@@ -45,6 +52,10 @@ export const ReferenceSlipPreviewModal: React.FC<ReferenceSlipPreviewModalProps>
   referenceNumber,
   candidateName,
   sourceReference,
+  referenceSlipId,
+  joiningFormId,
+  applicationId,
+  candidateEmail,
   consultancyAccepted,
   acceptedAt,
   generatedFile,
@@ -53,9 +64,61 @@ export const ReferenceSlipPreviewModal: React.FC<ReferenceSlipPreviewModalProps>
   canManage = false
 }) => {
   const [iframeLoading, setIframeLoading] = useState(true);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   if (!isOpen) return null;
+
+  const handleDownload = async () => {
+    if (!signedUrl) return;
+    try {
+      const res = await fetch(signedUrl);
+      const blob = await res.blob();
+      const safeRef = sourceReference ? sourceReference.replace(/[^a-zA-Z0-9_-]/g, '_') : 'REFERENCE-SLIP';
+      const filename = `${safeRef}-REFERENCE-SLIP.pdf`;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch {
+      window.open(signedUrl, '_blank');
+    }
+  };
+
+  const handleSendEmail = async () => {
+    setIsSendingEmail(true);
+    setEmailStatus(null);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch('/api/admin/reference-slips/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify({
+          referenceSlipId: referenceSlipId || (generatedFile as any)?.reference_slip_id,
+          joiningFormId: joiningFormId || generatedFile?.joining_form_id,
+          applicationId: applicationId || generatedFile?.application_id
+        })
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success) {
+        setEmailStatus('Email sent successfully!');
+      } else {
+        setEmailStatus(`Failed: ${json.error || 'Delivery failed'}`);
+      }
+    } catch (err: any) {
+      setEmailStatus(`Error: ${err?.message || 'Network error'}`);
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
 
   const handlePrint = () => {
     if (iframeRef.current && iframeRef.current.contentWindow) {
@@ -182,7 +245,30 @@ export const ReferenceSlipPreviewModal: React.FC<ReferenceSlipPreviewModalProps>
 
             <button
               type="button"
+              onClick={handleDownload}
+              title="Download Official 2-Page Reference Slip PDF"
+              style={{
+                padding: '0.5rem 0.85rem',
+                borderRadius: '8px',
+                border: '1px solid #CBD5E1',
+                backgroundColor: '#FFFFFF',
+                color: '#1E293B',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}
+            >
+              <Download size={15} />
+              <span>Download PDF</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handlePrint}
+              title="Print only the 2-Page Reference Slip document"
               style={{
                 padding: '0.5rem 0.95rem',
                 borderRadius: '8px',
@@ -198,15 +284,44 @@ export const ReferenceSlipPreviewModal: React.FC<ReferenceSlipPreviewModalProps>
               }}
             >
               <Printer size={15} />
-              <span>Print Document</span>
+              <span>Print</span>
             </button>
+
+            {canManage && (
+              <button
+                type="button"
+                onClick={handleSendEmail}
+                disabled={isSendingEmail}
+                title={candidateEmail ? `Send Reference Slip to ${candidateEmail}` : 'Send Reference Slip via Resend'}
+                style={{
+                  padding: '0.5rem 0.95rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#4F46E5',
+                  color: '#FFFFFF',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: isSendingEmail ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                {isSendingEmail ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Mail size={15} />
+                )}
+                <span>{isSendingEmail ? 'Sending...' : 'Send to Candidate'}</span>
+              </button>
+            )}
 
             {signedUrl && (
               <a
                 href={signedUrl}
                 target="_blank"
                 rel="noreferrer"
-                title="Open in new window"
+                title="Open in new tab"
                 style={{
                   padding: '0.5rem',
                   borderRadius: '8px',
@@ -303,6 +418,32 @@ export const ReferenceSlipPreviewModal: React.FC<ReferenceSlipPreviewModalProps>
             )}
           </div>
         </div>
+
+        {/* Email Status Notification Banner */}
+        {emailStatus && (
+          <div
+            style={{
+              padding: '0.6rem 1.5rem',
+              backgroundColor: emailStatus.startsWith('Email sent') ? '#ECFDF5' : '#FEF2F2',
+              color: emailStatus.startsWith('Email sent') ? '#065F46' : '#991B1B',
+              borderBottom: '1px solid #E2E8F0',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}
+          >
+            <span>{emailStatus}</span>
+            <button
+              type="button"
+              onClick={() => setEmailStatus(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* PDF Viewer Container */}
         <div style={{ flex: 1, position: 'relative', backgroundColor: '#525659' }}>

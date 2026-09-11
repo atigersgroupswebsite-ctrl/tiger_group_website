@@ -16,8 +16,11 @@ import {
   Edit3,
   Plus,
   Loader2,
-  ShieldCheck
+  ShieldCheck,
+  Download,
+  Mail
 } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import {
   getReferenceSlipForEntity,
@@ -140,6 +143,68 @@ export const ReferenceSlipApplicationTab: React.FC<ReferenceSlipApplicationTabPr
     // If not generated yet, prompt generation
     if (canGenerate) {
       await handleGeneratePdf();
+    }
+  };
+
+  const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
+
+  // Handle Download PDF directly
+  const handleDownloadPdf = async () => {
+    if (!detail) return;
+    const latestFile = detail.generatedFiles[0];
+    if (!latestFile?.storage_path) return;
+    try {
+      const { url } = await getGeneratedDocumentSignedUrl(latestFile.storage_path, 3600);
+      if (url) {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const safeRef = detail.candidate.sourceReference
+          ? detail.candidate.sourceReference.replace(/[^a-zA-Z0-9_-]/g, '_')
+          : 'REFERENCE-SLIP';
+        const filename = `${safeRef}-REFERENCE-SLIP.pdf`;
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(blobUrl);
+      }
+    } catch {
+      alert('Failed to download Reference Slip.');
+    }
+  };
+
+  // Handle Send Email directly
+  const handleSendEmail = async () => {
+    if (!detail) return;
+    setIsSendingEmail(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch('/api/admin/reference-slips/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify({
+          referenceSlipId: detail.slip.id,
+          joiningFormId: detail.slip.joining_form_id || joiningFormId,
+          applicationId: detail.slip.application_id || applicationId
+        })
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success) {
+        alert(`Reference Slip email successfully sent to ${detail.candidate.email}`);
+        await loadData();
+      } else {
+        alert(`Failed to send email: ${json.error || 'Server error'}`);
+      }
+    } catch (err: any) {
+      alert(`Error sending email: ${err?.message || 'Network failure'}`);
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -345,6 +410,53 @@ export const ReferenceSlipApplicationTab: React.FC<ReferenceSlipApplicationTabPr
                   <Printer size={15} />
                   <span>View / Print 2-Page PDF</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  title="Download candidate 2-page Reference Slip PDF"
+                  style={{
+                    padding: '0.55rem 0.9rem',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    backgroundColor: '#FFFFFF',
+                    color: '#334155',
+                    fontSize: '0.825rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <Download size={15} />
+                  <span>Download</span>
+                </button>
+
+                {canGenerate && (
+                  <button
+                    type="button"
+                    onClick={handleSendEmail}
+                    disabled={isSendingEmail}
+                    title="Send Reference Slip to Candidate via Resend"
+                    style={{
+                      padding: '0.55rem 0.9rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: '#4F46E5',
+                      color: '#FFFFFF',
+                      fontSize: '0.825rem',
+                      fontWeight: 600,
+                      cursor: isSendingEmail ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}
+                  >
+                    {isSendingEmail ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+                    <span>{isSendingEmail ? 'Sending...' : 'Send to Candidate'}</span>
+                  </button>
+                )}
 
                 {canGenerate && (
                   <button
@@ -610,6 +722,10 @@ export const ReferenceSlipApplicationTab: React.FC<ReferenceSlipApplicationTabPr
           referenceNumber={slip.reference_number}
           candidateName={candidate.fullName}
           sourceReference={candidate.sourceReference}
+          referenceSlipId={slip.id}
+          joiningFormId={slip.joining_form_id || joiningFormId}
+          applicationId={slip.application_id || applicationId}
+          candidateEmail={candidate.email}
           consultancyAccepted={consultancyReturn?.candidate_acceptance}
           acceptedAt={consultancyReturn?.accepted_at}
           generatedFile={latestFile}

@@ -20,6 +20,8 @@ import type {
   CompanyRow
 } from '../types/database';
 import { logActivity } from './activityService';
+import { generateAndPersistReferenceSlipPdf } from './referenceSlipPdfGenerator';
+import { getGeneratedDocumentSignedUrl } from './filePersistenceService';
 
 export interface CandidateSourceInfo {
   sourceType: 'APPLICATION' | 'JOINING_FORM';
@@ -160,7 +162,7 @@ export async function resolveCandidateSource(
           sourceId: jf.id,
           sourceReference: jf.joining_reference || `JOIN-${new Date().getFullYear()}-000000`,
           fullName: jf.candidate_name || '—',
-          fatherName: jf.mother_or_husband_name || '—',
+          fatherName: jf.father_name || jf.mother_or_husband_name || '—',
           mobile: jf.employee_contact_number || '—',
           email: jf.email || '—',
           address: [jf.permanent_address, jf.permanent_city, jf.permanent_district, jf.permanent_state, jf.permanent_pin_code]
@@ -871,3 +873,188 @@ export async function getCandidatesForReferenceSlip(): Promise<Array<{
     return [];
   }
 }
+
+/**
+ * Idempotently retrieves or creates a Reference Slip and its persisted 2-page vector PDF.
+ * Never creates duplicate reference slips or duplicate generated files.
+ */
+export async function getOrCreateReferenceSlipForEntity(params: {
+  applicationId?: string | null;
+  joiningFormId?: string | null;
+  adminUserId?: string | null;
+  forceRegenerate?: boolean;
+}): Promise<{
+  success: boolean;
+  data?: ReferenceSlipDetailData;
+  file?: GeneratedFileRow;
+  signedUrl?: string;
+  pdfBytes?: Uint8Array;
+  error?: string;
+}> {
+  if (!params.applicationId && !params.joiningFormId) {
+    return { success: false, error: 'Either applicationId or joiningFormId is required.' };
+  }
+
+  // 1. Fetch existing reference slip or create one if absent
+  let detailRes = await getReferenceSlipForEntity({
+    applicationId: params.applicationId || undefined,
+    joiningFormId: params.joiningFormId || undefined
+  });
+
+  if (!detailRes.success) {
+    return { success: false, error: detailRes.error };
+  }
+
+  let detail = detailRes.data;
+
+  // If no reference slip exists yet, create one
+  if (!detail) {
+    const candidate = await resolveCandidateSource(params.applicationId, params.joiningFormId);
+    if (!candidate) {
+      return { success: false, error: 'Could not resolve candidate source records.' };
+    }
+
+    const saveRes = await saveReferenceSlip({
+      applicationId: params.applicationId,
+      joiningFormId: params.joiningFormId,
+      formData: {
+        interviewResult: 'SELECTED',
+        designation: candidate.positionApplied || 'Consultant / Executive',
+        remarks: 'Auto-generated official reference slip upon verified payment completion.'
+      },
+      adminUser: { id: params.adminUserId || 'system', name: 'Automated Payment Verification' }
+    });
+
+    if (!saveRes.success || !saveRes.data) {
+      return { success: false, error: saveRes.error || 'Failed to initialize reference slip record.' };
+    }
+
+    detailRes = await getReferenceSlipById(saveRes.data.id);
+    if (!detailRes.success || !detailRes.data) {
+      return { success: false, error: detailRes.error || 'Failed to load created reference slip.' };
+    }
+    detail = detailRes.data;
+  }
+
+  // 2. Check if a generated 2-page PDF already exists
+  const existingPdfFile = detail.generatedFiles.find((f) => f.file_type === 'REFERENCE_SLIP_PDF');
+
+  if (existingPdfFile && !params.forceRegenerate) {
+    // Reuse existing generated PDF
+    const { url: signedUrl } = await getGeneratedDocumentSignedUrl(existingPdfFile.storage_path, 3600);
+    return {
+      success: true,
+      data: detail,
+      file: existingPdfFile,
+      signedUrl: signedUrl || undefined
+    };
+  }
+
+  // 3. Generate and persist new official 2-page vector PDF
+  const genRes = await generateAndPersistReferenceSlipPdf(detail, params.adminUserId);
+  if (!genRes.success) {
+    return { success: false, error: genRes.error, data: detail };
+  }
+
+  // Re-fetch detail to reflect new generated file record
+  const refreshedDetailRes = await getReferenceSlipById(detail.slip.id);
+  const refreshedDetail = refreshedDetailRes.data || detail;
+  const newFile = refreshedDetail.generatedFiles.find((f) => f.id === genRes.fileId) || refreshedDetail.generatedFiles[0];
+
+  return {
+    success: true,
+    data: refreshedDetail,
+    file: newFile,
+    signedUrl: genRes.signedUrl,
+    pdfBytes: genRes.pdfBytes
+  };
+}
+
+/**
+ * Idempotently generates or fetches the Reference Slip associated with a verified payment.
+ * Resolves candidate's authoritative email and reference numbers.
+ */
+export async function getOrCreateReferenceSlipForPayment(paymentId: string): Promise<{
+  success: boolean;
+  data?: ReferenceSlipDetailData;
+  file?: GeneratedFileRow;
+  signedUrl?: string;
+  pdfBytes?: Uint8Array;
+  candidateEmail?: string;
+  candidateName?: string;
+  referenceNumber?: string;
+  sourceReference?: string;
+  error?: string;
+}> {
+  if (!paymentId) {
+    return { success: false, error: 'Payment ID is required' };
+  }
+
+  try {
+    const { data: payment, error: pErr } = await supabase
+      .from('payments')
+      .select('id, application_id, joining_form_id, status, purpose')
+      .eq('id', paymentId)
+      .maybeSingle();
+
+    if (pErr || !payment) {
+      return { success: false, error: pErr?.message || `Payment record ${paymentId} not found.` };
+    }
+
+    let applicationId = payment.application_id;
+    let joiningFormId = payment.joining_form_id;
+
+    // If joiningFormId is missing but applicationId is present, check if joining_forms has it
+    if (!joiningFormId && applicationId) {
+      const { data: linkedJf } = await supabase
+        .from('joining_forms')
+        .select('id')
+        .eq('application_id', applicationId)
+        .maybeSingle();
+      if (linkedJf) {
+        joiningFormId = linkedJf.id;
+      }
+    }
+
+    // If applicationId is missing but joiningFormId is present, check if joining_forms has application_id
+    if (!applicationId && joiningFormId) {
+      const { data: linkedJf } = await supabase
+        .from('joining_forms')
+        .select('application_id')
+        .eq('id', joiningFormId)
+        .maybeSingle();
+      if (linkedJf?.application_id) {
+        applicationId = linkedJf.application_id;
+      }
+    }
+
+    if (!joiningFormId && !applicationId) {
+      return { success: false, error: 'Payment is not linked to an Application or Joining Form.' };
+    }
+
+    const res = await getOrCreateReferenceSlipForEntity({
+      applicationId,
+      joiningFormId
+    });
+
+    if (!res.success || !res.data) {
+      return { success: false, error: res.error || 'Failed to get or create reference slip for payment.' };
+    }
+
+    return {
+      success: true,
+      data: res.data,
+      file: res.file,
+      signedUrl: res.signedUrl,
+      pdfBytes: res.pdfBytes,
+      candidateEmail: res.data.candidate.email,
+      candidateName: res.data.candidate.fullName,
+      referenceNumber: res.data.slip.reference_number,
+      sourceReference: res.data.candidate.sourceReference
+    };
+  } catch (err: any) {
+    console.error('[getOrCreateReferenceSlipForPayment] Error:', err);
+    return { success: false, error: err?.message || 'Error processing payment reference slip.' };
+  }
+}
+

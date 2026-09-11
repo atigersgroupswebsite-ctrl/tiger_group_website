@@ -84,6 +84,9 @@ export const AdminReferenceSlipsPage: React.FC = () => {
     acceptedAt: string | null;
     genFile: any;
     slipId: string;
+    joiningFormId?: string | null;
+    applicationId?: string | null;
+    candidateEmail?: string;
   } | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
@@ -149,7 +152,10 @@ export const AdminReferenceSlipsPage: React.FC = () => {
           consultancyAccepted: item.consultancyAccepted,
           acceptedAt: item.consultancyAcceptedAt,
           genFile: item.latestGeneratedFile,
-          slipId: item.id
+          slipId: item.id,
+          joiningFormId: item.joiningFormId,
+          applicationId: item.applicationId,
+          candidateEmail: item.candidateEmail
         });
         setIsPreviewOpen(true);
         return;
@@ -172,7 +178,10 @@ export const AdminReferenceSlipsPage: React.FC = () => {
               consultancyAccepted: item.consultancyAccepted,
               acceptedAt: item.consultancyAcceptedAt,
               genFile: { version: genRes.version },
-              slipId: item.id
+              slipId: item.id,
+              joiningFormId: item.joiningFormId,
+              applicationId: item.applicationId,
+              candidateEmail: item.candidateEmail
             });
             setIsPreviewOpen(true);
             await loadSlips();
@@ -763,6 +772,10 @@ export const AdminReferenceSlipsPage: React.FC = () => {
           consultancyAccepted={previewMeta.consultancyAccepted}
           acceptedAt={previewMeta.acceptedAt}
           generatedFile={previewMeta.genFile}
+          referenceSlipId={previewMeta.slipId}
+          joiningFormId={previewMeta.joiningFormId || undefined}
+          applicationId={previewMeta.applicationId || undefined}
+          candidateEmail={previewMeta.candidateEmail}
           onRegenerate={canGenerate ? handleRegenerateFromPreview : undefined}
           isRegenerating={isGenerating}
           canManage={canGenerate}
