@@ -113,7 +113,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.status === 'SUBMITTED' || parsed.submissionStatus === 'SUBMITTED') {
-          return parsed.viewMode !== 'REVIEW';
+          return true;
         }
       }
     } catch {
@@ -260,6 +260,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
 
         if (isDbSubmitted) {
           setFormData(dbData);
+          setShowSuccessScreen(true);
           setCurrentStep(8);
           setCompletedSteps([1, 2, 3, 4, 5, 6, 7, 8]);
           setIsLoadingDossier(false);

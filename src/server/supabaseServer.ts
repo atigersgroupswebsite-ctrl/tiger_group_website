@@ -17,8 +17,10 @@ export function getSupabaseServer(): any {
       "https://bhfxqtaesvfsbdckgeka.supabase.co";
     const supabaseServiceKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
       process.env.VITE_SUPABASE_ANON_KEY ||
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy";
+      "";
     _supabaseServer = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });

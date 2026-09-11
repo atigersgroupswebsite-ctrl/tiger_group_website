@@ -42,7 +42,8 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
   confirmationChecked,
   onConfirmationToggle,
   onSubmit,
-  isSubmitting = false
+  isSubmitting = false,
+  onBackToSuccess
 }) => {
   const isSubmitted =
     formData.status === 'SUBMITTED' || formData.submissionStatus === 'SUBMITTED';
@@ -271,6 +272,27 @@ export const ReviewSection: React.FC<ReviewSectionProps> = ({
               {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />}
               <span>{isGeneratingPdf ? 'PREPARING PDF...' : 'DOWNLOAD PDF'}</span>
             </button>
+            {onBackToSuccess && (
+              <button
+                type="button"
+                onClick={onBackToSuccess}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.55rem 1.1rem',
+                  backgroundColor: '#047857',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                <span>&larr; BACK TO PAYMENT STATUS</span>
+              </button>
+            )}
           </div>
         </div>
       )}

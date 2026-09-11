@@ -407,6 +407,17 @@ export async function createPaymentOrderHandler(
   }
 
   const supabase = getSupabaseServer();
+  const token = authHeader?.replace('Bearer ', '').trim();
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const hasServiceRoleKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY);
+  const db = hasServiceRoleKey
+    ? supabase
+    : (token
+        ? createClient(supabaseUrl, process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '', {
+            auth: { persistSession: false, autoRefreshToken: false },
+            global: { headers: { Authorization: `Bearer ${token}` } }
+          })
+        : supabase);
   const payableAmount = AUTHORITATIVE_JOINING_FEE;
 
   let candidateName = 'Candidate';
@@ -468,7 +479,7 @@ export async function createPaymentOrderHandler(
   } else if (joiningFormId) {
     // Standalone Joining flow
     // 1. Fetch joining form
-    const { data: joiningForm, error: jfErr } = await supabase
+    const { data: joiningForm, error: jfErr } = await db
       .from('joining_forms')
       .select('id, application_id, candidate_name, email, employee_contact_number, other_contact_number, candidate_auth_user_id, joining_reference, submission_status')
       .eq('id', joiningFormId)
@@ -483,7 +494,7 @@ export async function createPaymentOrderHandler(
     const isOwner = Boolean(joiningForm.candidate_auth_user_id && joiningForm.candidate_auth_user_id === candidateAuthUserId);
 
     if (!isOwner) {
-      const { data: adminProfile } = await supabase
+      const { data: adminProfile } = await db
         .from('admin_profiles')
         .select('role, active')
         .eq('id', auth.user.id)
@@ -499,7 +510,7 @@ export async function createPaymentOrderHandler(
     // Try RPC first (if migration with p_joining_form_id is active)
     let rpcHandled = false;
     try {
-      const { data: rpcRes, error: rpcErr } = await supabase.rpc('create_or_get_pending_payment', {
+      const { data: rpcRes, error: rpcErr } = await db.rpc('create_or_get_pending_payment', {
         p_app_id: null,
         p_purpose: purpose,
         p_amount: payableAmount,
@@ -515,7 +526,7 @@ export async function createPaymentOrderHandler(
 
     if (!rpcHandled) {
       // Idempotency check: First, check if already successfully paid
-      const { data: existingSuccess } = await supabase
+      const { data: existingSuccess } = await db
         .from('payments')
         .select('*')
         .eq('joining_form_id', joiningFormId)
@@ -545,7 +556,7 @@ export async function createPaymentOrderHandler(
 
       // Check if a recent PENDING payment exists (within 24 hours)
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { data: existingPending } = await supabase
+      const { data: existingPending } = await db
         .from('payments')
         .select('*')
         .eq('joining_form_id', joiningFormId)
@@ -565,7 +576,7 @@ export async function createPaymentOrderHandler(
           is_existing_success: false
         };
       } else {
-        const { data: newPayment, error: insertErr } = await supabase
+        const { data: newPayment, error: insertErr } = await db
           .from('payments')
           .insert({
             application_id: joiningForm.application_id || null,

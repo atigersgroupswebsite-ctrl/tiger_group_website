@@ -199,17 +199,31 @@ export async function getJoiningForm(
     }
 
     if (!formRecord) {
-      // Find candidate's own form
-      const { data: byUser } = await (supabase
+      // 1a. Prioritize candidate's submitted form so returning candidates see their submission state
+      const { data: submittedForm } = await (supabase
         .from('joining_forms')
         .select('*')
-        .or(`user_id.eq.${user.id},email.eq.${candidateEmail}`)
+        .or(`candidate_auth_user_id.eq.${user.id},user_id.eq.${user.id},email.eq.${candidateEmail}`)
+        .eq('submission_status', 'SUBMITTED')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle() as any);
 
-      if (byUser) {
-        formRecord = byUser;
+      if (submittedForm) {
+        formRecord = submittedForm;
+      } else {
+        // 1b. Look for any existing draft for this candidate
+        const { data: byUser } = await (supabase
+          .from('joining_forms')
+          .select('*')
+          .or(`candidate_auth_user_id.eq.${user.id},user_id.eq.${user.id},email.eq.${candidateEmail}`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle() as any);
+
+        if (byUser) {
+          formRecord = byUser;
+        }
       }
     }
 
@@ -219,6 +233,7 @@ export async function getJoiningForm(
         .from('joining_forms')
         .insert({
           user_id: user.id,
+          candidate_auth_user_id: user.id,
           email: candidateEmail,
           candidate_name: user.user_metadata?.full_name || '',
           submission_status: 'DRAFT'

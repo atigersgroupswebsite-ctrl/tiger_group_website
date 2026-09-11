@@ -25,7 +25,10 @@ import {
   FileText,
   AlertCircle,
   XCircle,
-  ArrowRight
+  ArrowRight,
+  CreditCard,
+  ShieldCheck,
+  Download
 } from 'lucide-react';
 import { Container } from '../components/common/Container';
 import { Button } from '../components/common/Button';
@@ -37,6 +40,8 @@ import {
   candidateResubmitJoiningForm,
   uploadCandidateDocument
 } from '../services/joiningService';
+import { createPaymentOrder, launchCashfreeCheckout } from '../services/paymentService';
+import { downloadPaymentReceiptPdf } from '../utils/paymentReceiptGenerator';
 import type { DocumentCategory } from '../types/joining';
 
 export const CandidatePortalPage: React.FC = () => {
@@ -55,6 +60,8 @@ export const CandidatePortalPage: React.FC = () => {
   const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
   const [resubmitting, setResubmitting] = useState<boolean>(false);
   const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [paymentRecord, setPaymentRecord] = useState<any | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
 
   // 1. Authenticate candidate session & load candidate dossiers
   const loadDossiers = useCallback(async () => {
@@ -105,6 +112,21 @@ export const CandidatePortalPage: React.FC = () => {
       } else {
         setActionNotice({ type: 'error', message: res.error || 'Could not load dossier details.' });
       }
+
+      // Check payment status for this dossier
+      const { data: payments } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('joining_form_id', formId)
+        .order('created_at', { ascending: false });
+
+      if (payments && payments.length > 0) {
+        const successPayment = payments.find((p: any) => p.status === 'SUCCESS');
+        const pendingPayment = payments.find((p: any) => p.status === 'PENDING');
+        setPaymentRecord(successPayment || pendingPayment || payments[0]);
+      } else {
+        setPaymentRecord(null);
+      }
     } catch (err: any) {
       setActionNotice({ type: 'error', message: err.message || 'Error loading dossier details.' });
     } finally {
@@ -117,6 +139,55 @@ export const CandidatePortalPage: React.FC = () => {
       loadDossierDetails(selectedDossierId);
     }
   }, [selectedDossierId, loadDossierDetails]);
+
+  const handleProceedPayment = async () => {
+    if (!selectedDossierId || isProcessingPayment) return;
+    setIsProcessingPayment(true);
+    setActionNotice(null);
+
+    try {
+      const res = await createPaymentOrder({ joiningFormId: selectedDossierId });
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to initiate payment with Cashfree.');
+      }
+
+      if (res.alreadyPaid) {
+        setActionNotice({ type: 'success', message: 'Registration fee has already been verified for this dossier.' });
+        await loadDossierDetails(selectedDossierId);
+        setIsProcessingPayment(false);
+        return;
+      }
+
+      if (!res.payment_session_id) {
+        throw new Error('Payment session ID was not returned by gateway.');
+      }
+
+      await launchCashfreeCheckout(res.payment_session_id);
+    } catch (err: any) {
+      setActionNotice({ type: 'error', message: err.message || 'Payment failed to initiate.' });
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const handleDownloadReceipt = () => {
+    if (!paymentRecord || !selectedDossier) return;
+    downloadPaymentReceiptPdf({
+      applicationNumber: selectedDossier.joining_reference || 'ATG-JOIN',
+      paymentReference: paymentRecord.payment_reference || 'N/A',
+      receiptNumber: paymentRecord.receipt_number || paymentRecord.payment_reference || 'REC',
+      candidateName: selectedDossier.candidate_name || candidateName || 'Candidate',
+      candidateEmail: selectedDossier.email || candidateEmail,
+      paymentPurpose: 'Candidate Registration & Dossier Verification Fee',
+      amount: Number(paymentRecord.amount) || 500,
+      currency: paymentRecord.currency || 'INR',
+      paymentDate: paymentRecord.paid_at || paymentRecord.created_at || new Date().toISOString(),
+      paymentStatus: 'SUCCESS',
+      paymentMethod: paymentRecord.payment_method || 'ONLINE / CASHFREE (SANDBOX)',
+      gateway: paymentRecord.gateway || 'CASHFREE',
+      gatewayOrderId: paymentRecord.gateway_order_id,
+      gatewayPaymentId: paymentRecord.gateway_payment_id
+    });
+  };
 
   // Handle Logout
   const handleLogout = async () => {
@@ -225,6 +296,8 @@ export const CandidatePortalPage: React.FC = () => {
   const historicalDocuments = documents.filter((d) => !d.is_current);
   const rejectedCount = activeDocuments.filter((d) => d.verification_status === 'REJECTED').length;
   const isReuploadRequired = selectedDossier?.submission_status === 'REUPLOAD_REQUIRED' || rejectedCount > 0;
+  const isPaymentPaid = paymentRecord?.status === 'SUCCESS';
+  const isPaymentPending = paymentRecord?.status === 'PENDING';
 
   return (
     <div style={{ paddingTop: 'calc(var(--header-height) + 1.5rem)', minHeight: '90vh', paddingBottom: '5rem', backgroundColor: '#F8FAFC' }}>
@@ -478,6 +551,127 @@ export const CandidatePortalPage: React.FC = () => {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Registration & Verification Fee / Payment State Card */}
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 'var(--radius-xl)',
+                border: isPaymentPaid ? '1px solid #86EFAC' : '1px solid var(--color-border)',
+                padding: '1.75rem 2rem',
+                boxShadow: 'var(--shadow-sm)',
+                marginBottom: '2rem'
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '1.25rem'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+                  <div
+                    style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: isPaymentPaid ? 'rgba(16, 185, 129, 0.1)' : 'rgba(25, 42, 86, 0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isPaymentPaid ? '#059669' : 'var(--color-midnight-navy)',
+                      flexShrink: 0
+                    }}
+                  >
+                    {isPaymentPaid ? <ShieldCheck size={26} /> : <CreditCard size={26} />}
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      <h3 style={{ fontSize: '1.15rem', color: 'var(--color-midnight-navy)', fontWeight: 800, margin: 0 }}>
+                        Registration &amp; Verification Fee
+                      </h3>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          padding: '0.2rem 0.65rem',
+                          borderRadius: '9999px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          backgroundColor: isPaymentPaid
+                            ? '#DCFCE7'
+                            : isPaymentPending
+                            ? '#FEF3C7'
+                            : '#F1F5F9',
+                          color: isPaymentPaid
+                            ? '#15803D'
+                            : isPaymentPending
+                            ? '#B45309'
+                            : '#475569',
+                          border: `1px solid ${
+                            isPaymentPaid
+                              ? '#86EFAC'
+                              : isPaymentPending
+                              ? '#FCD34D'
+                              : '#CBD5E1'
+                          }`
+                        }}
+                      >
+                        {isPaymentPaid ? (
+                          <>
+                            <CheckCircle2 size={13} />
+                            <span>PAID &amp; VERIFIED (₹500)</span>
+                          </>
+                        ) : isPaymentPending ? (
+                          <>
+                            <Clock size={13} />
+                            <span>PAYMENT PENDING (₹500)</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle size={13} />
+                            <span>NOT PAID (₹500)</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+
+                    <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: '0.35rem 0 0 0' }}>
+                      {isPaymentPaid
+                        ? `Official payment confirmed via ${paymentRecord?.gateway || 'Cashfree'} (Ref: ${paymentRecord?.payment_reference || paymentRecord?.gateway_order_id || 'N/A'}). Your Joining dossier is authorized for processing.`
+                        : 'A mandatory non-refundable fee of ₹500 is required for identity verification, document compliance checks, and issuance of your official Joining Reference Slip.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  {isPaymentPaid ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={<Download size={15} />}
+                      onClick={handleDownloadReceipt}
+                    >
+                      Download Receipt
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      size="md"
+                      icon={isProcessingPayment ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+                      onClick={handleProceedPayment}
+                      disabled={isProcessingPayment || dossierLoading}
+                    >
+                      {isProcessingPayment ? 'Connecting to Cashfree...' : 'PAY REGISTRATION & VERIFICATION FEE (₹500)'}
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Document Inspection & Controlled Re-upload Table */}
