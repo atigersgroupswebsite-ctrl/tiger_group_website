@@ -23,7 +23,10 @@ import {
   resendReceiptEmailHandler,
   getSupabaseServer
 } from './_paymentCore.js';
-import { ensureReferenceSlipForPayment } from './_referenceSlipCore.js';
+import {
+  ensureReferenceSlipForPayment,
+  verifyDocumentTokenHandler
+} from './_referenceSlipCore.js';
 
 function resolveAction(req: VercelReq): string {
   const urlObj = new URL(req.url || '', 'http://localhost');
@@ -160,6 +163,23 @@ export default async function handler(req: VercelReq, res: VercelRes) {
           verificationToken: slipRes.verificationToken,
           storagePath: slipRes.storagePath,
         });
+      }
+
+      case 'public-verify':
+      case 'verify-document': {
+        if (method !== 'GET') {
+          return sendResponse(res, 405, { isValid: false, error: 'Method Not Allowed. Use GET.' });
+        }
+        const token = (
+          urlObj.searchParams.get('token') ||
+          (req.query?.token as string) ||
+          urlObj.searchParams.get('t') ||
+          (req.query?.t as string) ||
+          ''
+        ).trim();
+
+        const result = await verifyDocumentTokenHandler(token);
+        return sendResponse(res, result.status, result.data);
       }
 
       default: {

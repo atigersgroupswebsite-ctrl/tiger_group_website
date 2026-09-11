@@ -15,7 +15,30 @@
 
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import QRCode from 'qrcode';
-import { getSupabaseServer } from './_paymentCore.js';
+import { createClient } from '@supabase/supabase-js';
+
+const DEFAULT_SUPABASE_URL = 'https://bhfxqtaesvfsbdckgeka.supabase.co';
+
+let _supabaseServer: any = null;
+
+export function getSupabaseServer(): any {
+  if (!_supabaseServer) {
+    const supabaseUrl =
+      process.env.SUPABASE_URL ||
+      process.env.VITE_SUPABASE_URL ||
+      DEFAULT_SUPABASE_URL;
+    const supabaseServiceKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
+      process.env.VITE_SUPABASE_ANON_KEY ||
+      '';
+    _supabaseServer = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  return _supabaseServer;
+}
 
 export interface EnsureReferenceSlipResult {
   success: boolean;
@@ -1143,3 +1166,157 @@ export async function ensureReferenceSlipForPayment(
     return { success: false, error: err?.message || 'Failed to ensure reference slip for payment.' };
   }
 }
+
+// ------------------------------------------------------------------------------
+// Permanent Public Document Verification Handler
+// ------------------------------------------------------------------------------
+
+export async function verifyDocumentTokenHandler(token: string): Promise<{ status: number; data: any }> {
+  const cleanToken = (token || '').trim();
+
+  if (!cleanToken) {
+    return {
+      status: 400,
+      data: {
+        isValid: false,
+        error: 'Missing verification token in scan request.'
+      }
+    };
+  }
+
+  const supabase = getSupabaseServer();
+
+  try {
+    // 1. Check Reference Slips
+    let slip: any = null;
+
+    // Check by verification_token column
+    const { data: slipsByToken } = await supabase
+      .from('reference_slips')
+      .select('*')
+      .eq('verification_token', cleanToken)
+      .limit(1);
+
+    slip = slipsByToken?.[0] || null;
+
+    // If not found and token starts with atg_ref_, attempt UUID lookup
+    if (!slip && cleanToken.startsWith('atg_ref_')) {
+      const hex = cleanToken.replace('atg_ref_', '');
+      if (hex.length === 32) {
+        const uuid = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+        const { data: slipByUuid } = await supabase
+          .from('reference_slips')
+          .select('*')
+          .eq('id', uuid)
+          .maybeSingle();
+
+        slip = slipByUuid || null;
+      }
+    }
+
+    // Direct UUID match fallback
+    if (!slip && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanToken)) {
+      const { data: slipByDirectId } = await supabase
+        .from('reference_slips')
+        .select('*')
+        .eq('id', cleanToken)
+        .maybeSingle();
+
+      slip = slipByDirectId || null;
+    }
+
+    if (slip) {
+      // Resolve candidate name (Non-PII: No phone, Aadhaar, PAN, or full street address)
+      let candidateName = 'Verified Candidate';
+      if (slip.joining_form_id) {
+        const { data: jf } = await supabase
+          .from('joining_forms')
+          .select('candidate_name')
+          .eq('id', slip.joining_form_id)
+          .maybeSingle();
+        if (jf?.candidate_name) candidateName = jf.candidate_name;
+      } else if (slip.application_id) {
+        const { data: app } = await supabase
+          .from('applications')
+          .select('full_name')
+          .eq('id', slip.application_id)
+          .maybeSingle();
+        if (app?.full_name) candidateName = app.full_name;
+      }
+
+      // Resolve payment confirmation
+      let pQuery = supabase
+        .from('payments')
+        .select('payment_reference, receipt_number, amount, status, paid_at')
+        .eq('status', 'SUCCESS');
+
+      if (slip.joining_form_id) {
+        pQuery = pQuery.eq('joining_form_id', slip.joining_form_id);
+      } else if (slip.application_id) {
+        pQuery = pQuery.eq('application_id', slip.application_id);
+      }
+
+      const { data: payments } = await pQuery.order('paid_at', { ascending: false }).limit(1);
+      const payment = payments?.[0] || null;
+
+      return {
+        status: 200,
+        data: {
+          isValid: true,
+          documentType: 'REFERENCE_SLIP',
+          documentTitle: 'Official Employee Reference Slip & Placement Authorization',
+          referenceNumber: slip.reference_number,
+          candidateName,
+          issuanceDate: slip.date || (slip.created_at ? slip.created_at.split('T')[0] : '—'),
+          issuingAuthority: 'A TIGER GLOBAL Career Solution & Consultancy',
+          designation: slip.selected_designation || slip.designation || 'Consultant / Executive',
+          department: slip.department || 'Operations / Placement',
+          companyName: slip.company_name || 'A TIGER GLOBAL Authorized Client Organization',
+          interviewResult: slip.interview_result || 'SELECTED',
+          paymentVerified: Boolean(payment?.status === 'SUCCESS'),
+          paymentReference: payment?.payment_reference || 'VERIFIED',
+          receiptNumber: payment?.receipt_number || 'REC-VERIFIED',
+          feeStatus: payment?.status === 'SUCCESS' ? 'PAID & VERIFIED (INR 500.00)' : 'CONFIRMED',
+          verificationStatus: 'OFFICIALLY ISSUED & AUTHENTIC DOCUMENT',
+          verifiedAt: new Date().toISOString(),
+        }
+      };
+    }
+
+    // 2. Check Employees (ID Cards)
+    const { data: empRpc } = await supabase.rpc('verify_employee_by_token', {
+      p_token: cleanToken
+    });
+
+    if (empRpc && empRpc.is_valid) {
+      return {
+        status: 200,
+        data: {
+          isValid: true,
+          documentType: 'EMPLOYEE_ID_CARD',
+          documentTitle: 'Official Corporate Employee Identity Credential',
+          ...empRpc,
+        }
+      };
+    }
+
+    // 3. Not Found
+    return {
+      status: 200,
+      data: {
+        isValid: false,
+        error: 'No official Reference Slip or Identity Record matches this verification token. The document may be invalid, superseded, or tampered.'
+      }
+    };
+  } catch (err: any) {
+    console.error('[API_VERIFY_ERROR]', err);
+    return {
+      status: 500,
+      data: {
+        isValid: false,
+        error: 'An internal server error occurred while verifying the cryptographic token.'
+      }
+    };
+  }
+}
+

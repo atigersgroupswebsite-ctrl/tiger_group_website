@@ -34,6 +34,26 @@ export function paymentApiPlugin(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url || '';
 
+        // Handle Public Document Verification
+        if (url.startsWith('/api/verify')) {
+          try {
+            const parsedUrl = new URL(url, 'http://localhost');
+            const token = (
+              parsedUrl.searchParams.get('token') ||
+              parsedUrl.searchParams.get('t') ||
+              url.replace(/^\/api\/verify\/?/i, '').split('?')[0] ||
+              ''
+            ).trim();
+
+            const { verifyDocumentTokenHandler } = await import('../../api/payment/_referenceSlipCore.js');
+            const result = await verifyDocumentTokenHandler(token);
+            return sendJsonResponse(res, result.status || 200, result.data);
+          } catch (verErr: any) {
+            console.error('[API_VERIFY_LOCAL_ERROR]', verErr);
+            return sendJsonResponse(res, 500, { isValid: false, error: verErr.message || 'Verification failed' });
+          }
+        }
+
         // Handle privileged Admin Directory operations
         if (url.startsWith('/api/admin/users')) {
           const method = req.method?.toUpperCase();
