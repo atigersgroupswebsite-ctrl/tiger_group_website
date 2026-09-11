@@ -3,8 +3,16 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/payment/(.*)",
+      "destination": "/api/payment?_action=$1"
+    },
+    {
       "source": "/api/payments/(.*)",
-      "destination": "/api/payment/$1"
+      "destination": "/api/payment?_action=$1"
+    },
+    {
+      "source": "/api/enquiries/(.*)",
+      "destination": "/api/enquiries?_action=$1"
     },
     {
       "source": "/api/(.*)",
