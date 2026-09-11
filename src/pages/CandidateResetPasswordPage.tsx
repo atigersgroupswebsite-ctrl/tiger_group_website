@@ -34,15 +34,41 @@ export const CandidateResetPasswordPage: React.FC = () => {
     const qEmail = searchParams.get('email');
     if (qEmail) setEmail(qEmail);
 
-    // Check if the current URL contains access token or recovery hash
+    // 1. Check for PKCE Authorization Code in query params (?code=...)
+    const code = searchParams.get('code');
+    if (code) {
+      setLoading(true);
+      setError(null);
+      supabase.auth.exchangeCodeForSession(code).then(({ data, error: exchangeErr }) => {
+        setLoading(false);
+        if (exchangeErr) {
+          console.warn('[PKCE_EXCHANGE_ERROR]', exchangeErr.message);
+          setError('This password reset link is invalid or has expired. Please request a new link below.');
+        } else if (data?.session) {
+          setMode('RESET');
+        }
+      });
+    }
+
+    // 2. Check if the current URL contains access token or recovery hash / query
     const hash = window.location.hash;
-    if (hash.includes('type=recovery') || hash.includes('access_token')) {
+    const typeParam = searchParams.get('type');
+    if (hash.includes('type=recovery') || hash.includes('access_token') || typeParam === 'recovery') {
       setMode('RESET');
     }
 
-    // Also check onAuthStateChange for PASSWORD_RECOVERY event
-    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+    // 3. Listen on auth state change for PASSWORD_RECOVERY or SIGNED_IN event
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, _session) => {
       if (event === 'PASSWORD_RECOVERY') {
+        setMode('RESET');
+      } else if (event === 'SIGNED_IN' && (hash.includes('type=recovery') || typeParam === 'recovery' || Boolean(code))) {
+        setMode('RESET');
+      }
+    });
+
+    // 4. If an active recovery session already exists in memory/storage
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && (hash.includes('type=recovery') || typeParam === 'recovery' || Boolean(code))) {
         setMode('RESET');
       }
     });
@@ -68,19 +94,27 @@ export const CandidateResetPasswordPage: React.FC = () => {
 
     try {
       const redirectUrl = `${window.location.origin}/joining/reset-password`;
-      await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
         redirectTo: redirectUrl
       });
 
+      if (resetErr) {
+        console.warn('[RESET_PASSWORD_NOTICE]', resetErr);
+        if (resetErr.message?.toLowerCase().includes('rate') || (resetErr as any).status === 429) {
+          setError('Too many reset attempts. Please wait a few minutes before trying again.');
+          setLoading(false);
+          return;
+        }
+      }
+
       // Generic success notice to prevent user enumeration
       setSuccessMessage(
-        'If an account is associated with this email address, password reset instructions have been dispatched. Please check your inbox.'
+        'If an account is associated with this email address, password reset instructions have been dispatched. Please check your inbox and click the recovery link.'
       );
     } catch (err: any) {
-      // Even on error, provide a safe generic response unless system failure
-      console.warn('[RESET_PASSWORD_NOTICE]', err);
+      console.warn('[RESET_PASSWORD_ERROR]', err);
       setSuccessMessage(
-        'If an account is associated with this email address, password reset instructions have been dispatched. Please check your inbox.'
+        'If an account is associated with this email address, password reset instructions have been dispatched. Please check your inbox and click the recovery link.'
       );
     } finally {
       setLoading(false);
@@ -105,6 +139,14 @@ export const CandidateResetPasswordPage: React.FC = () => {
     setLoading(true);
 
     try {
+      // Validate that an active recovery session exists
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr || !session) {
+        setError('Your password recovery session has expired or is invalid. Please request a new reset link.');
+        setLoading(false);
+        return;
+      }
+
       const { error: updateErr } = await supabase.auth.updateUser({
         password
       });
@@ -115,7 +157,7 @@ export const CandidateResetPasswordPage: React.FC = () => {
         return;
       }
 
-      setSuccessMessage('Your password has been successfully updated! You can now log in.');
+      setSuccessMessage('Your password has been successfully updated! Redirecting you to login...');
       setTimeout(() => {
         navigate('/joining/login', { replace: true });
       }, 2500);

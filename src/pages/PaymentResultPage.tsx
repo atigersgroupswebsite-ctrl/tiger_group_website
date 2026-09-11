@@ -69,10 +69,11 @@ export const PaymentResultPage: React.FC = () => {
     setDownloadingSlip(true);
     setDownloadNotice(null);
 
-    const safeRef = (verificationData.applicationNumber || verificationData.paymentReference || 'ATG').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const fileName = `${safeRef}-REFERENCE-SLIP.pdf`;
+    const fileName = verificationData.referenceSlipFileName ||
+      `${(verificationData.applicationNumber || verificationData.paymentReference || 'ATG').replace(/[^a-zA-Z0-9_-]/g, '_')}-REFERENCE-SLIP.pdf`;
 
     const res = await downloadReferenceSlipPdf({
+      paymentId: verificationData.paymentId,
       signedUrl: verificationData.referenceSlipDownloadUrl,
       fileName,
     });

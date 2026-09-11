@@ -987,11 +987,13 @@ export async function verifyPaymentHandler(
     // Ensure candidate reference slip exists and signed URL is ready for immediate download
     let refSlipNumber: string | undefined;
     let refSlipDownloadUrl: string | undefined;
+    let refSlipFileName: string | undefined;
     try {
       const refSlipRes = await ensureReferenceSlipForPayment(paymentRecord.id);
       if (refSlipRes.success) {
         refSlipNumber = refSlipRes.slip?.reference_number;
         refSlipDownloadUrl = refSlipRes.signedUrl;
+        refSlipFileName = refSlipRes.fileName;
       }
     } catch (refErr: any) {
       console.warn('[CASHFREE_VERIFY] Reference slip retrieval non-blocking notice:', refErr?.message);
@@ -1001,6 +1003,7 @@ export async function verifyPaymentHandler(
       status: 200,
       data: {
         success: true,
+        paymentId: verifiedPayment.id,
         paymentStatus: 'SUCCESS',
         paymentReference: verifiedPayment.payment_reference,
         receiptNumber: verifiedPayment.receipt_number,
@@ -1013,6 +1016,7 @@ export async function verifyPaymentHandler(
         candidateName: verifiedPayment.candidate_name,
         referenceSlipNumber: refSlipNumber,
         referenceSlipDownloadUrl: refSlipDownloadUrl,
+        referenceSlipFileName: refSlipFileName,
       },
     };
   }

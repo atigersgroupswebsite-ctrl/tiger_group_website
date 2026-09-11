@@ -21,14 +21,22 @@ export const AuthCallbackPage: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState<boolean>(true);
 
   // Sanitized redirect target: internal only, default /joining
-  const resolveNextPath = (target: string | null): string => {
+  const resolveNextPath = (target: string | null, isRecovery = false): string => {
+    if (isRecovery) {
+      return '/joining/reset-password';
+    }
     if (!target) return '/joining';
     // Reject absolute URLs, protocol relative URLs, or unapproved paths
     if (target.startsWith('//') || target.includes('://') || !target.startsWith('/')) {
       return '/joining';
     }
-    // Only allow candidate joining paths
-    if (target.startsWith('/joining')) {
+    // Allow candidate joining paths, password recovery, and candidate portal
+    if (
+      target.startsWith('/joining') ||
+      target.startsWith('/reset-password') ||
+      target.startsWith('/forgot-password') ||
+      target.startsWith('/candidate-portal')
+    ) {
       return target;
     }
     return '/joining';
@@ -55,6 +63,12 @@ export const AuthCallbackPage: React.FC = () => {
           throw new Error(desc || 'The authentication link has expired or has already been used.');
         }
 
+        // Detect if this is a password recovery link
+        const isRecovery =
+          searchParams.get('type') === 'recovery' ||
+          (Boolean(hash) && hash.includes('type=recovery')) ||
+          Boolean(searchParams.get('next')?.includes('reset-password'));
+
         // 2. PKCE Code Exchange if present
         const code = searchParams.get('code');
         if (code) {
@@ -72,7 +86,7 @@ export const AuthCallbackPage: React.FC = () => {
 
         if (session?.user) {
           // Success! Redirect to target
-          const nextUrl = resolveNextPath(searchParams.get('next'));
+          const nextUrl = resolveNextPath(searchParams.get('next'), isRecovery);
           if (isMounted) {
             setIsProcessing(false);
             navigate(nextUrl, { replace: true });
@@ -86,7 +100,7 @@ export const AuthCallbackPage: React.FC = () => {
           if (newSession?.user) {
             subscription.unsubscribe();
             setIsProcessing(false);
-            const nextUrl = resolveNextPath(searchParams.get('next'));
+            const nextUrl = resolveNextPath(searchParams.get('next'), isRecovery);
             navigate(nextUrl, { replace: true });
           }
         });
@@ -96,7 +110,7 @@ export const AuthCallbackPage: React.FC = () => {
           if (!isMounted) return;
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-            const nextUrl = resolveNextPath(searchParams.get('next'));
+            const nextUrl = resolveNextPath(searchParams.get('next'), isRecovery);
             navigate(nextUrl, { replace: true });
           } else {
             subscription.unsubscribe();

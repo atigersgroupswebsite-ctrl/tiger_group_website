@@ -21,11 +21,13 @@ import {
   webhookHandler,
   recordOfflinePaymentHandler,
   resendReceiptEmailHandler,
-  getSupabaseServer
+  getSupabaseServer,
+  authenticateRequest
 } from './_paymentCore.js';
 import {
   ensureReferenceSlipForPayment,
-  verifyDocumentTokenHandler
+  verifyDocumentTokenHandler,
+  validateDocumentAccess
 } from './_referenceSlipCore.js';
 
 function resolveAction(req: VercelReq): string {
@@ -151,14 +153,59 @@ export default async function handler(req: VercelReq, res: VercelRes) {
           return sendResponse(res, 400, { success: false, error: 'Valid paymentId, joiningFormId, or applicationId is required.' });
         }
 
+        // Fetch payment record to verify linkage
+        const { data: paymentRecord } = await supabase
+          .from('payments')
+          .select('id, joining_form_id, application_id, status')
+          .eq('id', paymentId)
+          .maybeSingle();
+
+        if (!paymentRecord) {
+          return sendResponse(res, 404, { success: false, error: 'Payment record not found.' });
+        }
+
+        // Authenticate caller (support Bearer header or token query param for direct browser download links)
+        const queryToken = (urlObj.searchParams.get('token') || urlObj.searchParams.get('auth_token') || req.query?.token || req.query?.auth_token) as string | undefined;
+        const effectiveAuthHeader = authHeader || (queryToken ? `Bearer ${queryToken}` : undefined);
+        const authCheck = await authenticateRequest(effectiveAuthHeader);
+
+        if (!authCheck.authenticated) {
+          return sendResponse(res, 401, { success: false, error: authCheck.error || 'Authentication required to download Reference Slip.' });
+        }
+
+        // Enforce candidate ownership or admin privileges
+        const accessCheck = await validateDocumentAccess(
+          supabase,
+          authCheck.user,
+          paymentRecord.joining_form_id,
+          paymentRecord.application_id
+        );
+
+        if (!accessCheck.authorized) {
+          return sendResponse(res, 403, { success: false, error: accessCheck.error || 'Access denied. You do not own this document.' });
+        }
+
         const slipRes = await ensureReferenceSlipForPayment(paymentId);
         if (!slipRes.success) {
           return sendResponse(res, 500, { success: false, error: slipRes.error || 'Failed to resolve reference slip.' });
         }
 
+        const downloadFileName = slipRes.fileName || 'REFERENCE-SLIP.pdf';
+        const isDirectDownload = urlObj.searchParams.get('download') === '1' || urlObj.searchParams.get('stream') === '1';
+
+        // Direct PDF binary stream response
+        if (isDirectDownload && slipRes.pdfBuffer) {
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
+          res.setHeader('Content-Length', String(slipRes.pdfBuffer.length));
+          res.setHeader('Cache-Control', 'private, max-age=3600');
+          return res.end(slipRes.pdfBuffer);
+        }
+
         return sendResponse(res, 200, {
           success: true,
           referenceSlipNumber: slipRes.slip?.reference_number,
+          fileName: downloadFileName,
           signedUrl: slipRes.signedUrl,
           verificationToken: slipRes.verificationToken,
           storagePath: slipRes.storagePath,

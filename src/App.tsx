@@ -146,6 +146,8 @@ export const App: React.FC = () => {
             <Route path="/joining/portal" element={<CandidatePortalPage />} />
             <Route path="/joining/reset-password" element={<CandidateResetPasswordPage />} />
             <Route path="/joining/forgot-password" element={<CandidateResetPasswordPage />} />
+            <Route path="/reset-password" element={<CandidateResetPasswordPage />} />
+            <Route path="/forgot-password" element={<CandidateResetPasswordPage />} />
             <Route path="/joining/payment" element={<CandidatePaymentPage />} />
             <Route path="/payment/result" element={<PaymentResultPage />} />
             <Route path="/joining/payment/result" element={<PaymentResultPage />} />

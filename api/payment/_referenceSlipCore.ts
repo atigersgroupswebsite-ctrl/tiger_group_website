@@ -44,6 +44,7 @@ export interface EnsureReferenceSlipResult {
   success: boolean;
   slip?: any;
   pdfBuffer?: Buffer;
+  fileName?: string;
   signedUrl?: string;
   storagePath?: string;
   fileId?: string;
@@ -1054,12 +1055,13 @@ export async function ensureReferenceSlipForPayment(
     const existingGenFile = genFiles?.[0];
 
     if (existingGenFile?.storage_path && !options?.forceRegenerate) {
-      // Re-use existing file and generate fresh signed URL (valid 24 hours)
+      // Re-use existing file and generate fresh signed URL with forced attachment disposition
+      const resolvedFileName = existingGenFile.file_name || `${candidate.sourceReference.replace(/[^a-zA-Z0-9_-]/g, '_')}-REFERENCE-SLIP.pdf`;
       const { data: signData } = await supabase.storage
         .from('generated-documents')
-        .createSignedUrl(existingGenFile.storage_path, 86400);
+        .createSignedUrl(existingGenFile.storage_path, 86400, { download: resolvedFileName });
 
-      // Also retrieve bytes if needed for email
+      // Also retrieve bytes if needed for direct streaming / email
       const { data: fileBlob } = await supabase.storage
         .from('generated-documents')
         .download(existingGenFile.storage_path);
@@ -1074,6 +1076,7 @@ export async function ensureReferenceSlipForPayment(
         success: true,
         slip,
         pdfBuffer,
+        fileName: resolvedFileName,
         signedUrl: signData?.signedUrl || undefined,
         storagePath: existingGenFile.storage_path,
         fileId: existingGenFile.id,
@@ -1147,15 +1150,16 @@ export async function ensureReferenceSlipForPayment(
       fileId = insertedFile.id;
     }
 
-    // 9. Generate 24-Hour Signed Download URL
+    // 9. Generate 24-Hour Signed Download URL with forced attachment disposition
     const { data: signData } = await supabase.storage
       .from('generated-documents')
-      .createSignedUrl(storagePath, 86400);
+      .createSignedUrl(storagePath, 86400, { download: fileName });
 
     return {
       success: true,
       slip,
       pdfBuffer,
+      fileName,
       signedUrl: signData?.signedUrl || undefined,
       storagePath,
       fileId,
@@ -1319,4 +1323,80 @@ export async function verifyDocumentTokenHandler(token: string): Promise<{ statu
     };
   }
 }
+
+// ------------------------------------------------------------------------------
+// Document Security & Candidate Ownership Authorization Validator
+// ------------------------------------------------------------------------------
+
+export async function validateDocumentAccess(
+  supabase: any,
+  user: any,
+  joiningFormId?: string | null,
+  applicationId?: string | null
+): Promise<{ authorized: boolean; role: 'ADMIN' | 'CANDIDATE' | 'NONE'; error?: string }> {
+  if (!user || !user.id) {
+    return { authorized: false, role: 'NONE', error: 'Authentication required to access this document.' };
+  }
+
+  // 1. Check if caller is an active Admin (SUPER_ADMIN or COORDINATOR)
+  const { data: adminRecord } = await supabase
+    .from('admin_users')
+    .select('id, role, is_active')
+    .eq('auth_user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (adminRecord && ['SUPER_ADMIN', 'COORDINATOR'].includes(adminRecord.role)) {
+    return { authorized: true, role: 'ADMIN' };
+  }
+
+  // 2. Check Candidate Ownership
+  const userEmail = (user.email || '').toLowerCase().trim();
+
+  if (joiningFormId) {
+    const { data: jf } = await supabase
+      .from('joining_forms')
+      .select('id, candidate_auth_user_id, user_id, email')
+      .eq('id', joiningFormId)
+      .maybeSingle();
+
+    if (jf) {
+      const isOwner =
+        (jf.candidate_auth_user_id && jf.candidate_auth_user_id === user.id) ||
+        (jf.user_id && jf.user_id === user.id) ||
+        (jf.email && jf.email.toLowerCase().trim() === userEmail);
+
+      if (isOwner) {
+        return { authorized: true, role: 'CANDIDATE' };
+      }
+    }
+  }
+
+  if (applicationId) {
+    const { data: app } = await supabase
+      .from('applications')
+      .select('id, candidate_auth_user_id, user_id, user_email, email')
+      .eq('id', applicationId)
+      .maybeSingle();
+
+    if (app) {
+      const isOwner =
+        (app.candidate_auth_user_id && app.candidate_auth_user_id === user.id) ||
+        (app.user_id && app.user_id === user.id) ||
+        (app.user_email && app.user_email.toLowerCase().trim() === userEmail) ||
+        (app.email && app.email.toLowerCase().trim() === userEmail);
+
+      if (isOwner) {
+        return { authorized: true, role: 'CANDIDATE' };
+      }
+    }
+  }
+
+  return {
+    authorized: false,
+    role: 'NONE',
+    error: 'Access denied. You do not have permission to view or download this candidate document.'
+  };
+}
+
 

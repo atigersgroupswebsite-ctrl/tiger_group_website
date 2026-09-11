@@ -49,6 +49,7 @@ export interface CreateOrderResponse {
 
 export interface VerifyPaymentResponse {
   success: boolean;
+  paymentId?: string;
   paymentStatus?: 'SUCCESS' | 'PENDING' | 'USER_DROPPED' | 'FAILED';
   paymentReference?: string;
   receiptNumber?: string;
@@ -61,6 +62,7 @@ export interface VerifyPaymentResponse {
   candidateName?: string;
   referenceSlipNumber?: string;
   referenceSlipDownloadUrl?: string;
+  referenceSlipFileName?: string;
   message?: string;
   error?: string;
 }
@@ -251,6 +253,16 @@ export async function downloadReferenceSlipPdf(params: {
 }): Promise<{ success: boolean; error?: string }> {
   try {
     let url = params.signedUrl;
+    let fileName = params.fileName || 'REFERENCE-SLIP.pdf';
+
+    // Retrieve active Supabase session token
+    let authToken = '';
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      authToken = session?.access_token || '';
+    } catch {
+      // Fallback if session unavailable
+    }
 
     if (!url) {
       const q = new URLSearchParams();
@@ -258,27 +270,58 @@ export async function downloadReferenceSlipPdf(params: {
       if (params.joiningFormId) q.set('joiningFormId', params.joiningFormId);
       if (params.applicationId) q.set('applicationId', params.applicationId);
 
-      const res = await fetch(`/api/payment/reference-slip?${q.toString()}`);
+      const headers: Record<string, string> = {};
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+      const res = await fetch(`/api/payment/reference-slip?${q.toString()}`, { headers });
       const data = await res.json();
-      if (!data.success || !data.signedUrl) {
+      if (!data.success) {
         throw new Error(data.error || 'Unable to retrieve Reference Slip download URL.');
       }
       url = data.signedUrl;
+      if (data.fileName) fileName = data.fileName;
     }
 
-    if (url) {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = params.fileName || 'REFERENCE-SLIP.pdf';
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    if (!url) {
+      return { success: false, error: 'No download URL available.' };
+    }
+
+    // Layer 1: Fetch PDF bytes as a Blob to trigger guaranteed same-origin browser download
+    try {
+      const pdfRes = await fetch(url);
+      if (pdfRes.ok) {
+        const blob = await pdfRes.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
+        return { success: true };
+      }
+    } catch (fetchErr) {
+      console.warn('[downloadReferenceSlipPdf] Blob fetch fallback to direct navigation:', fetchErr);
+    }
+
+    // Layer 2: Same-origin direct server stream fallback
+    if (params.paymentId || params.joiningFormId || params.applicationId) {
+      const streamQ = new URLSearchParams();
+      if (params.paymentId) streamQ.set('paymentId', params.paymentId);
+      if (params.joiningFormId) streamQ.set('joiningFormId', params.joiningFormId);
+      if (params.applicationId) streamQ.set('applicationId', params.applicationId);
+      streamQ.set('download', '1');
+      if (authToken) streamQ.set('auth_token', authToken);
+
+      window.location.assign(`/api/payment/reference-slip?${streamQ.toString()}`);
       return { success: true };
     }
 
-    return { success: false, error: 'No download URL available.' };
+    // Layer 3: Direct signedUrl navigation
+    window.location.assign(url);
+    return { success: true };
   } catch (err: any) {
     console.error('[downloadReferenceSlipPdf] Error:', err);
     return { success: false, error: err.message || 'Failed to download Reference Slip.' };
