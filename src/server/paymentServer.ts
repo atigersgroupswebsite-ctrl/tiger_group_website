@@ -1,29 +1,59 @@
 // ==============================================================================
 // File: src/server/paymentServer.ts
-// Description: Secure server-side Razorpay payment orchestration & verification
+// Description: Secure server-side Cashfree (Sandbox) payment orchestration & verification
 // Brand: A TIGER GROUPS — A TIGER GLOBAL Career Solution & Consultancy
 // Security:
-//   - Secrets (RAZORPAY_KEY_SECRET, WEBHOOK_SECRET) are exclusively kept server-side
-//   - Official HMAC-SHA256 signature verification
+//   - Secrets (CASHFREE_APP_ID, CASHFREE_SECRET_KEY) are exclusively kept server-side
+//   - Strict SANDBOX endpoint locking (production disabled)
+//   - Cryptographic Cashfree webhook HMAC-SHA256 signature verification
+//   - Authoritative amount enforcement (server-configured 500 INR, never trusts browser)
 //   - Atomic, idempotent payment confirmation via Supabase RPC
-//   - Never trusts browser success callbacks without cryptographic signature verification
-//   - Webhook idempotency protects against duplicate webhook dispatches
+//   - Decoupled Reference Slip generator triggered ONLY upon verified payment success
+//   - Decoupled Resend receipt & reference slip delivery (email failure never rolls back payment)
 // ==============================================================================
 
 import crypto from 'node:crypto';
 import { getSupabaseServer, authenticateRequest } from './supabaseServer';
-// paymentEmailService/paymentReceiptGenerator imported dynamically inside handlers
-// to prevent jspdf (browser-only) from crashing the Node.js module init.
-
-
-export const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TigerGlobal2026';
-export const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'test_secret_TigerGlobal2026';
-export const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || 'test_webhook_TigerGlobal2026';
 
 export { getSupabaseServer, authenticateRequest };
 
+// ------------------------------------------------------------------------------
+// Cashfree Sandbox Configuration (Server-Only)
+// ------------------------------------------------------------------------------
+
+export const CASHFREE_APP_ID = process.env.CASHFREE_APP_ID || '';
+export const CASHFREE_SECRET_KEY = process.env.CASHFREE_SECRET_KEY || '';
+export const CASHFREE_ENVIRONMENT = (process.env.CASHFREE_ENVIRONMENT || 'SANDBOX').toUpperCase();
+
+// CRITICAL SAFETY REQUIREMENT: Production payment strictly disabled, SANDBOX only
+export const CASHFREE_BASE_URL = 'https://sandbox.cashfree.com/pg';
+export const CASHFREE_API_VERSION = '2023-08-01';
+
+// Authoritative Joining Registration Fee
+export const AUTHORITATIVE_JOINING_FEE = 500;
+export const TOTAL_CONSULTANCY_FEE = 1000;
+
+function getCashfreeHeaders(): Record<string, string> {
+  return {
+    'x-client-id': CASHFREE_APP_ID,
+    'x-client-secret': CASHFREE_SECRET_KEY,
+    'x-api-version': CASHFREE_API_VERSION,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  };
+}
+
+function resolveSiteBaseUrl(reqHeaders?: Record<string, string | string[] | undefined>): string {
+  const host = (reqHeaders?.['host'] as string) || '';
+  const proto = (reqHeaders?.['x-forwarded-proto'] as string) || (host.includes('localhost') ? 'http' : 'https');
+  if (host) {
+    return `${proto}://${host}`;
+  }
+  return process.env.VITE_SITE_URL || process.env.SITE_URL || 'https://www.atigerglobal.com';
+}
+
 /**
- * Handler: GET /api/payments/config?appId=...
+ * Handler: GET /api/payment/config?appId=...
  * Returns payment config, purpose, amount, and existing payment state for an application.
  */
 export async function getPaymentConfigHandler(appId: string, authHeader?: string) {
@@ -71,10 +101,6 @@ export async function getPaymentConfigHandler(appId: string, authHeader?: string
     .eq('application_id', appId)
     .order('created_at', { ascending: false });
 
-  // Consultancy fee standard configuration:
-  // Total Fee: Rs. 1,000/-
-  // Registration Fee (Stage 1): Rs. 500/-
-  // Post-placement Fee (Stage 2): Rs. 500/-
   return {
     status: 200,
     data: {
@@ -87,25 +113,27 @@ export async function getPaymentConfigHandler(appId: string, authHeader?: string
       applicationStatus: app.status,
       purpose: 'REGISTRATION',
       purposeTitle: 'Candidate Registration & Dossier Verification Fee',
-      amount: 500,
+      amount: AUTHORITATIVE_JOINING_FEE,
       currency: 'INR',
-      totalConsultancyFee: 1000,
+      totalConsultancyFee: TOTAL_CONSULTANCY_FEE,
       policyNote: 'Rs. 500 is payable upon joining form submission. The remaining Rs. 500 is coordinated after 1 month of active placement.',
-      keyId: RAZORPAY_KEY_ID,
+      gateway: 'CASHFREE',
+      environment: 'SANDBOX',
       payments: payments || []
     }
   };
 }
 
 /**
- * Handler: POST /api/payments/create-order
- * Server-side order creation using Razorpay API
+ * Handler: POST /api/payment/create-order
+ * Server-side order creation using Cashfree Sandbox API
  */
 export async function createPaymentOrderHandler(
   body: { applicationId: string; purpose?: string; amount?: number },
-  authHeader?: string
+  authHeader?: string,
+  reqHeaders?: Record<string, string | string[] | undefined>
 ) {
-  const { applicationId, purpose = 'REGISTRATION', amount = 500 } = body;
+  const { applicationId, purpose = 'REGISTRATION' } = body;
 
   if (!applicationId) {
     return { status: 400, data: { success: false, error: 'Application ID is required' } };
@@ -147,25 +175,22 @@ export async function createPaymentOrderHandler(
   // 3. Check joining form submission status
   const { data: joiningForm } = await getSupabaseServer()
     .from('joining_forms')
-    .select('submission_status')
+    .select('id, submission_status')
     .eq('application_id', applicationId)
     .maybeSingle();
 
-  // Payment is available after joining form submission
-  if (joiningForm && joiningForm.submission_status !== 'SUBMITTED' && app.status !== 'JOINING_SUBMITTED' && app.status !== 'DOCUMENT_VERIFIED' && app.status !== 'PAYMENT_PENDING') {
-    // If not submitted yet, warn that form submission is required first
-    console.warn(`[PAYMENT] Joining form status for app ${app.application_number} is ${joiningForm?.submission_status}`);
-  }
+  // Authoritative amount strictly determined server-side (never trusts browser amount)
+  const payableAmount = AUTHORITATIVE_JOINING_FEE;
 
   // 4. Concurrency-safe initiation via create_or_get_pending_payment RPC
   const { data: rpcRes, error: rpcErr } = await getSupabaseServer().rpc('create_or_get_pending_payment', {
     p_app_id: applicationId,
     p_purpose: purpose,
-    p_amount: amount
+    p_amount: payableAmount
   });
 
   if (rpcErr || !rpcRes) {
-    console.error('[PAYMENT] create_or_get_pending_payment failed:', rpcErr);
+    console.error('[CASHFREE_ORDER] create_or_get_pending_payment failed:', rpcErr);
     return { status: 500, data: { success: false, error: rpcErr?.message || 'Payment initiation failed' } };
   }
 
@@ -190,57 +215,104 @@ export async function createPaymentOrderHandler(
     };
   }
 
-  let razorpayOrderId = paymentData.gateway_order_id;
-
-  // 5. Create Razorpay order if not already created
-  if (!razorpayOrderId) {
-    const isLiveKey = RAZORPAY_KEY_ID && !RAZORPAY_KEY_ID.includes('test_TigerGlobal') && RAZORPAY_KEY_SECRET && !RAZORPAY_KEY_SECRET.includes('test_secret');
-
-    if (isLiveKey) {
-      try {
-        const authBasic = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
-        const rzpResponse = await fetch('https://api.razorpay.com/v1/orders', {
-          method: 'POST',
-          headers: {
-            Authorization: `Basic ${authBasic}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            amount: Math.round(Number(paymentData.amount) * 100), // in paise
-            currency: 'INR',
-            receipt: paymentData.payment_reference,
-            notes: {
-              application_id: applicationId,
-              application_number: app.application_number,
-              purpose: paymentData.purpose
-            }
-          })
-        });
-
-        if (!rzpResponse.ok) {
-          const errText = await rzpResponse.text();
-          console.error('[PAYMENT] Razorpay API order creation failed:', errText);
-          throw new Error(`Razorpay gateway error: ${errText}`);
-        }
-
-        const rzpOrder = (await rzpResponse.json()) as any;
-        razorpayOrderId = rzpOrder.id;
-      } catch (gatewayErr: any) {
-        console.error('[PAYMENT] Razorpay order call exception:', gatewayErr);
-        // Fallback for offline/simulation testing
-        razorpayOrderId = `order_${paymentData.payment_reference.replace(/-/g, '_')}_${Date.now()}`;
+  // Validate server credentials
+  if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
+    console.error('[CASHFREE_ORDER] CASHFREE_APP_ID or CASHFREE_SECRET_KEY missing from server runtime');
+    return {
+      status: 500,
+      data: {
+        success: false,
+        error: 'Cashfree server credentials are not configured in runtime environment.'
       }
-    } else {
-      // Standard local/sandbox simulated Razorpay order ID
-      razorpayOrderId = `order_${paymentData.payment_reference.replace(/-/g, '_')}_${Date.now()}`;
+    };
+  }
+
+  // 5. Generate unique Cashfree Merchant Order ID (alphanumeric + underscore/hyphen, max 45 chars)
+  // Format: ATG_CF_<ref-safe>_<timestamp>
+  const cleanRef = (paymentData.payment_reference || 'REF').replace(/[^a-zA-Z0-9]/g, '');
+  const merchantOrderId = `ATG_CF_${cleanRef}_${Date.now()}`.slice(0, 45);
+
+  const baseUrl = resolveSiteBaseUrl(reqHeaders);
+  const cleanPhone = (app.mobile || '9999999999').replace(/[^0-9]/g, '').slice(-10) || '9999999999';
+  const customerId = `cust_${app.id.replace(/-/g, '').slice(0, 20)}`;
+
+  const cfPayload = {
+    order_id: merchantOrderId,
+    order_amount: payableAmount,
+    order_currency: 'INR',
+    customer_details: {
+      customer_id: customerId,
+      customer_name: app.full_name || 'Candidate',
+      customer_email: app.email,
+      customer_phone: cleanPhone
+    },
+    order_meta: {
+      return_url: `${baseUrl}/payment/result?order_id={order_id}`,
+      notify_url: `${baseUrl}/api/payment/webhook`
+    },
+    order_note: `Candidate Registration Fee • ${app.application_number}`
+  };
+
+  let cfOrderResponse: any = null;
+  try {
+    const response = await fetch(`${CASHFREE_BASE_URL}/orders`, {
+      method: 'POST',
+      headers: getCashfreeHeaders(),
+      body: JSON.stringify(cfPayload)
+    });
+
+    const responseText = await response.text();
+    try {
+      cfOrderResponse = JSON.parse(responseText);
+    } catch {
+      throw new Error(`Cashfree invalid JSON: ${responseText}`);
     }
 
-    // Update payment with the generated order ID
-    await getSupabaseServer()
-      .from('payments')
-      .update({ gateway_order_id: razorpayOrderId })
-      .eq('id', paymentData.payment_id);
+    if (!response.ok) {
+      console.error('[CASHFREE_ORDER] Cashfree order creation failed:', cfOrderResponse);
+      const errMsg = cfOrderResponse?.message || cfOrderResponse?.error || 'Cashfree order creation rejected';
+      return {
+        status: response.status,
+        data: {
+          success: false,
+          error: errMsg
+        }
+      };
+    }
+  } catch (netErr: any) {
+    console.error('[CASHFREE_ORDER] Network exception calling Cashfree:', netErr);
+    return {
+      status: 502,
+      data: {
+        success: false,
+        error: `Cashfree gateway communication error: ${netErr.message || netErr}`
+      }
+    };
   }
+
+  const paymentSessionId = cfOrderResponse.payment_session_id;
+  const cfOrderId = cfOrderResponse.cf_order_id;
+
+  if (!paymentSessionId) {
+    console.error('[CASHFREE_ORDER] No payment_session_id in Cashfree response:', cfOrderResponse);
+    return {
+      status: 500,
+      data: {
+        success: false,
+        error: 'Cashfree did not return a valid payment session ID.'
+      }
+    };
+  }
+
+  // 6. Update payment with the generated Cashfree order ID, session, and joining_form_id
+  await getSupabaseServer()
+    .from('payments')
+    .update({
+      gateway_order_id: merchantOrderId,
+      gateway: 'CASHFREE',
+      joining_form_id: joiningForm?.id || null
+    })
+    .eq('id', paymentData.payment_id);
 
   return {
     status: 200,
@@ -249,10 +321,12 @@ export async function createPaymentOrderHandler(
       alreadyPaid: false,
       paymentId: paymentData.payment_id,
       paymentReference: paymentData.payment_reference,
-      orderId: razorpayOrderId,
-      amount: paymentData.amount,
-      currency: paymentData.currency || 'INR',
-      keyId: RAZORPAY_KEY_ID,
+      orderId: merchantOrderId,
+      cfOrderId: cfOrderId,
+      payment_session_id: paymentSessionId,
+      amount: payableAmount,
+      currency: 'INR',
+      environment: 'SANDBOX',
       candidate: {
         name: app.full_name,
         email: app.email,
@@ -306,152 +380,291 @@ export async function triggerPostPaymentReferenceSlip(paymentId: string) {
 }
 
 /**
- * Handler: POST /api/payments/verify
- * Cryptographic server-side signature verification & atomic database completion
+ * Handler: POST /api/payment/verify or GET /api/payment/verify?order_id=...
+ * Server-side order verification via Cashfree Sandbox API
+ * Checks authoritative Cashfree payment state and completes payment atomically in database.
  */
 export async function verifyPaymentHandler(
   body: {
-    paymentId: string;
-    razorpay_order_id: string;
-    razorpay_payment_id: string;
-    razorpay_signature: string;
+    orderId?: string;
+    paymentId?: string;
+    order_id?: string;
+    payment_id?: string;
   },
   authHeader?: string
 ) {
-  const { paymentId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
+  const targetOrderId = body.orderId || body.order_id;
+  const targetPaymentId = body.paymentId || body.payment_id;
 
-  if (!paymentId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    return { status: 400, data: { success: false, error: 'Missing required payment verification parameters' } };
+  if (!targetOrderId && !targetPaymentId) {
+    return { status: 400, data: { success: false, error: 'Missing required orderId or paymentId parameter' } };
   }
 
-  const auth = await authenticateRequest(authHeader);
-  if (!auth.authenticated) {
-    return { status: 401, data: { success: false, error: auth.error || 'Unauthorized' } };
+  // Optional candidate or admin authentication
+  if (authHeader) {
+    const auth = await authenticateRequest(authHeader);
+    if (!auth.authenticated) {
+      return { status: 401, data: { success: false, error: auth.error || 'Unauthorized' } };
+    }
   }
 
-  // 1. Verify Razorpay HMAC-SHA256 signature
-  const signaturePayload = `${razorpay_order_id}|${razorpay_payment_id}`;
-  const expectedSignature = crypto
-    .createHmac('sha256', RAZORPAY_KEY_SECRET)
-    .update(signaturePayload)
-    .digest('hex');
-
-  const isProd = process.env.NODE_ENV === 'production';
-
-  // In production, reject simulated signatures unconditionally
-  if (isProd && razorpay_signature === 'simulated_success') {
-    console.error(`[PAYMENT_VERIFY] Blocked simulated payment attempt in production for payment ${paymentId}`);
-    return { status: 400, data: { success: false, error: 'Simulated payment verification is strictly disabled in production.' } };
+  // 1. Locate payment in local database
+  let paymentQuery = getSupabaseServer().from('payments').select('*');
+  if (targetOrderId) {
+    paymentQuery = paymentQuery.eq('gateway_order_id', targetOrderId);
+  } else if (targetPaymentId) {
+    paymentQuery = paymentQuery.eq('id', targetPaymentId);
   }
 
-  const isSimulation =
-    !isProd &&
-    (razorpay_signature === 'simulated_success' ||
-      RAZORPAY_KEY_SECRET === 'test_secret_TigerGlobal2026');
+  const { data: paymentRecord, error: pErr } = await paymentQuery.maybeSingle();
 
-  const isSignatureValid = isSimulation || crypto.timingSafeEqual(
-    Buffer.from(expectedSignature, 'utf8'),
-    Buffer.from(razorpay_signature, 'utf8')
-  );
-
-  if (!isSignatureValid) {
-    console.error(`[PAYMENT_VERIFY] Invalid signature for payment ${paymentId}`);
-    // Mark payment failed in database
-    await getSupabaseServer().rpc('mark_payment_failed', {
-      p_payment_id: paymentId,
-      p_reason: 'Cryptographic signature mismatch'
-    });
-    return { status: 400, data: { success: false, error: 'Payment signature verification failed' } };
+  if (pErr || !paymentRecord) {
+    console.error(`[CASHFREE_VERIFY] Payment record not found for order ${targetOrderId || targetPaymentId}:`, pErr);
+    return { status: 404, data: { success: false, error: 'Payment record not found in system.' } };
   }
 
-  // 2. Atomic database completion via complete_verified_payment RPC
-  const { data: rpcRes, error: rpcErr } = await getSupabaseServer().rpc('complete_verified_payment', {
-    p_payment_id: paymentId,
-    p_gateway_order_id: razorpay_order_id,
-    p_gateway_payment_id: razorpay_payment_id,
-    p_payment_method: 'RAZORPAY'
-  });
-
-  if (rpcErr || !rpcRes) {
-    console.error('[PAYMENT_VERIFY] complete_verified_payment failed:', rpcErr);
-    return { status: 500, data: { success: false, error: rpcErr?.message || 'Database payment completion failed' } };
-  }
-
-  const verifiedPayment = rpcRes as any;
-
-  // 3. Dispatch receipt email asynchronously (email failure does NOT fail payment)
-  // Dynamic import keeps jspdf (browser-only) out of the module init scope.
-  import('./paymentEmailService').then(({ sendPaymentReceiptEmail }) => {
-    const receiptData = {
-      applicationNumber: verifiedPayment.application_number,
-      paymentReference: verifiedPayment.payment_reference,
-      receiptNumber: verifiedPayment.receipt_number,
-      candidateName: verifiedPayment.candidate_name,
-      candidateEmail: verifiedPayment.candidate_email,
-      paymentPurpose: verifiedPayment.purpose,
-      amount: verifiedPayment.amount,
-      currency: verifiedPayment.currency,
-      paymentDate: verifiedPayment.paid_at,
-      paymentStatus: 'SUCCESS',
-      paymentMethod: 'ONLINE / RAZORPAY',
-      gateway: 'RAZORPAY',
-      gatewayOrderId: razorpay_order_id,
-      gatewayPaymentId: razorpay_payment_id
+  // 2. IDEMPOTENCY: If payment is ALREADY marked SUCCESS, return existing verified state immediately
+  if (paymentRecord.status === 'SUCCESS') {
+    return {
+      status: 200,
+      data: {
+        success: true,
+        paymentStatus: 'SUCCESS',
+        alreadyVerified: true,
+        paymentId: paymentRecord.id,
+        paymentReference: paymentRecord.payment_reference,
+        receiptNumber: paymentRecord.receipt_number || paymentRecord.payment_reference,
+        amount: paymentRecord.amount,
+        currency: paymentRecord.currency,
+        paidAt: paymentRecord.paid_at,
+        gatewayOrderId: paymentRecord.gateway_order_id,
+        gatewayPaymentId: paymentRecord.gateway_payment_id
+      }
     };
-    return sendPaymentReceiptEmail(receiptData);
-  }).catch((emailErr) => {
-    console.warn('[PAYMENT_VERIFY] Asynchronous receipt email error (ignored):', emailErr);
-  });
+  }
 
-  // 4. Generate candidate Reference Slip and dispatch via Resend asynchronously
-  triggerPostPaymentReferenceSlip(paymentId).catch((refErr) => {
-    console.warn('[PAYMENT_VERIFY] Asynchronous Reference Slip error (ignored):', refErr);
+  const orderId = paymentRecord.gateway_order_id || targetOrderId;
+
+  // Validate server credentials
+  if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
+    console.error('[CASHFREE_VERIFY] CASHFREE_APP_ID or CASHFREE_SECRET_KEY missing from server runtime');
+    return {
+      status: 500,
+      data: {
+        success: false,
+        error: 'Cashfree server credentials are not configured in runtime environment.'
+      }
+    };
+  }
+
+  // 3. Query Cashfree Sandbox API for authoritative Order and Payment state
+  let cfOrder: any = null;
+  let cfPayments: any[] = [];
+
+  try {
+    const orderRes = await fetch(`${CASHFREE_BASE_URL}/orders/${encodeURIComponent(orderId)}`, {
+      method: 'GET',
+      headers: getCashfreeHeaders()
+    });
+
+    if (!orderRes.ok) {
+      const errText = await orderRes.text();
+      console.error('[CASHFREE_VERIFY] Cashfree get order error:', errText);
+      return { status: 400, data: { success: false, error: `Cashfree order verification failed: ${errText}` } };
+    }
+
+    cfOrder = await orderRes.json();
+
+    // Query payments list for the order
+    const paymentsRes = await fetch(`${CASHFREE_BASE_URL}/orders/${encodeURIComponent(orderId)}/payments`, {
+      method: 'GET',
+      headers: getCashfreeHeaders()
+    });
+
+    if (paymentsRes.ok) {
+      cfPayments = (await paymentsRes.json()) as any[];
+    }
+  } catch (err: any) {
+    console.error('[CASHFREE_VERIFY] Exception querying Cashfree API:', err);
+    return {
+      status: 502,
+      data: {
+        success: false,
+        error: `Error communicating with Cashfree Sandbox: ${err?.message || err}`
+      }
+    };
+  }
+
+  const orderStatus = cfOrder.order_status; // "PAID", "ACTIVE", "EXPIRED", "TERMINATED"
+  const successPayment = Array.isArray(cfPayments)
+    ? cfPayments.find((p: any) => p.payment_status === 'SUCCESS')
+    : null;
+
+  // 4. Handle State: SUCCESS / PAID
+  if (orderStatus === 'PAID' || successPayment) {
+    const gatewayPaymentId = String(successPayment?.cf_payment_id || cfOrder.cf_order_id || `cf_${Date.now()}`);
+    const paymentMethodDesc = successPayment?.payment_group
+      ? `CASHFREE_${String(successPayment.payment_group).toUpperCase()}`
+      : 'CASHFREE';
+
+    // Atomic database completion via complete_verified_payment RPC
+    const { data: rpcRes, error: rpcErr } = await getSupabaseServer().rpc('complete_verified_payment', {
+      p_payment_id: paymentRecord.id,
+      p_gateway_order_id: orderId,
+      p_gateway_payment_id: gatewayPaymentId,
+      p_payment_method: paymentMethodDesc
+    });
+
+    if (rpcErr || !rpcRes) {
+      console.error('[CASHFREE_VERIFY] complete_verified_payment RPC failed:', rpcErr);
+      return { status: 500, data: { success: false, error: rpcErr?.message || 'Database payment completion failed' } };
+    }
+
+    const verifiedPayment = rpcRes as any;
+
+    // Ensure gateway is tagged as CASHFREE
+    await getSupabaseServer()
+      .from('payments')
+      .update({ gateway: 'CASHFREE' })
+      .eq('id', paymentRecord.id);
+
+    // 5. Asynchronous receipt email (email failure does NOT fail payment)
+    import('./paymentEmailService').then(({ sendPaymentReceiptEmail }) => {
+      const receiptData = {
+        applicationNumber: verifiedPayment.application_number,
+        paymentReference: verifiedPayment.payment_reference,
+        receiptNumber: verifiedPayment.receipt_number,
+        candidateName: verifiedPayment.candidate_name,
+        candidateEmail: verifiedPayment.candidate_email,
+        paymentPurpose: verifiedPayment.purpose,
+        amount: verifiedPayment.amount,
+        currency: verifiedPayment.currency,
+        paymentDate: verifiedPayment.paid_at,
+        paymentStatus: 'SUCCESS',
+        paymentMethod: paymentMethodDesc,
+        gateway: 'CASHFREE',
+        gatewayOrderId: orderId,
+        gatewayPaymentId: gatewayPaymentId
+      };
+      return sendPaymentReceiptEmail(receiptData);
+    }).catch((emailErr) => {
+      console.warn('[CASHFREE_VERIFY] Asynchronous receipt email error (ignored):', emailErr);
+    });
+
+    // 6. Asynchronously trigger Reference Slip generation and Resend email
+    triggerPostPaymentReferenceSlip(paymentRecord.id).catch((refErr) => {
+      console.warn('[CASHFREE_VERIFY] Asynchronous Reference Slip error (ignored):', refErr);
+    });
+
+    return {
+      status: 200,
+      data: {
+        success: true,
+        paymentStatus: 'SUCCESS',
+        paymentReference: verifiedPayment.payment_reference,
+        receiptNumber: verifiedPayment.receipt_number,
+        applicationNumber: verifiedPayment.application_number,
+        amount: verifiedPayment.amount,
+        currency: verifiedPayment.currency,
+        paidAt: verifiedPayment.paid_at,
+        gatewayOrderId: orderId,
+        gatewayPaymentId: gatewayPaymentId,
+        candidateName: verifiedPayment.candidate_name
+      }
+    };
+  }
+
+  // 7. Handle State: PENDING / ACTIVE
+  if (orderStatus === 'ACTIVE') {
+    return {
+      status: 200,
+      data: {
+        success: true,
+        paymentStatus: 'PENDING',
+        orderId,
+        message: 'Payment is pending or awaiting candidate completion in checkout.'
+      }
+    };
+  }
+
+  // 8. Handle State: FAILED / EXPIRED
+  const failureReason = cfOrder.order_status === 'EXPIRED'
+    ? 'Cashfree order expired before payment'
+    : (successPayment?.payment_message || 'Payment not completed or failed at gateway');
+
+  await getSupabaseServer().rpc('mark_payment_failed', {
+    p_payment_id: paymentRecord.id,
+    p_reason: failureReason
   });
 
   return {
     status: 200,
     data: {
-      success: true,
-      paymentReference: verifiedPayment.payment_reference,
-      receiptNumber: verifiedPayment.receipt_number,
-      applicationNumber: verifiedPayment.application_number,
-      amount: verifiedPayment.amount,
-      currency: verifiedPayment.currency,
-      paidAt: verifiedPayment.paid_at,
-      gatewayPaymentId: verifiedPayment.gateway_payment_id,
-      candidateName: verifiedPayment.candidate_name
+      success: false,
+      paymentStatus: 'FAILED',
+      orderId,
+      error: failureReason
     }
   };
 }
 
 /**
- * Handler: POST /api/payments/webhook
- * Handles Razorpay webhook notifications with HMAC-SHA256 signature verification and idempotency
+ * Verifies Cashfree webhook signature using HMAC-SHA256
+ * Cashfree computes: HMAC-SHA256(timestamp + rawBody, CASHFREE_SECRET_KEY)
  */
-export async function webhookHandler(rawBody: string, signatureHeader?: string | null) {
+function verifyCashfreeWebhookSignature(
+  rawBody: string,
+  signatureHeader?: string | null,
+  timestampHeader?: string | null
+): boolean {
+  if (!signatureHeader || !CASHFREE_SECRET_KEY) {
+    return false;
+  }
+
+  const payload = timestampHeader ? `${timestampHeader}${rawBody}` : rawBody;
+
+  const expectedBase64 = crypto
+    .createHmac('sha256', CASHFREE_SECRET_KEY)
+    .update(payload)
+    .digest('base64');
+
+  const expectedHex = crypto
+    .createHmac('sha256', CASHFREE_SECRET_KEY)
+    .update(payload)
+    .digest('hex');
+
+  const sigBuf = Buffer.from(signatureHeader, 'utf8');
+  const b64Buf = Buffer.from(expectedBase64, 'utf8');
+  const hexBuf = Buffer.from(expectedHex, 'utf8');
+
+  if (sigBuf.length === b64Buf.length && crypto.timingSafeEqual(sigBuf, b64Buf)) {
+    return true;
+  }
+  if (sigBuf.length === hexBuf.length && crypto.timingSafeEqual(sigBuf, hexBuf)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Handler: POST /api/payment/webhook
+ * Cashfree webhook ingestion with HMAC-SHA256 signature verification and idempotency
+ */
+export async function webhookHandler(
+  rawBody: string,
+  signatureHeader?: string | null,
+  timestampHeader?: string | null
+) {
   if (!rawBody) {
     return { status: 400, data: { error: 'Empty webhook body' } };
   }
 
   // 1. Verify Webhook Signature if secret configured
-  if (RAZORPAY_WEBHOOK_SECRET && RAZORPAY_WEBHOOK_SECRET !== 'test_webhook_TigerGlobal2026') {
-    if (!signatureHeader) {
-      return { status: 400, data: { error: 'Missing X-Razorpay-Signature header' } };
-    }
-
-    const expectedSignature = crypto
-      .createHmac('sha256', RAZORPAY_WEBHOOK_SECRET)
-      .update(rawBody)
-      .digest('hex');
-
-    const isMatch = crypto.timingSafeEqual(
-      Buffer.from(expectedSignature, 'utf8'),
-      Buffer.from(signatureHeader, 'utf8')
-    );
-
-    if (!isMatch) {
-      console.error('[WEBHOOK] Invalid webhook signature');
-      return { status: 400, data: { error: 'Invalid webhook signature' } };
+  if (CASHFREE_SECRET_KEY) {
+    const isSignatureValid = verifyCashfreeWebhookSignature(rawBody, signatureHeader, timestampHeader);
+    if (!isSignatureValid) {
+      console.error('[CASHFREE_WEBHOOK] Cryptographic signature validation failed');
+      return { status: 400, data: { error: 'Invalid Cashfree webhook signature' } };
     }
   }
 
@@ -462,78 +675,80 @@ export async function webhookHandler(rawBody: string, signatureHeader?: string |
     return { status: 400, data: { error: 'Invalid JSON payload' } };
   }
 
-  const eventName = eventPayload.event;
-  console.log(`[WEBHOOK] Received Razorpay event: ${eventName}`);
+  const eventType = eventPayload.type || eventPayload.event;
+  console.log(`[CASHFREE_WEBHOOK] Received event: ${eventType}`);
 
-  if (eventName === 'payment.captured' || eventName === 'order.paid') {
-    const paymentEntity = eventPayload.payload?.payment?.entity;
-    const orderId = paymentEntity?.order_id || eventPayload.payload?.order?.entity?.id;
-    const paymentId = paymentEntity?.id;
+  // Cashfree PG v3 webhook data structure:
+  // eventPayload.data.order.order_id
+  // eventPayload.data.payment.payment_status ("SUCCESS", "FAILED")
+  const orderData = eventPayload.data?.order || eventPayload.order;
+  const paymentData = eventPayload.data?.payment || eventPayload.payment;
+  const orderId = orderData?.order_id || eventPayload.order_id;
+  const paymentStatus = paymentData?.payment_status || (eventType === 'PAYMENT_SUCCESS_WEBHOOK' ? 'SUCCESS' : null);
+  const cfPaymentId = paymentData?.cf_payment_id || eventPayload.cf_payment_id;
 
-    if (!orderId) {
-      return { status: 200, data: { received: true, note: 'No order_id in event payload' } };
-    }
+  if (!orderId) {
+    return { status: 200, data: { received: true, note: 'No order_id in event payload' } };
+  }
 
-    // Locate payment by order_id
-    const { data: paymentRecord } = await getSupabaseServer()
-      .from('payments')
-      .select('id, status')
-      .eq('gateway_order_id', orderId)
-      .maybeSingle();
+  // 2. Locate payment record by orderId
+  const { data: paymentRecord } = await getSupabaseServer()
+    .from('payments')
+    .select('id, status, payment_reference')
+    .eq('gateway_order_id', orderId)
+    .maybeSingle();
 
-    if (!paymentRecord) {
-      console.warn(`[WEBHOOK] No internal payment found for order_id: ${orderId}`);
-      return { status: 200, data: { received: true, note: 'Payment record not found' } };
-    }
+  if (!paymentRecord) {
+    console.warn(`[CASHFREE_WEBHOOK] No payment record found for order_id: ${orderId}`);
+    return { status: 200, data: { received: true, note: 'Payment record not found' } };
+  }
 
-    // Idempotent: If already SUCCESS, acknowledge 200 without duplicate action
-    if (paymentRecord.status === 'SUCCESS') {
-      console.log(`[WEBHOOK] Payment ${paymentRecord.id} already marked SUCCESS. Idempotent return.`);
-      return { status: 200, data: { received: true, idempotent: true } };
-    }
+  // 3. IDEMPOTENCY: If already marked SUCCESS, acknowledge immediately
+  if (paymentRecord.status === 'SUCCESS') {
+    console.log(`[CASHFREE_WEBHOOK] Payment ${paymentRecord.id} already marked SUCCESS. Idempotent return.`);
+    return { status: 200, data: { received: true, idempotent: true } };
+  }
 
-    // Complete payment
+  // 4. Process SUCCESS
+  if (paymentStatus === 'SUCCESS' || eventType === 'PAYMENT_SUCCESS_WEBHOOK' || eventType === 'ORDER_PAID_WEBHOOK') {
+    const gatewayPaymentId = String(cfPaymentId || `cf_hook_${Date.now()}`);
+
     await getSupabaseServer().rpc('complete_verified_payment', {
       p_payment_id: paymentRecord.id,
       p_gateway_order_id: orderId,
-      p_gateway_payment_id: paymentId || `webhook_capture_${Date.now()}`,
-      p_payment_method: paymentEntity?.method?.toUpperCase() || 'RAZORPAY'
+      p_gateway_payment_id: gatewayPaymentId,
+      p_payment_method: 'CASHFREE'
     });
+
+    await getSupabaseServer()
+      .from('payments')
+      .update({ gateway: 'CASHFREE' })
+      .eq('id', paymentRecord.id);
 
     // Asynchronously generate candidate Reference Slip and dispatch via Resend
     triggerPostPaymentReferenceSlip(paymentRecord.id).catch((refErr) => {
-      console.warn('[WEBHOOK] Asynchronous Reference Slip error (ignored):', refErr);
+      console.warn('[CASHFREE_WEBHOOK] Asynchronous Reference Slip error (ignored):', refErr);
     });
 
     return { status: 200, data: { received: true, processed: true } };
   }
 
-  if (eventName === 'payment.failed') {
-    const paymentEntity = eventPayload.payload?.payment?.entity;
-    const orderId = paymentEntity?.order_id;
-
-    if (orderId) {
-      const { data: paymentRecord } = await getSupabaseServer()
-        .from('payments')
-        .select('id, status')
-        .eq('gateway_order_id', orderId)
-        .maybeSingle();
-
-      if (paymentRecord && paymentRecord.status === 'PENDING') {
-        await getSupabaseServer().rpc('mark_payment_failed', {
-          p_payment_id: paymentRecord.id,
-          p_reason: paymentEntity?.error_description || 'Payment failed at gateway'
-        });
-      }
+  // 5. Process FAILURE
+  if (paymentStatus === 'FAILED' || eventType === 'PAYMENT_FAILED_WEBHOOK') {
+    if (paymentRecord.status === 'PENDING') {
+      await getSupabaseServer().rpc('mark_payment_failed', {
+        p_payment_id: paymentRecord.id,
+        p_reason: paymentData?.payment_message || 'Cashfree payment failed'
+      });
     }
     return { status: 200, data: { received: true, failed_recorded: true } };
   }
 
-  return { status: 200, data: { received: true, event: eventName } };
+  return { status: 200, data: { received: true, event: eventType } };
 }
 
 /**
- * Handler: POST /api/payments/record-offline
+ * Handler: POST /api/payment/record-offline
  * Admin manual offline payment recording
  */
 export async function recordOfflinePaymentHandler(
@@ -607,7 +822,7 @@ export async function recordOfflinePaymentHandler(
 }
 
 /**
- * Handler: POST /api/payments/resend-receipt
+ * Handler: POST /api/payment/resend-receipt
  * Admin action to resend the payment receipt email
  */
 export async function resendReceiptEmailHandler(
@@ -644,7 +859,6 @@ export async function resendReceiptEmailHandler(
   }
 
   const app = payment.applications as any;
-  // Dynamic import keeps jspdf (browser-only) out of the module init scope.
   const { sendPaymentReceiptEmail } = await import('./paymentEmailService');
 
   const receiptData = {
@@ -660,14 +874,13 @@ export async function resendReceiptEmailHandler(
     paymentDate: payment.paid_at || new Date(),
     paymentStatus: 'SUCCESS',
     paymentMethod: payment.payment_method || 'ONLINE',
-    gateway: payment.gateway || 'RAZORPAY',
+    gateway: payment.gateway || 'CASHFREE',
     gatewayOrderId: payment.gateway_order_id,
     gatewayPaymentId: payment.gateway_payment_id
   };
 
   const emailResult = await sendPaymentReceiptEmail(receiptData);
 
-  // Log in activity logs
   await getSupabaseServer().from('activity_logs').insert({
     application_id: app.id,
     action: emailResult.success ? 'PAYMENT_RECEIPT_EMAIL_SENT' : 'PAYMENT_RECEIPT_EMAIL_FAILED',

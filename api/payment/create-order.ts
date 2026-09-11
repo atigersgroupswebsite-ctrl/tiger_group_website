@@ -1,11 +1,12 @@
 // ==============================================================================
 // File: api/payment/create-order.ts
-// Description: Vercel Serverless Function — Razorpay Order Initiation
+// Description: Vercel Serverless Function — Cashfree Sandbox Order Initiation
 // Endpoint: POST /api/payment/create-order
 // Brand: A TIGER GROUPS — A TIGER GLOBAL Career Solution & Consultancy
 // Security:
-//   - Razorpay secret key kept strictly server-side
+//   - Cashfree secret key kept strictly server-side
 //   - Requester must be authorized candidate or active admin
+//   - Authoritative payable amount (500 INR) determined server-side
 //   - Interacts with Supabase create_or_get_pending_payment RPC
 // ==============================================================================
 
@@ -29,7 +30,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
   try {
     const body = await parseBody(req);
     const authHeader = req.headers['authorization'] as string | undefined;
-    const result = await createPaymentOrderHandler(body, authHeader);
+    const result = await createPaymentOrderHandler(body, authHeader, req.headers);
     return sendResponse(res, result.status, result.data);
   } catch (err: any) {
     console.error('[API_PAYMENT_CREATE_ORDER_ERROR]', err);

@@ -1,6 +1,6 @@
 // ==============================================================================
 // File: src/services/paymentService.ts
-// Description: Client-side Razorpay payment orchestration and verification service
+// Description: Client-side Cashfree (Sandbox) payment orchestration and verification service
 // Brand: A TIGER GROUPS — A TIGER GLOBAL Career Solution & Consultancy
 // ==============================================================================
 
@@ -21,7 +21,8 @@ export interface PaymentConfigResponse {
   currency?: string;
   totalConsultancyFee?: number;
   policyNote?: string;
-  keyId?: string;
+  gateway?: string;
+  environment?: string;
   payments?: PaymentRow[];
   error?: string;
 }
@@ -32,10 +33,12 @@ export interface CreateOrderResponse {
   paymentId?: string;
   paymentReference?: string;
   orderId?: string;
+  cfOrderId?: string;
+  payment_session_id?: string;
   receiptNumber?: string;
   amount?: number;
   currency?: string;
-  keyId?: string;
+  environment?: string;
   candidate?: {
     name: string;
     email: string;
@@ -46,34 +49,68 @@ export interface CreateOrderResponse {
 
 export interface VerifyPaymentResponse {
   success: boolean;
+  paymentStatus?: 'SUCCESS' | 'PENDING' | 'FAILED';
   paymentReference?: string;
   receiptNumber?: string;
   applicationNumber?: string;
   amount?: number;
   currency?: string;
   paidAt?: string;
+  gatewayOrderId?: string;
   gatewayPaymentId?: string;
   candidateName?: string;
+  message?: string;
   error?: string;
 }
 
 /**
- * Dynamically loads the Razorpay checkout.js script.
+ * Dynamically loads the official Cashfree Web SDK V3.
  */
-export function loadRazorpayCheckoutScript(): Promise<boolean> {
+export function loadCashfreeCheckoutScript(): Promise<boolean> {
   return new Promise((resolve) => {
-    if ((window as any).Razorpay) {
+    if ((window as any).Cashfree) {
       return resolve(true);
     }
+    const existing = document.querySelector('script[src="https://sdk.cashfree.com/js/v3/cashfree.js"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(true));
+      existing.addEventListener('error', () => resolve(false));
+      return;
+    }
     const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
     script.async = true;
     script.onload = () => resolve(true);
     script.onerror = () => {
-      console.error('Failed to load Razorpay SDK');
+      console.error('Failed to load Cashfree V3 SDK');
       resolve(false);
     };
     document.body.appendChild(script);
+  });
+}
+
+/**
+ * Initializes and triggers Cashfree Web Checkout in Sandbox mode.
+ */
+export async function launchCashfreeCheckout(paymentSessionId: string): Promise<void> {
+  const isLoaded = await loadCashfreeCheckoutScript();
+  if (!isLoaded) {
+    throw new Error('Could not load Cashfree payment gateway SDK. Please check your internet connection.');
+  }
+
+  const CashfreeSDK = (window as any).Cashfree;
+  if (!CashfreeSDK) {
+    throw new Error('Cashfree SDK is not available in window context.');
+  }
+
+  // Strictly Sandbox mode per project specification
+  const cashfree = CashfreeSDK({
+    mode: 'sandbox'
+  });
+
+  cashfree.checkout({
+    paymentSessionId,
+    redirectTarget: '_self'
   });
 }
 
@@ -91,7 +128,7 @@ async function getAuthHeader(): Promise<string> {
 export async function getPaymentConfig(applicationId: string): Promise<PaymentConfigResponse> {
   try {
     const authHeader = await getAuthHeader();
-    const res = await fetch(`/api/payments/config?appId=${encodeURIComponent(applicationId)}`, {
+    const res = await fetch(`/api/payment/config?appId=${encodeURIComponent(applicationId)}`, {
       headers: {
         Authorization: authHeader
       }
@@ -103,7 +140,7 @@ export async function getPaymentConfig(applicationId: string): Promise<PaymentCo
 }
 
 /**
- * Initiates order creation on the server.
+ * Initiates order creation on the server with Cashfree Sandbox.
  */
 export async function createPaymentOrder(
   applicationId: string,
@@ -112,7 +149,7 @@ export async function createPaymentOrder(
 ): Promise<CreateOrderResponse> {
   try {
     const authHeader = await getAuthHeader();
-    const res = await fetch('/api/payments/create-order', {
+    const res = await fetch('/api/payment/create-order', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -127,17 +164,15 @@ export async function createPaymentOrder(
 }
 
 /**
- * Sends client Razorpay handler response to server for cryptographic signature verification.
+ * Verifies payment status with server (which queries Cashfree Sandbox API authoritatively).
  */
 export async function verifyPaymentWithServer(payload: {
-  paymentId: string;
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
+  orderId?: string;
+  paymentId?: string;
 }): Promise<VerifyPaymentResponse> {
   try {
     const authHeader = await getAuthHeader();
-    const res = await fetch('/api/payments/verify', {
+    const res = await fetch('/api/payment/verify', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -161,10 +196,10 @@ export async function recordOfflinePayment(payload: {
   amount: number;
   receivedBy: string;
   notes?: string;
-}): Promise<{ success: boolean; data?: any; error?: string }> {
+}): Promise<{ success: boolean; error?: string; data?: any }> {
   try {
     const authHeader = await getAuthHeader();
-    const res = await fetch('/api/payments/record-offline', {
+    const res = await fetch('/api/payment/record-offline', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -172,23 +207,19 @@ export async function recordOfflinePayment(payload: {
       },
       body: JSON.stringify(payload)
     });
-    const result = await res.json();
-    if (!res.ok || !result.success) {
-      return { success: false, error: result.error || 'Failed to record offline payment' };
-    }
-    return { success: true, data: result };
+    return await res.json();
   } catch (err: any) {
-    return { success: false, error: err.message || 'Offline payment recording failed' };
+    return { success: false, error: err.message || 'Failed to record offline payment' };
   }
 }
 
 /**
- * Admin action to resend the payment receipt email.
+ * Admin action to trigger payment receipt email resend.
  */
 export async function resendPaymentReceiptEmail(paymentId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const authHeader = await getAuthHeader();
-    const res = await fetch('/api/payments/resend-receipt', {
+    const res = await fetch('/api/payment/resend-receipt', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

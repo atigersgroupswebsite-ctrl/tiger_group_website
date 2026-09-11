@@ -264,23 +264,34 @@ export function paymentApiPlugin(): Plugin {
           if (normalizedUrl === '/api/payment/create-order' && method === 'POST') {
             const rawBody = await parseRequestBody(req);
             const body = JSON.parse(rawBody || '{}');
-            const result = await createPaymentOrderHandler(body, authHeader);
+            const result = await createPaymentOrderHandler(body, authHeader, req.headers);
             return sendJsonResponse(res, result.status, result.data);
           }
 
-          // 3. POST /api/payment/verify
-          if (normalizedUrl === '/api/payment/verify' && method === 'POST') {
-            const rawBody = await parseRequestBody(req);
-            const body = JSON.parse(rawBody || '{}');
-            const result = await verifyPaymentHandler(body, authHeader);
+          // 3. POST /api/payment/verify or GET /api/payment/verify
+          if ((normalizedUrl.startsWith('/api/payment/verify') || normalizedUrl.startsWith('/api/payment/status')) && (method === 'POST' || method === 'GET')) {
+            let orderId = '';
+            let paymentId = '';
+            if (method === 'GET') {
+              const parsedUrl = new URL(url, 'http://localhost');
+              orderId = parsedUrl.searchParams.get('order_id') || parsedUrl.searchParams.get('orderId') || '';
+              paymentId = parsedUrl.searchParams.get('payment_id') || parsedUrl.searchParams.get('paymentId') || '';
+            } else {
+              const rawBody = await parseRequestBody(req);
+              const body = JSON.parse(rawBody || '{}');
+              orderId = body.orderId || body.order_id || body.gateway_order_id || '';
+              paymentId = body.paymentId || body.payment_id || '';
+            }
+            const result = await verifyPaymentHandler({ orderId, paymentId }, authHeader);
             return sendJsonResponse(res, result.status, result.data);
           }
 
           // 4. POST /api/payment/webhook
           if (normalizedUrl === '/api/payment/webhook' && method === 'POST') {
             const rawBody = await parseRequestBody(req);
-            const signature = req.headers['x-razorpay-signature'] as string | undefined;
-            const result = await webhookHandler(rawBody, signature);
+            const signature = (req.headers['x-webhook-signature'] || req.headers['x-cashfree-signature']) as string | undefined;
+            const timestamp = (req.headers['x-webhook-timestamp'] || req.headers['x-cashfree-timestamp']) as string | undefined;
+            const result = await webhookHandler(rawBody, signature, timestamp);
             return sendJsonResponse(res, result.status, result.data);
           }
 

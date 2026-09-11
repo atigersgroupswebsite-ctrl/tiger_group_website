@@ -63,6 +63,7 @@ import { Contact } from './pages/Contact';
 import { Joining } from './pages/Joining';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CandidatePaymentPage } from './pages/CandidatePaymentPage';
+import { PaymentResultPage } from './pages/PaymentResultPage';
 import { TermsAndConditionsPage } from './pages/TermsAndConditionsPage';
 import { ConsultancyPolicyPage } from './pages/ConsultancyPolicyPage';
 import { LegalDocumentsPage } from './pages/LegalDocumentsPage';
@@ -145,6 +146,8 @@ export const App: React.FC = () => {
             <Route path="/joining/reset-password" element={<CandidateResetPasswordPage />} />
             <Route path="/joining/forgot-password" element={<CandidateResetPasswordPage />} />
             <Route path="/joining/payment" element={<CandidatePaymentPage />} />
+            <Route path="/payment/result" element={<PaymentResultPage />} />
+            <Route path="/joining/payment/result" element={<PaymentResultPage />} />
             <Route path="/joining" element={<Joining />} />
             <Route path="/terms-and-conditions" element={<TermsAndConditionsPage />} />
             <Route path="/consultancy-policy" element={<ConsultancyPolicyPage />} />

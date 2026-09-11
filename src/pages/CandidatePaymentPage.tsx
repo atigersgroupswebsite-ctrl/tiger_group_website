@@ -4,8 +4,8 @@
 // Brand: A TIGER GROUPS — A TIGER GLOBAL Career Solution & Consultancy
 // Security:
 //   - Gated by candidate authentication (getAuthorizedApplication)
-//   - Amount and purpose come dynamically from server/database configuration
-//   - Official Razorpay checkout with strict server-side HMAC verification
+//   - Amount and purpose come dynamically from server configuration (500 INR)
+//   - Official Cashfree Web Checkout (V3 JS SDK) in SANDBOX mode
 //   - Immediate digital receipt download upon verified success
 // ==============================================================================
 
@@ -27,8 +27,8 @@ import { getAuthorizedApplication } from '../services/joiningService';
 import {
   getPaymentConfig,
   createPaymentOrder,
-  verifyPaymentWithServer,
-  loadRazorpayCheckoutScript,
+  loadCashfreeCheckoutScript,
+  launchCashfreeCheckout,
   type PaymentConfigResponse
 } from '../services/paymentService';
 import { downloadPaymentReceiptPdf, type PaymentReceiptData } from '../utils/paymentReceiptGenerator';
@@ -38,6 +38,7 @@ export const CandidatePaymentPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const appIdParam = searchParams.get('appId');
+  const returnOrderId = searchParams.get('order_id') || searchParams.get('orderId');
 
   // Page state
   const [loading, setLoading] = useState(true);
@@ -60,6 +61,13 @@ export const CandidatePaymentPage: React.FC = () => {
     candidateEmail: string;
     purpose: string;
   } | null>(null);
+
+  // If redirected with order_id, automatically forward to /payment/result
+  useEffect(() => {
+    if (returnOrderId) {
+      navigate(`/payment/result?order_id=${encodeURIComponent(returnOrderId)}`, { replace: true });
+    }
+  }, [returnOrderId, navigate]);
 
   // 1. Resolve authorized application & payment config
   useEffect(() => {
@@ -85,6 +93,9 @@ export const CandidatePaymentPage: React.FC = () => {
 
       const application = appResult.data;
       setApp(application);
+
+      // Preload Cashfree V3 SDK
+      loadCashfreeCheckoutScript().catch(() => {});
 
       // Fetch payment configuration for this application
       const configRes = await getPaymentConfig(application.id);
@@ -128,7 +139,7 @@ export const CandidatePaymentPage: React.FC = () => {
     };
   }, [appIdParam, navigate]);
 
-  // 2. Trigger Razorpay Checkout
+  // 2. Trigger Cashfree Web Checkout (Sandbox)
   const handleInitiatePayment = async () => {
     if (!app || !paymentConfig) return;
 
@@ -137,14 +148,14 @@ export const CandidatePaymentPage: React.FC = () => {
     setError(null);
 
     try {
-      // Step A: Load Razorpay script
-      const isScriptLoaded = await loadRazorpayCheckoutScript();
+      // Step A: Load Cashfree SDK
+      const isScriptLoaded = await loadCashfreeCheckoutScript();
       if (!isScriptLoaded) {
-        throw new Error('Could not load Razorpay payment gateway. Please check your internet connection.');
+        throw new Error('Could not load Cashfree payment gateway SDK. Please check your internet connection.');
       }
 
       // Step B: Request server to create atomic payment order
-      setProcessStep('Connecting to secure gateway...');
+      setProcessStep('Connecting to Cashfree Sandbox...');
       const orderRes = await createPaymentOrder(
         app.id,
         paymentConfig.purpose || 'REGISTRATION',
@@ -173,148 +184,18 @@ export const CandidatePaymentPage: React.FC = () => {
         return;
       }
 
-      const paymentId = orderRes.paymentId!;
-      const orderId = orderRes.orderId!;
-      const keyId = orderRes.keyId || paymentConfig.keyId || 'rzp_test_TigerGlobal2026';
-
-      setProcessStep('Awaiting payment completion...');
-
-      // Step C: Initialize Razorpay Checkout Options
-      const options = {
-        key: keyId,
-        amount: Math.round(Number(orderRes.amount || 500) * 100), // in paise
-        currency: orderRes.currency || 'INR',
-        name: 'A TIGER GLOBAL',
-        description: `${paymentConfig.purposeTitle || 'Registration Fee'} • App #${app.application_number}`,
-        image: '/assets/logo.png',
-        order_id: orderId.startsWith('order_') && !orderId.includes('order_PAY') ? orderId : undefined,
-        prefill: {
-          name: app.full_name,
-          email: app.email,
-          contact: app.mobile
-        },
-        notes: {
-          application_id: app.id,
-          application_number: app.application_number,
-          payment_reference: orderRes.paymentReference
-        },
-        theme: {
-          color: '#192A56'
-        },
-        modal: {
-          ondismiss: () => {
-            setIsProcessing(false);
-            setProcessStep('');
-          }
-        },
-        handler: async (response: {
-          razorpay_payment_id: string;
-          razorpay_order_id?: string;
-          razorpay_signature: string;
-        }) => {
-          setIsProcessing(true);
-          setProcessStep('Verifying payment signature with server...');
-
-          try {
-            // Step D: Official Server-side cryptographic signature verification
-            const verifyRes = await verifyPaymentWithServer({
-              paymentId,
-              razorpay_order_id: response.razorpay_order_id || orderId,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
-            });
-
-            if (!verifyRes.success) {
-              throw new Error(verifyRes.error || 'Server payment verification failed.');
-            }
-
-            setPaymentSuccessData({
-              paymentReference: verifyRes.paymentReference || orderRes.paymentReference || 'N/A',
-              receiptNumber: verifyRes.receiptNumber || 'N/A',
-              applicationNumber: app.application_number,
-              amount: verifyRes.amount || orderRes.amount || 500,
-              currency: verifyRes.currency || 'INR',
-              paidAt: verifyRes.paidAt || new Date().toISOString(),
-              gatewayPaymentId: response.razorpay_payment_id,
-              candidateName: app.full_name,
-              candidateEmail: app.email,
-              purpose: paymentConfig.purpose || 'REGISTRATION'
-            });
-          } catch (verErr: any) {
-            setError(verErr.message || 'Payment verification encountered an issue.');
-          } finally {
-            setIsProcessing(false);
-            setProcessStep('');
-          }
-        }
-      };
-
-      // In production, NEVER permit mock or simulated payments. Real Razorpay checkout is strictly required.
-      if (import.meta.env.PROD) {
-        if (!(window as any).Razorpay) {
-          setError('Razorpay payment gateway script could not be loaded. Please verify your connection and refresh.');
-          setIsProcessing(false);
-          setProcessStep('');
-          return;
-        }
-        if (keyId.includes('test_TigerGlobal')) {
-          setError('Live payment gateway configuration is pending for this environment. Please contact support.');
-          setIsProcessing(false);
-          setProcessStep('');
-          return;
-        }
+      const paymentSessionId = orderRes.payment_session_id;
+      if (!paymentSessionId) {
+        throw new Error('Cashfree did not return a valid payment session ID.');
       }
 
-      // Check if running in local development simulated mode (strictly DEV only)
-      if (import.meta.env.DEV && (keyId.includes('test_TigerGlobal') || !(window as any).Razorpay)) {
-        // Provide clear local testing fallback with server verification
-        const simulatedPaymentId = `pay_sim_${Date.now()}`;
-        const simulatedOrderId = orderId;
-        const simulatedSignature = 'simulated_success';
+      setProcessStep('Launching Cashfree Checkout...');
 
-        setTimeout(async () => {
-          setProcessStep('Verifying transaction in test gateway...');
-          const verifyRes = await verifyPaymentWithServer({
-            paymentId,
-            razorpay_order_id: simulatedOrderId,
-            razorpay_payment_id: simulatedPaymentId,
-            razorpay_signature: simulatedSignature
-          });
-
-          if (!verifyRes.success) {
-            setError(verifyRes.error || 'Payment verification failed.');
-            setIsProcessing(false);
-            setProcessStep('');
-            return;
-          }
-
-          setPaymentSuccessData({
-            paymentReference: verifyRes.paymentReference || orderRes.paymentReference || 'N/A',
-            receiptNumber: verifyRes.receiptNumber || 'N/A',
-            applicationNumber: app.application_number,
-            amount: verifyRes.amount || orderRes.amount || 500,
-            currency: verifyRes.currency || 'INR',
-            paidAt: verifyRes.paidAt || new Date().toISOString(),
-            gatewayPaymentId: simulatedPaymentId,
-            candidateName: app.full_name,
-            candidateEmail: app.email,
-            purpose: paymentConfig.purpose || 'REGISTRATION'
-          });
-          setIsProcessing(false);
-          setProcessStep('');
-        }, 800);
-        return;
-      }
-
-      const rzpInstance = new (window as any).Razorpay(options);
-      rzpInstance.on('payment.failed', (failRes: any) => {
-        setIsProcessing(false);
-        setProcessStep('');
-        setError(failRes?.error?.description || 'Payment was declined or cancelled by bank.');
-      });
-      rzpInstance.open();
-    } catch (e: any) {
-      setError(e.message || 'An unexpected error occurred during payment.');
+      // Step C: Trigger Cashfree V3 Web Checkout in SANDBOX
+      await launchCashfreeCheckout(paymentSessionId);
+    } catch (err: any) {
+      console.error('[CASHFREE_CHECKOUT_ERROR]', err);
+      setError(err.message || 'Payment initiation encountered an issue.');
       setIsProcessing(false);
       setProcessStep('');
     }
@@ -335,8 +216,8 @@ export const CandidatePaymentPage: React.FC = () => {
       currency: paymentSuccessData.currency,
       paymentDate: paymentSuccessData.paidAt,
       paymentStatus: 'SUCCESS',
-      paymentMethod: 'ONLINE / RAZORPAY',
-      gateway: 'RAZORPAY',
+      paymentMethod: 'ONLINE / CASHFREE (SANDBOX)',
+      gateway: 'CASHFREE',
       gatewayPaymentId: paymentSuccessData.gatewayPaymentId
     };
 
@@ -380,11 +261,11 @@ export const CandidatePaymentPage: React.FC = () => {
             color: '#FFFFFF',
             borderRadius: '6px',
             textDecoration: 'none',
-            fontSize: '0.85rem',
-            fontWeight: 700
+            fontWeight: 600,
+            fontSize: '0.875rem'
           }}
         >
-          <span>Return to Access Portal</span>
+          <span>Go to Access Portal</span>
           <ArrowRight size={16} />
         </Link>
       </div>
@@ -392,7 +273,7 @@ export const CandidatePaymentPage: React.FC = () => {
   }
 
   // =========================================================================
-  // VIEW A: PAYMENT SUCCESS SCREEN
+  // VIEW A: PAYMENT COMPLETED / SUCCESS SCREEN
   // =========================================================================
   if (paymentSuccessData) {
     return (
@@ -401,180 +282,144 @@ export const CandidatePaymentPage: React.FC = () => {
           style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '16px',
-            border: '1px solid #E2E8F0',
-            boxShadow: '0 10px 30px -5px rgba(25, 42, 86, 0.08)',
-            padding: 'clamp(1.5rem, 5vw, 2.5rem)',
-            textAlign: 'center'
+            border: '1px solid #A7F3D0',
+            boxShadow: '0 10px 25px -5px rgba(5, 150, 105, 0.1)',
+            overflow: 'hidden'
           }}
         >
-          {/* Success Check Icon */}
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: '#DCFCE7',
-              color: '#16A34A',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1.25rem'
-            }}
-          >
-            <CheckCircle2 size={36} />
+          {/* Header Ribbon */}
+          <div style={{ backgroundColor: '#047857', padding: '2rem', textAlign: 'center', color: '#FFFFFF' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '50%', marginBottom: '1rem' }}>
+              <CheckCircle2 size={32} color="#FFFFFF" />
+            </div>
+            <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
+              Payment Verified Successfully!
+            </h1>
+            <p style={{ margin: '0.5rem 0 0 0', color: '#D1FAE5', fontSize: '0.9rem' }}>
+              Dossier registration fee confirmed via Cashfree Sandbox
+            </p>
           </div>
 
-          <span
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: 800,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: '#166534',
-              backgroundColor: '#F0FDF4',
-              padding: '4px 12px',
-              borderRadius: '20px',
-              border: '1px solid #BBF7D0'
-            }}
-          >
-            TRANSACTION VERIFIED
-          </span>
-
-          <h1
-            style={{
-              fontSize: 'clamp(1.5rem, 3vw, 2rem)',
-              fontWeight: 800,
-              color: '#192A56',
-              margin: '0.75rem 0 0.5rem 0'
-            }}
-          >
-            PAYMENT SUCCESSFUL
-          </h1>
-
-          <p style={{ color: '#64748B', fontSize: '0.9rem', maxWidth: '480px', margin: '0 auto 1.75rem', lineHeight: 1.5 }}>
-            Your registration fee has been successfully processed and recorded into the corporate placement ledger.
-          </p>
-
-          {/* Payment Detail Card */}
-          <div
-            style={{
-              backgroundColor: '#F8FAFC',
-              borderRadius: '12px',
-              border: '1px solid #E2E8F0',
-              padding: '1.25rem 1.5rem',
-              textAlign: 'left',
-              marginBottom: '1.75rem'
-            }}
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Payment Reference
-                </span>
-                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#192A56', fontFamily: 'monospace', marginTop: '2px' }}>
-                  {paymentSuccessData.paymentReference}
-                </div>
-              </div>
-
-              <div>
-                <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Receipt Number
-                </span>
-                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#166534', fontFamily: 'monospace', marginTop: '2px' }}>
-                  {paymentSuccessData.receiptNumber}
-                </div>
-              </div>
-
-              <div>
-                <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Application Number
-                </span>
-                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#192A56', fontFamily: 'monospace', marginTop: '2px' }}>
-                  {paymentSuccessData.applicationNumber}
-                </div>
-              </div>
-
-              <div>
-                <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Amount Paid
-                </span>
-                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#192A56', marginTop: '2px' }}>
-                  ₹{Number(paymentSuccessData.amount).toFixed(2)} {paymentSuccessData.currency}
-                </div>
-              </div>
-
-              <div>
-                <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Payment Date
-                </span>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>
-                  {new Date(paymentSuccessData.paidAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-                </div>
-              </div>
-
-              {paymentSuccessData.gatewayPaymentId && (
+          {/* Receipt Content */}
+          <div style={{ padding: '2rem' }}>
+            <div style={{ backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '1.5rem', marginBottom: '1.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
                 <div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Transaction ID
+                  <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Receipt Number
                   </span>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#192A56', fontFamily: 'monospace', marginTop: '2px' }}>
-                    {paymentSuccessData.gatewayPaymentId}
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#192A56', fontFamily: 'monospace', marginTop: '2px' }}>
+                    {paymentSuccessData.receiptNumber}
                   </div>
                 </div>
-              )}
+
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Payment Reference
+                  </span>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#334155', fontFamily: 'monospace', marginTop: '2px' }}>
+                    {paymentSuccessData.paymentReference}
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Candidate Name
+                  </span>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#192A56', marginTop: '2px' }}>
+                    {paymentSuccessData.candidateName}
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Application Number
+                  </span>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#192A56', fontFamily: 'monospace', marginTop: '2px' }}>
+                    {paymentSuccessData.applicationNumber}
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Amount Paid
+                  </span>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#047857', marginTop: '2px' }}>
+                    ₹{paymentSuccessData.amount.toFixed(2)} {paymentSuccessData.currency}
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Payment Date
+                  </span>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>
+                    {new Date(paymentSuccessData.paidAt).toLocaleDateString('en-IN', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div style={{ borderTop: '1px dashed #CBD5E1', marginTop: '1rem', paddingTop: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.775rem', color: '#64748B' }}>
-              <ShieldCheck size={16} color="#166534" />
-              <span>A digital copy of this receipt has been dispatched to <strong>{paymentSuccessData.candidateEmail}</strong>.</span>
+            {/* Reference Slip Notice */}
+            <div style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px', padding: '1rem', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <ShieldCheck size={24} color="#2563EB" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: '0.825rem', color: '#1E40AF', lineHeight: 1.4 }}>
+                <strong>Official Reference Slip:</strong> Your verified Reference Slip PDF has been generated and dispatched to your email via Resend.
+              </div>
             </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem', justifyContent: 'center' }}>
-            <button
-              type="button"
-              onClick={handleDownloadReceipt}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                backgroundColor: '#192A56',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '0.75rem 1.5rem',
-                fontSize: '0.875rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(25, 42, 86, 0.15)',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Download size={18} />
-              <span>DOWNLOAD RECEIPT (PDF)</span>
-            </button>
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={handleDownloadReceipt}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: '#192A56',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.75rem 1.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(25, 42, 86, 0.15)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Download size={18} />
+                <span>DOWNLOAD RECEIPT (PDF)</span>
+              </button>
 
-            <Link
-              to="/joining"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                backgroundColor: '#FFFFFF',
-                color: '#192A56',
-                border: '1px solid #CBD5E1',
-                borderRadius: '8px',
-                padding: '0.75rem 1.35rem',
-                fontSize: '0.875rem',
-                fontWeight: 700,
-                textDecoration: 'none',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <span>CONTINUE TO DOSSIER</span>
-              <ArrowRight size={16} />
-            </Link>
+              <Link
+                to="/joining"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: '#FFFFFF',
+                  color: '#192A56',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '8px',
+                  padding: '0.75rem 1.35rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span>CONTINUE TO DOSSIER</span>
+                <ArrowRight size={16} />
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -600,7 +445,7 @@ export const CandidatePaymentPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#C5A059', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                ONBOARDING PAYMENT GATEWAY
+                CASHFREE GATEWAY • SANDBOX MODE
               </span>
               <h1 style={{ margin: '0.25rem 0 0 0', fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
                 Candidate Registration Fee
@@ -725,20 +570,22 @@ export const CandidatePaymentPage: React.FC = () => {
             ) : (
               <>
                 <CreditCard size={20} color="#C5A059" />
-                <span>PAY NOW — ₹{Number(paymentConfig?.amount || 500).toFixed(2)}</span>
+                <span>PAY NOW WITH CASHFREE — ₹{Number(paymentConfig?.amount || 500).toFixed(2)}</span>
               </>
             )}
           </button>
 
           <div style={{ textAlign: 'center', marginTop: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', fontSize: '0.75rem', color: '#64748B' }}>
-            <span>Razorpay Secure Gateway</span>
+            <span>Cashfree Sandbox Checkout</span>
             <span>•</span>
-            <span>UPI / Debit / Credit / Net Banking</span>
+            <span>UPI / Cards / Net Banking</span>
             <span>•</span>
-            <span>Instant Digital Receipt</span>
+            <span>Official Reference Slip Issued On Success</span>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+export default CandidatePaymentPage;
