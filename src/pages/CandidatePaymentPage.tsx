@@ -278,6 +278,7 @@ export const CandidatePaymentPage: React.FC = () => {
     return (
       <div style={{ maxWidth: '680px', margin: '3rem auto', padding: '0 1rem' }}>
         <div
+          className="candidate-payment-card"
           style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '16px',
@@ -431,6 +432,7 @@ export const CandidatePaymentPage: React.FC = () => {
   return (
     <div style={{ maxWidth: '680px', margin: '3rem auto', padding: '0 1rem' }}>
       <div
+        className="candidate-payment-card"
         style={{
           backgroundColor: '#FFFFFF',
           borderRadius: '16px',

@@ -112,6 +112,7 @@ export const CandidateEmailEntry: React.FC<CandidateEmailEntryProps> = ({
 
   return (
     <div
+      className="candidate-auth-card"
       style={{
         maxWidth: '640px',
         margin: '0 auto',

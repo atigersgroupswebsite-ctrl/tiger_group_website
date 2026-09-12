@@ -45,7 +45,7 @@ export const FormNavigation: React.FC<FormNavigationProps> = ({
       )}
 
       <div className="joining-navigation">
-        <div>
+        <div className="joining-nav-prev">
           {currentStep > 1 ? (
             <button
               type="button"
@@ -61,7 +61,7 @@ export const FormNavigation: React.FC<FormNavigationProps> = ({
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+        <div className="joining-nav-actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           {!isReadOnly && (
             <button
               type="button"

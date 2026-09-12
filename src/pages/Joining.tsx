@@ -12,18 +12,19 @@ import { JoiningForm } from '../components/joining/JoiningForm';
 
 export const Joining: React.FC = () => {
   return (
-    <div style={{ paddingTop: 'calc(var(--header-height) + 1.5rem)', minHeight: '90vh', paddingBottom: '5rem' }}>
+    <div className="joining-page-container" style={{ paddingTop: 'calc(var(--header-height) + 1.5rem)', minHeight: '90vh', paddingBottom: '5rem' }}>
       {/* Editorial Header (Excluded from browser print / PDF output) */}
-      <section className="no-print" style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: 'var(--color-pearl-white)', padding: '2.5rem 0 2rem 0' }}>
-        <Container size="lg">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-                  <span className="eyebrow" style={{ margin: 0, letterSpacing: '0.12em' }}>
+      <section className="joining-editorial-header no-print" style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: 'var(--color-pearl-white)', padding: '2.5rem 0 2rem 0' }}>
+        <Container size="lg" className="joining-header-container">
+          <div className="joining-header-content" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div className="joining-header-top-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+              <div className="joining-header-title-box">
+                <div className="joining-header-badge-row" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                  <span className="eyebrow joining-eyebrow-text" style={{ margin: 0, letterSpacing: '0.12em' }}>
                     A TIGER GLOBAL • ONBOARDING DOSSIER
                   </span>
                   <span
+                    className="joining-portal-tag"
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -40,13 +41,14 @@ export const Joining: React.FC = () => {
                     <span>Official Joining Portal</span>
                   </span>
                 </div>
-                <h1 style={{ fontSize: 'clamp(1.75rem, 3vw, 2.35rem)', color: 'var(--color-midnight-navy)', margin: 0, fontWeight: 800, letterSpacing: '-0.01em' }}>
+                <h1 className="joining-page-title" style={{ fontSize: 'clamp(1.75rem, 3vw, 2.35rem)', color: 'var(--color-midnight-navy)', margin: 0, fontWeight: 800, letterSpacing: '-0.01em' }}>
                   CANDIDATE JOINING & REGISTRATION FORM
                 </h1>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div className="joining-header-registry-box" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div
+                  className="joining-registry-pill"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -71,7 +73,7 @@ export const Joining: React.FC = () => {
               </div>
             </div>
 
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: '0.5rem 0 0 0', maxWidth: '750px', lineHeight: 1.6 }}>
+            <p className="joining-editorial-desc" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: '0.5rem 0 0 0', maxWidth: '750px', lineHeight: 1.6 }}>
               Welcome to A Tiger Global. Please fill in your personal, address, banking, educational, and statutory declaration records. All information is securely prepared for your official onboarding record.
             </p>
           </div>
@@ -79,8 +81,8 @@ export const Joining: React.FC = () => {
       </section>
 
       {/* Main Multi-Step Form Container */}
-      <section style={{ marginTop: 'var(--space-6)' }}>
-        <Container size="lg">
+      <section className="joining-form-wrapper-section" style={{ marginTop: 'var(--space-6)' }}>
+        <Container size="lg" className="joining-form-container">
           <JoiningForm />
         </Container>
       </section>

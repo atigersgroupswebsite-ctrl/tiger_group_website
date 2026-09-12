@@ -74,6 +74,12 @@
   position: static;
 }
 
+@media (max-width: 1023px) {
+  .joining-progress-sidebar {
+    display: none !important;
+  }
+}
+
 @media (min-width: 1024px) {
   .joining-progress-sidebar {
     position: sticky;
@@ -216,6 +222,9 @@
   border-radius: var(--radius-2xl);
   padding: clamp(1.5rem, 3.5vw, 2.75rem);
   box-shadow: 0 15px 40px rgba(25, 42, 86, 0.05);
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 /* Step Header */
@@ -318,7 +327,11 @@
 .repeatable-table-wrapper {
   border: 1px solid rgba(25, 42, 86, 0.12);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   margin-bottom: var(--space-6);
 }
 
@@ -954,6 +967,7 @@
 
 .pdf-val {
   color: #0F172A;
+  word-break: break-word;
 }
 
 .pdf-bold {
@@ -981,6 +995,12 @@
   align-items: flex-start;
   gap: 2rem;
   margin-top: 1.5rem;
+}
+
+.pdf-attestation-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
 }
 
 .pdf-sign-box,
@@ -1198,29 +1218,250 @@
   margin-bottom: 1rem;
 }
 
-/* Scoped Mobile Responsive Rules for Dossier / Print Preview Screens */
+/* ==========================================================================
+   Comprehensive Mobile Responsive Rules for Complete Joining Flow
+   Scope: Entry / Form / Sections / Tables / Uploads / Review / Payment / Success
+   Preserves Desktop 100% (strictly scoped to max-width: 640px)
+   ========================================================================== */
 @media screen and (max-width: 640px) {
+  /* 1. Outer Container & Padding Alignment */
+  .joining-page-container {
+    padding-top: calc(var(--header-height) + 0.85rem);
+    padding-bottom: 2.5rem;
+  }
+
+  .container.joining-header-container,
+  .container.joining-form-container {
+    padding-left: 0.85rem !important;
+    padding-right: 0.85rem !important;
+  }
+
+  .joining-editorial-header {
+    margin-bottom: 1.25rem !important;
+  }
+
+  .joining-header-top-row {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.65rem !important;
+  }
+
+  .joining-header-title-box {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.35rem !important;
+  }
+
+  .joining-page-title {
+    font-size: 1.45rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .joining-editorial-desc {
+    max-width: 100% !important;
+    font-size: 0.85rem !important;
+    line-height: 1.5 !important;
+  }
+
+  /* 2. Main Form Card & Spacing */
+  .joining-form-card {
+    padding: 1.25rem 0.85rem !important;
+    border-radius: var(--radius-xl);
+  }
+
+  .joining-step-header {
+    padding-bottom: var(--space-4);
+    margin-bottom: var(--space-5);
+  }
+
+  .joining-step-title {
+    font-size: 1.35rem !important;
+  }
+
+  /* 3. Mobile Progress Bar Reflow */
+  .joining-mobile-progress {
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+    gap: 0.35rem;
+  }
+
+  .joining-mobile-step-text {
+    flex: 1 1 auto;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+
+  .joining-mobile-progress-bar {
+    width: 100%;
+    flex-basis: 100%;
+    margin: 0.4rem 0 0 0;
+    order: 3;
+  }
+
+  /* 4. Candidate Session Bar */
+  .candidate-session-bar {
+    padding: 0.65rem 0.85rem !important;
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.5rem !important;
+  }
+
+  .candidate-session-email {
+    word-break: break-all;
+  }
+
+  /* 5. Repeatable Tables (Education / Family) */
+  .repeatable-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .repeatable-table {
+    min-width: 520px;
+  }
+
+  .repeatable-table th,
+  .repeatable-table td {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .repeatable-input {
+    font-size: 0.825rem;
+    padding: 0.45rem 0.55rem;
+  }
+
+  /* 5b. Document Uploader File Name Containment */
+  .uploaded-file-info {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .uploaded-file-name {
+    max-width: 100%;
+  }
+
+  /* 6. Form Navigation Footer Controls */
+  .joining-navigation {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 0.75rem;
+    margin-top: var(--space-6);
+    padding-top: var(--space-4);
+  }
+
+  .joining-nav-prev,
+  .joining-nav-actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .joining-navigation .btn,
+  .joining-navigation .save-draft-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* 7. Card Containers Padding Across Journey */
+  .candidate-auth-card,
+  .joining-success-card,
+  .candidate-payment-card,
+  .candidate-login-card {
+    padding: 1.35rem 0.95rem !important;
+    border-radius: var(--radius-xl) !important;
+  }
+
+  /* 8. Button Text Wrapping & Safety */
+  .candidate-auth-card .btn,
+  .joining-success-card .btn,
+  .candidate-payment-card .btn,
+  .candidate-login-card .btn,
+  .joining-form-card .btn {
+    white-space: normal !important;
+    word-break: break-word !important;
+    max-width: 100% !important;
+    text-align: center !important;
+  }
+
+  /* 9. Print Preview & Review Dossier Sheets */
   .pdf-page-sheet {
     padding: 1.25rem 0.85rem;
     overflow-x: hidden;
   }
+
   .pdf-page-inner {
     width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-  .pdf-verification-row {
+
+  .pdf-edit-bar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .pdf-edit-bar .pdf-btn-edit {
+    margin-top: 0.25rem;
+  }
+
+  .pdf-verification-row,
+  .pdf-attestation-row {
     flex-direction: column;
     gap: 1.25rem;
     align-items: stretch;
   }
+
   .pdf-sign-box,
   .pdf-hr-sign-box {
     width: 100%;
     max-width: 100%;
   }
+
   .pdf-table {
     min-width: 440px;
+  }
+
+  .review-actions-toolbar,
+  .submission-banner-action {
+    padding: 1rem 0.85rem !important;
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 0.75rem !important;
+  }
+
+  .review-actions-toolbar > div,
+  .submission-banner-action > div {
+    width: 100%;
+  }
+
+  .review-actions-toolbar button,
+  .submission-banner-action button,
+  .confirm-submit-card button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* 10. Photo / Signature Area */
+  .photo-signature-grid {
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+
+  .avatar-preview-box {
+    width: 110px;
+    height: 140px;
+  }
+
+  .signature-preview-box {
+    width: 170px;
+    height: 80px;
   }
 }
 

@@ -889,7 +889,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
   return (
     <div className="joining-layout">
       {candidateAuthUser && (
-        <div style={{
+        <div className="candidate-session-bar" style={{
           gridColumn: '1 / -1',
           marginBottom: '1rem',
           padding: '0.65rem 1.25rem',
@@ -903,7 +903,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
           gap: '0.75rem',
           fontSize: '0.8125rem'
         }}>
-          <span style={{ color: 'var(--color-midnight-navy)', fontWeight: 600 }}>
+          <span className="candidate-session-email" style={{ color: 'var(--color-midnight-navy)', fontWeight: 600 }}>
             Candidate Session: <strong>{candidateAuthUser.email}</strong>
           </span>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>

@@ -116,6 +116,7 @@ export const CandidateLoginPage: React.FC = () => {
     <div style={{ paddingTop: 'calc(var(--header-height) + 2rem)', minHeight: '90vh', paddingBottom: '5rem' }}>
       <Container size="sm">
         <div
+          className="candidate-login-card"
           style={{
             backgroundColor: '#FFFFFF',
             borderRadius: 'var(--radius-2xl)',

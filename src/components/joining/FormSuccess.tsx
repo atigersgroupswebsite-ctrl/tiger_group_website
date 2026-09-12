@@ -165,6 +165,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
 
   return (
     <div
+      className="joining-success-card"
       style={{
         maxWidth: '740px',
         margin: '0 auto',

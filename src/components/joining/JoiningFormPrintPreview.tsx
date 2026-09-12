@@ -607,7 +607,7 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
               </p>
             </div>
 
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div className="pdf-attestation-row" style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
               <div>
                 <p><strong>Place:</strong> {decl.womenNightShiftPlace || 'Nagpur'}</p>
                 <p><strong>Date:</strong> {decl.declarationDate}</p>
@@ -658,7 +658,7 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
             </p>
           </div>
 
-          <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div className="pdf-attestation-row" style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div>
               <p><strong>Name:</strong> {p.employeeName}</p>
               <p><strong>Date:</strong> {decl.declarationDate}</p>
@@ -715,7 +715,7 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
             </p>
           </div>
 
-          <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div className="pdf-attestation-row" style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div>
               <p><strong>Name:</strong> {p.employeeName}</p>
               <p><strong>Date:</strong> {decl.declarationDate}</p>
@@ -754,7 +754,7 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
             <p><strong>3. Statutory Wages:</strong> Minimum wages paid strictly in accordance with applicable notification schedules between the 10th and 15th of every month.</p>
           </div>
 
-          <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div className="pdf-attestation-row" style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div>
               <p><strong>Employee Name:</strong> {p.employeeName}</p>
               <p><strong>Attestation Date:</strong> {decl.declarationDate}</p>

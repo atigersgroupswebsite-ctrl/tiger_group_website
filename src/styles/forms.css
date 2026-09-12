@@ -417,7 +417,9 @@
   color: var(--color-midnight-navy);
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.35rem;
+  row-gap: 0.25rem;
 }
 
 .field-required-star {
@@ -435,6 +437,8 @@
 .field-textarea,
 .field-select {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 0.85rem 1rem;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(25, 42, 86, 0.16);
