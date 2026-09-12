@@ -6,7 +6,7 @@
 // Security:
 //   - Never trusts browser redirect; queries server for authoritative Cashfree state
 //   - Shows verified receipt details only after server confirms SUCCESS
-//   - Direct access to Candidate Portal and receipt downloads
+//   - Direct access to Candidate Portal and Reference Slip download
 // ==============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -85,34 +85,77 @@ export const PaymentResultPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
+    <div
+      style={{
+        minHeight: '85vh',
+        backgroundColor: '#F8FAFC',
+        padding: '3rem 1rem 5rem 1rem',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center'
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: '680px', margin: '0 auto' }}>
         {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold uppercase tracking-wider mb-3">
-            <ShieldCheck className="w-4 h-4 text-blue-600" />
-            Cashfree Gateway • Sandbox Mode
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.35rem 0.85rem',
+              borderRadius: 'var(--radius-full, 9999px)',
+              backgroundColor: 'rgba(25, 42, 86, 0.08)',
+              border: '1px solid var(--color-border, #E2DFD8)',
+              color: 'var(--color-midnight-navy, #192A56)',
+              fontSize: 'var(--text-xs, 0.75rem)',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              marginBottom: '0.75rem'
+            }}
+          >
+            <ShieldCheck size={16} color="#192A56" />
+            <span>Cashfree Gateway &bull; Sandbox Mode</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+          <h1
+            style={{
+              fontSize: 'clamp(1.5rem, 3vw, 2rem)',
+              fontWeight: 800,
+              color: 'var(--color-midnight-navy, #192A56)',
+              margin: '0 0 0.35rem 0',
+              letterSpacing: '-0.01em',
+              fontFamily: 'var(--font-heading)'
+            }}
+          >
             Payment Status Verification
           </h1>
-          <p className="text-sm text-slate-600 mt-1">
+          <p style={{ fontSize: 'var(--text-sm, 0.875rem)', color: 'var(--color-text-secondary, #4A5568)', margin: 0 }}>
             Authoritative transaction status confirmed directly with Cashfree
           </p>
         </div>
 
         {/* Loading State */}
         {loading && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 sm:p-12 text-center">
-            <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-            <h2 className="text-lg font-semibold text-slate-900 mb-1">
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 'var(--radius-2xl, 20px)',
+              border: '1px solid var(--color-border, #E2DFD8)',
+              boxShadow: 'var(--shadow-sm, 0 2px 6px rgba(25, 42, 86, 0.04))',
+              padding: '3rem 2rem',
+              textAlign: 'center'
+            }}
+          >
+            <Loader2 size={44} color="#192A56" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 1rem auto' }} />
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', margin: '0 0 0.5rem 0' }}>
               Verifying with Cashfree...
             </h2>
-            <p className="text-sm text-slate-500 max-w-md mx-auto">
+            <p style={{ fontSize: 'var(--text-sm, 0.875rem)', color: 'var(--color-text-secondary, #4A5568)', maxWidth: '440px', margin: '0 auto', lineHeight: 1.5 }}>
               Please wait while our server cryptographically queries the Cashfree Sandbox API to confirm your payment state.
             </p>
             {orderId && (
-              <div className="mt-4 inline-block font-mono text-xs bg-slate-100 px-3 py-1.5 rounded text-slate-700">
+              <div style={{ marginTop: '1.25rem', display: 'inline-block', fontFamily: 'monospace', fontSize: '0.75rem', backgroundColor: '#F1F5F9', padding: '0.35rem 0.75rem', borderRadius: '4px', color: '#334155' }}>
                 Order ID: {orderId}
               </div>
             )}
@@ -121,24 +164,57 @@ export const PaymentResultPage: React.FC = () => {
 
         {/* Error without status */}
         {!loading && error && !verificationData?.paymentStatus && (
-          <div className="bg-white rounded-2xl shadow-sm border border-rose-200 p-8 text-center">
-            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="w-6 h-6" />
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 'var(--radius-2xl, 20px)',
+              border: '1px solid #FECACA',
+              boxShadow: 'var(--shadow-sm, 0 2px 6px rgba(25, 42, 86, 0.04))',
+              padding: '2.5rem 2rem',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{ width: '50px', height: '50px', borderRadius: '50%', backgroundColor: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
+              <AlertCircle size={26} />
             </div>
-            <h2 className="text-lg font-bold text-slate-900 mb-2">Verification Error</h2>
-            <p className="text-sm text-slate-600 mb-6">{error}</p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', margin: '0 0 0.5rem 0' }}>
+              Verification Error
+            </h2>
+            <p style={{ fontSize: 'var(--text-sm, 0.875rem)', color: 'var(--color-text-secondary, #4A5568)', marginBottom: '1.75rem' }}>{error}</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center' }}>
               <button
                 type="button"
                 onClick={checkStatus}
-                className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  backgroundColor: 'var(--color-midnight-navy, #192A56)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  fontWeight: 700,
+                  fontSize: 'var(--text-sm, 0.875rem)',
+                  cursor: 'pointer'
+                }}
               >
-                <RotateCcw className="w-4 h-4" />
-                Retry Verification
+                <RotateCcw size={16} />
+                <span>Retry Verification</span>
               </button>
               <Link
                 to="/joining/payment"
-                className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '0.65rem 1.25rem',
+                  backgroundColor: '#F1F5F9',
+                  color: '#334155',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  fontWeight: 600,
+                  fontSize: 'var(--text-sm, 0.875rem)',
+                  textDecoration: 'none'
+                }}
               >
                 Return to Payment Page
               </Link>
@@ -148,107 +224,251 @@ export const PaymentResultPage: React.FC = () => {
 
         {/* SUCCESS State */}
         {!loading && verificationData?.paymentStatus === 'SUCCESS' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-6 sm:p-8 text-white text-center">
-              <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center mx-auto mb-3">
-                <CheckCircle2 className="w-8 h-8" />
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 'var(--radius-2xl, 24px)',
+              border: '1px solid #A7F3D0',
+              boxShadow: '0 12px 32px -4px rgba(16, 185, 129, 0.12), 0 4px 12px rgba(25, 42, 86, 0.04)',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Header Ribbon - Deep Emerald & Teal with White Accent */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #047857 0%, #0D9488 100%)',
+                padding: '2.25rem 2rem',
+                textAlign: 'center',
+                color: '#FFFFFF'
+              }}
+            >
+              <div
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(4px)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 1rem auto'
+                }}
+              >
+                <CheckCircle2 size={34} color="#FFFFFF" />
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold">Payment Successful</h2>
-              <p className="text-emerald-100 text-sm mt-1">
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 'clamp(1.4rem, 2.5vw, 1.75rem)',
+                  fontWeight: 800,
+                  letterSpacing: '-0.01em',
+                  fontFamily: 'var(--font-heading)'
+                }}
+              >
+                Payment Successful
+              </h2>
+              <p style={{ margin: '0.5rem 0 0 0', color: '#D1FAE5', fontSize: 'var(--text-sm, 0.875rem)', lineHeight: 1.5 }}>
                 Your dossier registration fee has been received and verified.
               </p>
             </div>
 
-            <div className="p-6 sm:p-8 space-y-6">
+            <div style={{ padding: 'clamp(1.5rem, 4vw, 2.25rem)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* Receipt & Payment Verification Grid */}
-              <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-3">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Payment Reference</span>
-                  <span className="font-mono font-bold text-slate-900">
+              <div
+                style={{
+                  backgroundColor: 'var(--color-pearl-surface, #F5F3EF)',
+                  borderRadius: 'var(--radius-xl, 16px)',
+                  border: '1px solid var(--color-border, #E2DFD8)',
+                  padding: '1.25rem 1.5rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.85rem'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)' }}>
+                  <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Payment Reference</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', fontSize: '0.95rem' }}>
                     {verificationData.paymentReference || 'N/A'}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-2.5">
-                  <span className="text-slate-500">Receipt Number</span>
-                  <span className="font-mono font-semibold text-slate-800">
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                  <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Receipt Number</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-midnight-navy, #192A56)' }}>
                     {verificationData.receiptNumber || 'N/A'}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-2.5">
-                  <span className="text-slate-500">Amount Paid</span>
-                  <span className="text-base font-bold text-emerald-700">
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                  <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Amount Paid</span>
+                  <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#047857' }}>
                     ₹{Number(verificationData.amount || 500).toFixed(2)} {verificationData.currency || 'INR'}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-2.5">
-                  <span className="text-slate-500">Verified Status</span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    PAID &amp; VERIFIED
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                  <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Verified Status</span>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.25rem 0.65rem',
+                      borderRadius: 'var(--radius-full, 9999px)',
+                      backgroundColor: '#DCFCE7',
+                      color: '#15803D',
+                      border: '1px solid #86EFAC',
+                      fontSize: 'var(--text-xs, 0.75rem)',
+                      fontWeight: 800,
+                      letterSpacing: '0.04em'
+                    }}
+                  >
+                    <ShieldCheck size={14} />
+                    <span>PAID &amp; VERIFIED</span>
                   </span>
                 </div>
+
                 {verificationData.referenceSlipNumber && (
-                  <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-2.5">
-                    <span className="text-slate-500">Reference Slip No.</span>
-                    <span className="font-mono text-xs font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                    <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Reference Slip No.</span>
+                    <span
+                      style={{
+                        fontFamily: 'monospace',
+                        fontSize: 'var(--text-xs, 0.75rem)',
+                        fontWeight: 800,
+                        backgroundColor: '#EFF6FF',
+                        color: '#1E40AF',
+                        border: '1px solid #BFDBFE',
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: 'var(--radius-sm, 4px)'
+                      }}
+                    >
                       {verificationData.referenceSlipNumber}
                     </span>
                   </div>
                 )}
+
                 {verificationData.gatewayPaymentId && (
-                  <div className="flex justify-between items-center text-xs text-slate-400 border-t border-slate-200 pt-2.5">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted, #718096)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                     <span>Cashfree Txn ID</span>
-                    <span className="font-mono">{verificationData.gatewayPaymentId}</span>
+                    <span style={{ fontFamily: 'monospace' }}>{verificationData.gatewayPaymentId}</span>
                   </div>
                 )}
               </div>
 
               {/* Reference Slip Callout */}
-              <div className="rounded-xl p-4 bg-blue-50 border border-blue-200 flex items-start gap-3">
-                <FileCheck className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  <span className="font-bold text-blue-900">Official Reference Slip Issued: </span>
-                  <span className="text-blue-800">
+              <div
+                style={{
+                  backgroundColor: '#EFF6FF',
+                  border: '1px solid #BFDBFE',
+                  borderRadius: 'var(--radius-lg, 12px)',
+                  padding: '1rem 1.25rem',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem'
+                }}
+              >
+                <FileCheck size={20} color="#1D4ED8" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: 'var(--text-xs, 0.75rem)', lineHeight: 1.55 }}>
+                  <strong style={{ color: '#1E3A8A' }}>Official Reference Slip Issued: </strong>
+                  <span style={{ color: '#1E40AF' }}>
                     Your candidate-specific 2-Page Reference Slip &amp; Consultancy Return Form has been verified and attached to your confirmation email. Carry this document when reporting to orientation.
                   </span>
                 </div>
               </div>
 
               {downloadNotice && (
-                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                <div
+                  style={{
+                    backgroundColor: '#FEF3C7',
+                    border: '1px solid #FCD34D',
+                    borderRadius: 'var(--radius-md, 8px)',
+                    padding: '0.75rem 1rem',
+                    color: '#92400E',
+                    fontSize: 'var(--text-xs, 0.75rem)',
+                    lineHeight: 1.4
+                  }}
+                >
                   {downloadNotice}
                 </div>
               )}
 
               {/* Candidate Actions */}
-              <div className="space-y-3 pt-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingTop: '0.25rem' }}>
                 <button
                   type="button"
                   onClick={handleDownloadReferenceSlip}
                   disabled={downloadingSlip}
-                  className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm"
+                  style={{
+                    width: '100%',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    padding: '0.85rem 1.5rem',
+                    backgroundColor: downloadingSlip ? '#059669' : '#047857',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md, 10px)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.95rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.02em',
+                    cursor: downloadingSlip ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 14px rgba(4, 120, 87, 0.25)',
+                    transition: 'all 0.15s ease'
+                  }}
                 >
                   {downloadingSlip ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
                   ) : (
-                    <Download className="w-4 h-4" />
+                    <Download size={18} />
                   )}
-                  {downloadingSlip ? 'Downloading Reference Slip...' : 'Download Reference Slip (PDF)'}
+                  <span>{downloadingSlip ? 'Downloading Reference Slip...' : 'Download Reference Slip (PDF)'}</span>
                 </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
                   <Link
                     to="/joining/portal"
-                    className="py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm text-center transition-colors flex items-center justify-center gap-2"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      padding: '0.75rem 1.25rem',
+                      backgroundColor: 'var(--color-midnight-navy, #192A56)',
+                      color: 'var(--color-pearl-white, #FCFBFB)',
+                      borderRadius: 'var(--radius-md, 10px)',
+                      fontSize: 'var(--text-sm, 0.875rem)',
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      boxShadow: 'var(--shadow-sm, 0 2px 6px rgba(25, 42, 86, 0.04))',
+                      transition: 'all 0.15s ease'
+                    }}
                   >
-                    Go to Candidate Portal
-                    <ArrowRight className="w-4 h-4" />
+                    <span>Go to Candidate Portal</span>
+                    <ArrowRight size={16} />
                   </Link>
+
                   <Link
                     to="/"
-                    className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium text-sm text-center transition-colors"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0.75rem 1.25rem',
+                      backgroundColor: '#FFFFFF',
+                      color: 'var(--color-midnight-navy, #192A56)',
+                      border: '1px solid var(--color-border, #E2DFD8)',
+                      borderRadius: 'var(--radius-md, 10px)',
+                      fontSize: 'var(--text-sm, 0.875rem)',
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      transition: 'all 0.15s ease'
+                    }}
                   >
-                    Back to Home
+                    <span>Back to Home</span>
                   </Link>
                 </div>
               </div>
@@ -258,26 +478,59 @@ export const PaymentResultPage: React.FC = () => {
 
         {/* PENDING State */}
         {!loading && verificationData?.paymentStatus === 'PENDING' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-amber-200 p-6 sm:p-8 text-center">
-            <div className="w-14 h-14 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-4">
-              <Clock className="w-8 h-8" />
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 'var(--radius-2xl, 20px)',
+              border: '1px solid #FDE68A',
+              boxShadow: 'var(--shadow-sm, 0 2px 6px rgba(25, 42, 86, 0.04))',
+              padding: '2.5rem 2rem',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#FEF3C7', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
+              <Clock size={30} />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Payment Awaiting Confirmation</h2>
-            <p className="text-sm text-slate-600 max-w-md mx-auto mb-6">
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', margin: '0 0 0.5rem 0' }}>
+              Payment Awaiting Confirmation
+            </h2>
+            <p style={{ fontSize: 'var(--text-sm, 0.875rem)', color: 'var(--color-text-secondary, #4A5568)', maxWidth: '440px', margin: '0 auto 1.75rem auto', lineHeight: 1.5 }}>
               Your transaction is currently active or pending confirmation from your bank or payment method.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center' }}>
               <button
                 type="button"
                 onClick={checkStatus}
-                className="w-full sm:w-auto px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  backgroundColor: '#D97706',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  fontWeight: 700,
+                  fontSize: 'var(--text-sm, 0.875rem)',
+                  cursor: 'pointer'
+                }}
               >
-                <RotateCcw className="w-4 h-4" />
-                Refresh Status
+                <RotateCcw size={16} />
+                <span>Refresh Status</span>
               </button>
               <Link
                 to="/joining/portal"
-                className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '0.65rem 1.25rem',
+                  backgroundColor: '#F1F5F9',
+                  color: '#334155',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  fontWeight: 600,
+                  fontSize: 'var(--text-sm, 0.875rem)',
+                  textDecoration: 'none'
+                }}
               >
                 Go to Portal
               </Link>
@@ -287,28 +540,60 @@ export const PaymentResultPage: React.FC = () => {
 
         {/* USER DROPPED State */}
         {!loading && verificationData?.paymentStatus === 'USER_DROPPED' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-300 p-6 sm:p-8 text-center">
-            <div className="w-14 h-14 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center mx-auto mb-4">
-              <RotateCcw className="w-8 h-8" />
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 'var(--radius-2xl, 20px)',
+              border: '1px solid var(--color-border, #E2DFD8)',
+              boxShadow: 'var(--shadow-sm, 0 2px 6px rgba(25, 42, 86, 0.04))',
+              padding: '2.5rem 2rem',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#F1F5F9', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
+              <RotateCcw size={30} />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Checkout Cancelled — No funds charged</h2>
-            <p className="text-sm text-slate-600 max-w-md mx-auto mb-2">
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', margin: '0 0 0.5rem 0' }}>
+              Checkout Cancelled &mdash; No funds charged
+            </h2>
+            <p style={{ fontSize: 'var(--text-sm, 0.875rem)', color: 'var(--color-text-secondary, #4A5568)', maxWidth: '440px', margin: '0 auto 0.5rem auto', lineHeight: 1.5 }}>
               {verificationData.message || 'You exited the Cashfree checkout window before completing the payment.'}
             </p>
-            <p className="text-xs text-slate-400 mb-6">
+            <p style={{ fontSize: 'var(--text-xs, 0.75rem)', color: 'var(--color-text-muted, #718096)', margin: '0 auto 1.75rem auto' }}>
               Your Joining submission is securely saved and awaiting the ₹500 Registration &amp; Verification Fee.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center' }}>
               <Link
                 to="/joining/payment"
-                className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  backgroundColor: 'var(--color-midnight-navy, #192A56)',
+                  color: '#FFFFFF',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  fontWeight: 700,
+                  fontSize: 'var(--text-sm, 0.875rem)',
+                  textDecoration: 'none'
+                }}
               >
-                <RotateCcw className="w-4 h-4" />
-                Resume Payment / Pay ₹500
+                <RotateCcw size={16} />
+                <span>Resume Payment / Pay ₹500</span>
               </Link>
               <Link
                 to="/joining/portal"
-                className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '0.65rem 1.25rem',
+                  backgroundColor: '#F1F5F9',
+                  color: '#334155',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  fontWeight: 600,
+                  fontSize: 'var(--text-sm, 0.875rem)',
+                  textDecoration: 'none'
+                }}
               >
                 Return to Portal
               </Link>
@@ -318,28 +603,60 @@ export const PaymentResultPage: React.FC = () => {
 
         {/* FAILED State */}
         {!loading && verificationData?.paymentStatus === 'FAILED' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-rose-200 p-6 sm:p-8 text-center">
-            <div className="w-14 h-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
-              <XCircle className="w-8 h-8" />
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 'var(--radius-2xl, 20px)',
+              border: '1px solid #FECACA',
+              boxShadow: 'var(--shadow-sm, 0 2px 6px rgba(25, 42, 86, 0.04))',
+              padding: '2.5rem 2rem',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
+              <XCircle size={30} />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Payment Not Completed</h2>
-            <p className="text-sm text-slate-600 max-w-md mx-auto mb-2">
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', margin: '0 0 0.5rem 0' }}>
+              Payment Not Completed
+            </h2>
+            <p style={{ fontSize: 'var(--text-sm, 0.875rem)', color: 'var(--color-text-secondary, #4A5568)', maxWidth: '440px', margin: '0 auto 0.5rem auto', lineHeight: 1.5 }}>
               {verificationData.error || 'The payment was cancelled or failed at Cashfree.'}
             </p>
-            <p className="text-xs text-slate-400 mb-6">
+            <p style={{ fontSize: 'var(--text-xs, 0.75rem)', color: 'var(--color-text-muted, #718096)', margin: '0 auto 1.75rem auto' }}>
               No funds were charged. You can retry safely at any time.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center' }}>
               <Link
                 to="/joining/payment"
-                className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  backgroundColor: '#DC2626',
+                  color: '#FFFFFF',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  fontWeight: 700,
+                  fontSize: 'var(--text-sm, 0.875rem)',
+                  textDecoration: 'none'
+                }}
               >
-                <RotateCcw className="w-4 h-4" />
-                Try Payment Again
+                <RotateCcw size={16} />
+                <span>Try Payment Again</span>
               </Link>
               <Link
                 to="/joining/portal"
-                className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '0.65rem 1.25rem',
+                  backgroundColor: '#F1F5F9',
+                  color: '#334155',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  fontWeight: 600,
+                  fontSize: 'var(--text-sm, 0.875rem)',
+                  textDecoration: 'none'
+                }}
               >
                 Return to Portal
               </Link>
