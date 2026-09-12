@@ -121,7 +121,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
       }}
     >
       {/* Left side: Mobile Toggle & Breadcrumbs */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, overflow: 'hidden' }}>
         <button
           type="button"
           onClick={onOpenMobile}

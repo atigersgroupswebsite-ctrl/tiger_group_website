@@ -292,28 +292,28 @@ export const PaymentResultPage: React.FC = () => {
                   gap: '0.85rem'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)' }}>
                   <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Payment Reference</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', fontSize: '0.95rem' }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', fontSize: '0.95rem', wordBreak: 'break-all', textAlign: 'right' }}>
                     {verificationData.paymentReference || 'N/A'}
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                   <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Receipt Number</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-midnight-navy, #192A56)' }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-midnight-navy, #192A56)', wordBreak: 'break-all', textAlign: 'right' }}>
                     {verificationData.receiptNumber || 'N/A'}
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                   <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Amount Paid</span>
                   <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#047857' }}>
                     ₹{Number(verificationData.amount || 500).toFixed(2)} {verificationData.currency || 'INR'}
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                   <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Verified Status</span>
                   <span
                     style={{
@@ -336,7 +336,7 @@ export const PaymentResultPage: React.FC = () => {
                 </div>
 
                 {verificationData.referenceSlipNumber && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                     <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Reference Slip No.</span>
                     <span
                       style={{
@@ -347,7 +347,9 @@ export const PaymentResultPage: React.FC = () => {
                         color: '#1E40AF',
                         border: '1px solid #BFDBFE',
                         padding: '0.2rem 0.5rem',
-                        borderRadius: 'var(--radius-sm, 4px)'
+                        borderRadius: 'var(--radius-sm, 4px)',
+                        wordBreak: 'break-all',
+                        textAlign: 'right'
                       }}
                     >
                       {verificationData.referenceSlipNumber}
@@ -356,9 +358,9 @@ export const PaymentResultPage: React.FC = () => {
                 )}
 
                 {verificationData.gatewayPaymentId && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted, #718096)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: '0.75rem', color: 'var(--color-text-muted, #718096)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                     <span>Cashfree Txn ID</span>
-                    <span style={{ fontFamily: 'monospace' }}>{verificationData.gatewayPaymentId}</span>
+                    <span style={{ fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'right' }}>{verificationData.gatewayPaymentId}</span>
                   </div>
                 )}
               </div>
@@ -567,24 +569,24 @@ export const PaymentResultPage: React.FC = () => {
                   gap: '0.85rem'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)' }}>
                   <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Order Reference</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', fontSize: '0.95rem' }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', fontSize: '0.95rem', wordBreak: 'break-all', textAlign: 'right' }}>
                     {orderId || 'N/A'}
                   </span>
                 </div>
 
                 {verificationData.paymentReference && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                     <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Payment Reference</span>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-midnight-navy, #192A56)' }}>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-midnight-navy, #192A56)', wordBreak: 'break-all', textAlign: 'right' }}>
                       {verificationData.paymentReference}
                     </span>
                   </div>
                 )}
 
                 {typeof verificationData.amount === 'number' && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                     <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Registration Fee</span>
                     <span style={{ fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)' }}>
                       ₹{verificationData.amount}
@@ -592,7 +594,7 @@ export const PaymentResultPage: React.FC = () => {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                   <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Verification Status</span>
                   <span
                     style={{
@@ -746,15 +748,15 @@ export const PaymentResultPage: React.FC = () => {
                   gap: '0.85rem'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)' }}>
                   <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Order Reference</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', fontSize: '0.95rem' }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', fontSize: '0.95rem', wordBreak: 'break-all', textAlign: 'right' }}>
                     {orderId || 'N/A'}
                   </span>
                 </div>
 
                 {typeof verificationData.amount === 'number' && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                     <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Registration Fee</span>
                     <span style={{ fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)' }}>
                       ₹{verificationData.amount}
@@ -762,7 +764,7 @@ export const PaymentResultPage: React.FC = () => {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                   <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Status</span>
                   <span
                     style={{
@@ -914,24 +916,24 @@ export const PaymentResultPage: React.FC = () => {
                   gap: '0.85rem'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)' }}>
                   <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Order Reference</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', fontSize: '0.95rem' }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)', fontSize: '0.95rem', wordBreak: 'break-all', textAlign: 'right' }}>
                     {orderId || 'N/A'}
                   </span>
                 </div>
 
                 {verificationData.paymentReference && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                     <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Payment Reference</span>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-midnight-navy, #192A56)' }}>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-midnight-navy, #192A56)', wordBreak: 'break-all', textAlign: 'right' }}>
                       {verificationData.paymentReference}
                     </span>
                   </div>
                 )}
 
                 {typeof verificationData.amount === 'number' && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                     <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Registration Fee</span>
                     <span style={{ fontWeight: 800, color: 'var(--color-midnight-navy, #192A56)' }}>
                       ₹{verificationData.amount}
@@ -939,14 +941,14 @@ export const PaymentResultPage: React.FC = () => {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                   <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Gateway Message</span>
-                  <span style={{ color: '#DC2626', fontWeight: 600, fontSize: '0.85rem', textAlign: 'right', maxWidth: '60%' }}>
+                  <span style={{ color: '#DC2626', fontWeight: 600, fontSize: '0.85rem', textAlign: 'right', maxWidth: '100%', wordBreak: 'break-word' }}>
                     {verificationData.error || verificationData.message || 'Transaction could not be processed.'}
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: 'var(--text-sm, 0.875rem)', borderTop: '1px solid var(--color-border, #E2DFD8)', paddingTop: '0.75rem' }}>
                   <span style={{ color: 'var(--color-text-secondary, #4A5568)', fontWeight: 600 }}>Payment Status</span>
                   <span
                     style={{

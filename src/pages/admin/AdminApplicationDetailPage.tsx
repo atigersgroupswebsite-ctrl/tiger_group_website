@@ -958,7 +958,7 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
                   </button>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>Full Name</div>
                     <div style={{ fontSize: '0.9rem', color: '#192A56', fontWeight: 700, marginTop: '2px' }}>{application.full_name}</div>
@@ -976,10 +976,10 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
 
                   <div>
                     <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>Email Address</div>
-                    <div style={{ fontSize: '0.9rem', color: '#192A56', fontWeight: 700, marginTop: '2px' }}>{application.email}</div>
+                    <div style={{ fontSize: '0.9rem', color: '#192A56', fontWeight: 700, marginTop: '2px', wordBreak: 'break-all' }}>{application.email}</div>
                   </div>
 
-                  <div style={{ gridColumn: 'span 2' }}>
+                  <div className="admin-col-span-2">
                     <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>Registered Address</div>
                     <div style={{ fontSize: '0.9rem', color: '#4A5568', marginTop: '2px', lineHeight: 1.4 }}>{application.address || '—'}</div>
                   </div>

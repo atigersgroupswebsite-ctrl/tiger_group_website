@@ -24,6 +24,15 @@
   }
 }
 
+@media (max-width: 640px) {
+  .hero-geometry {
+    width: 320px;
+    height: 320px;
+    top: -5%;
+    right: -15%;
+  }
+}
+
 .hero-geometry {
   position: absolute;
   top: -10%;

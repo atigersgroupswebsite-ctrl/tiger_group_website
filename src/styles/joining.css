@@ -1198,6 +1198,32 @@
   margin-bottom: 1rem;
 }
 
+/* Scoped Mobile Responsive Rules for Dossier / Print Preview Screens */
+@media screen and (max-width: 640px) {
+  .pdf-page-sheet {
+    padding: 1.25rem 0.85rem;
+    overflow-x: hidden;
+  }
+  .pdf-page-inner {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pdf-verification-row {
+    flex-direction: column;
+    gap: 1.25rem;
+    align-items: stretch;
+  }
+  .pdf-sign-box,
+  .pdf-hr-sign-box {
+    width: 100%;
+    max-width: 100%;
+  }
+  .pdf-table {
+    min-width: 440px;
+  }
+}
+
 /* ==========================================================================
    OFFICIAL JOINING FORM PRINT ISOLATION RULES
    Ensures ONLY the canonical Joining Paperwork sheets print.

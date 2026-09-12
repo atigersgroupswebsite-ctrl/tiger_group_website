@@ -20,13 +20,7 @@ export const AdminBreadcrumbs: React.FC<AdminBreadcrumbsProps> = ({ items }) => 
   return (
     <nav
       aria-label="Breadcrumb"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.4rem',
-        fontSize: '0.8rem',
-        color: 'rgba(252, 251, 251, 0.7)'
-      }}
+      className="admin-breadcrumbs-nav"
     >
       <Link
         to="/admin"

@@ -345,10 +345,10 @@ export const CandidatePortalPage: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ textAlign: 'right', fontSize: 'var(--text-xs)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem 1rem', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 'var(--text-xs)' }}>
                 <span style={{ color: 'var(--color-text-muted)', display: 'block' }}>Logged in as:</span>
-                <strong style={{ color: 'var(--color-midnight-navy)' }}>{candidateEmail}</strong>
+                <strong style={{ color: 'var(--color-midnight-navy)', wordBreak: 'break-all' }}>{candidateEmail}</strong>
               </div>
 
               <Button
@@ -682,6 +682,7 @@ export const CandidatePortalPage: React.FC = () => {
                       icon={isProcessingPayment ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
                       onClick={handleProceedPayment}
                       disabled={isProcessingPayment || dossierLoading}
+                      style={{ whiteSpace: 'normal', textAlign: 'center', height: 'auto', lineHeight: 1.35, padding: '0.75rem 1.25rem' }}
                     >
                       {isProcessingPayment ? 'Connecting to Cashfree...' : `PAY REGISTRATION & VERIFICATION FEE (₹${configuredFee})`}
                     </Button>
@@ -700,7 +701,7 @@ export const CandidatePortalPage: React.FC = () => {
                 boxShadow: 'var(--shadow-sm)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1.25rem', color: 'var(--color-midnight-navy)', fontWeight: 800, margin: 0 }}>
                     Submitted Compliance Documents

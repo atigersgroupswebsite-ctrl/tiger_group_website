@@ -223,6 +223,18 @@
   gap: var(--space-4);
 }
 
+.desktop-cta {
+  display: none;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+@media (min-width: 992px) {
+  .desktop-cta {
+    display: flex;
+  }
+}
+
 .menu-toggle {
   display: flex;
   align-items: center;
@@ -817,6 +829,24 @@
   border-top: 1px solid rgba(252, 251, 251, 0.1);
   font-size: var(--text-xs);
   color: rgba(252, 251, 251, 0.55);
+}
+
+.footer-bottom-links {
+  display: flex;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 767px) {
+  .footer-bottom {
+    text-align: center;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .footer-bottom-links {
+    gap: var(--space-3);
+    justify-content: center;
+  }
 }
 
 @media (min-width: 768px) {

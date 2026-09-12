@@ -104,37 +104,107 @@ export const PublicVerificationPage: React.FC = () => {
   }, [token]);
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: '#F8FAFC',
+        padding: '3rem 1rem 5rem 1rem',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+        boxSizing: 'border-box'
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: '640px', margin: '0 auto' }}>
         {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-900 text-amber-400 text-xs font-semibold uppercase tracking-wider mb-3 shadow-sm">
-            <Lock className="w-3.5 h-3.5" />
-            Official Public Verification Gateway
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.35rem 0.85rem',
+              borderRadius: '9999px',
+              backgroundColor: '#0F1B38',
+              color: '#F7D794',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              marginBottom: '0.75rem',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            <Lock size={14} color="#F7D794" />
+            <span>Official Public Verification Gateway</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+          <h1
+            style={{
+              fontSize: 'clamp(1.5rem, 3vw, 2rem)',
+              fontWeight: 800,
+              color: '#0F1B38',
+              margin: '0 0 0.25rem 0',
+              letterSpacing: '-0.01em',
+              fontFamily: 'var(--font-heading)'
+            }}
+          >
             A TIGER GLOBAL
           </h1>
-          <p className="text-sm font-semibold text-amber-700 tracking-wide uppercase mt-0.5">
+          <p
+            style={{
+              fontSize: '0.825rem',
+              fontWeight: 700,
+              color: '#8C7B65',
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              margin: '0 0 0.35rem 0'
+            }}
+          >
             Career Solution &amp; Consultancy
           </p>
-          <p className="text-xs text-slate-500 mt-1">
+          <p style={{ fontSize: '0.75rem', color: '#64748B', margin: 0 }}>
             Authoritative registry validation for official Reference Slips &amp; Credentials
           </p>
         </div>
 
         {/* Loading State */}
         {loading && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-10 text-center">
-            <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-slate-900 mb-1">
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              boxShadow: '0 4px 16px rgba(15, 27, 56, 0.05)',
+              border: '1px solid #E2E8F0',
+              padding: '2.5rem 1.5rem',
+              textAlign: 'center'
+            }}
+          >
+            <Loader2
+              size={40}
+              color="#0F1B38"
+              style={{ animation: 'spin 1s linear infinite', margin: '0 auto 1rem auto' }}
+            />
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F1B38', margin: '0 0 0.4rem 0' }}>
               Verifying Document Authenticity...
             </h2>
-            <p className="text-sm text-slate-500 max-w-sm mx-auto">
+            <p style={{ fontSize: '0.85rem', color: '#64748B', maxWidth: '380px', margin: '0 auto', lineHeight: 1.5 }}>
               Querying central cryptographic registry to attest record authenticity.
             </p>
             {token && (
-              <div className="mt-4 inline-block font-mono text-xs bg-slate-100 px-3 py-1.5 rounded-lg text-slate-600">
+              <div
+                style={{
+                  marginTop: '1rem',
+                  display: 'inline-block',
+                  fontFamily: 'monospace',
+                  fontSize: '0.75rem',
+                  backgroundColor: '#F1F5F9',
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '6px',
+                  color: '#475569',
+                  wordBreak: 'break-all'
+                }}
+              >
                 Token: {token.substring(0, 18)}...
               </div>
             )}
@@ -143,109 +213,209 @@ export const PublicVerificationPage: React.FC = () => {
 
         {/* Error / Invalid State */}
         {!loading && (error || !data?.isValid) && (
-          <div className="bg-white rounded-2xl shadow-sm border border-rose-200 p-8 sm:p-10 text-center">
-            <div className="w-14 h-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
-              <ShieldAlert className="w-8 h-8" />
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              boxShadow: '0 4px 16px rgba(220, 38, 38, 0.06)',
+              border: '1px solid #FECACA',
+              padding: '2.25rem 1.5rem',
+              textAlign: 'center'
+            }}
+          >
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                backgroundColor: '#FEE2E2',
+                color: '#DC2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1rem auto'
+              }}
+            >
+              <ShieldAlert size={28} />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-2">
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F1B38', margin: '0 0 0.5rem 0' }}>
               Verification Notice: Unverified Record
             </h2>
-            <p className="text-sm text-slate-600 max-w-md mx-auto mb-6 leading-relaxed">
+            <p style={{ fontSize: '0.875rem', color: '#4A5568', maxWidth: '440px', margin: '0 auto 1.5rem auto', lineHeight: 1.5 }}>
               {error || data?.error || 'The scanned document could not be authenticated against the active registry. It may be expired, superseded, or invalid.'}
             </p>
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-xs text-slate-500 max-w-md mx-auto mb-6">
+            <div
+              style={{
+                backgroundColor: '#F8FAFC',
+                borderRadius: '10px',
+                padding: '1rem',
+                border: '1px solid #E2E8F0',
+                fontSize: '0.75rem',
+                color: '#64748B',
+                maxWidth: '440px',
+                margin: '0 auto 1.5rem auto',
+                lineHeight: 1.5
+              }}
+            >
               For assistance, please contact the A Tiger Global onboarding compliance desk at{' '}
-              <span className="font-semibold text-slate-700">atigerglobal@gmail.com</span> or call{' '}
-              <span className="font-semibold text-slate-700">+91 8349353946</span>.
+              <strong style={{ color: '#0F1B38' }}>atigerglobal@gmail.com</strong> or call{' '}
+              <strong style={{ color: '#0F1B38' }}>+91 8349353946</strong>.
             </div>
             <Link
               to="/"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.65rem 1.35rem',
+                backgroundColor: '#0F1B38',
+                color: '#FFFFFF',
+                borderRadius: '8px',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                textDecoration: 'none'
+              }}
             >
-              <ArrowLeft className="w-4 h-4" />
-              Return to Website
+              <ArrowLeft size={16} />
+              <span>Return to Website</span>
             </Link>
           </div>
         )}
 
         {/* Success / Authentic State */}
         {!loading && data?.isValid && (
-          <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden">
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '20px',
+              border: '1px solid #A7F3D0',
+              boxShadow: '0 10px 25px -5px rgba(5, 150, 105, 0.1), 0 4px 12px rgba(15, 27, 56, 0.04)',
+              overflow: 'hidden'
+            }}
+          >
             {/* Header Banner */}
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-6 sm:p-8 text-white text-center">
-              <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center mx-auto mb-3 shadow-inner">
-                <ShieldCheck className="w-8 h-8" />
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #047857 0%, #0D9488 100%)',
+                padding: '2rem 1.5rem',
+                textAlign: 'center',
+                color: '#FFFFFF'
+              }}
+            >
+              <div
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(4px)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 0.75rem auto'
+                }}
+              >
+                <ShieldCheck size={30} color="#FFFFFF" />
               </div>
-              <span className="inline-block px-3 py-0.5 rounded-full bg-emerald-500/40 text-xs font-bold tracking-wider uppercase mb-1">
+              <div
+                style={{
+                  display: 'inline-block',
+                  padding: '0.2rem 0.65rem',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(16, 185, 129, 0.35)',
+                  fontSize: '0.725rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  marginBottom: '0.5rem'
+                }}
+              >
                 Registry Verified
-              </span>
-              <h2 className="text-xl sm:text-2xl font-bold">
+              </div>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 'clamp(1.25rem, 2.5vw, 1.6rem)',
+                  fontWeight: 800,
+                  fontFamily: 'var(--font-heading)'
+                }}
+              >
                 {data.verificationStatus || 'OFFICIALLY ISSUED & AUTHENTIC DOCUMENT'}
               </h2>
-              <p className="text-emerald-100 text-sm mt-1">
+              <p style={{ margin: '0.4rem 0 0 0', color: '#D1FAE5', fontSize: '0.85rem' }}>
                 {data.documentTitle || 'Official Employee Reference Slip & Placement Authorization'}
               </p>
             </div>
 
             {/* Document Details Body */}
-            <div className="p-6 sm:p-8 space-y-6">
+            <div style={{ padding: 'clamp(1.25rem, 3vw, 2rem)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {/* Primary Attribution Grid */}
-              <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-3.5">
+              <div
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0',
+                  padding: '1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.85rem'
+                }}
+              >
                 {data.referenceNumber && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500 flex items-center gap-1.5">
-                      <FileCheck2 className="w-4 h-4 text-blue-600" />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: '0.875rem' }}>
+                    <span style={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                      <FileCheck2 size={16} color="#2563EB" />
                       Reference Number
                     </span>
-                    <span className="font-mono font-bold text-slate-900">
+                    <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#0F1B38', wordBreak: 'break-all', textAlign: 'right' }}>
                       {data.referenceNumber}
                     </span>
                   </div>
                 )}
 
                 {data.candidateName && (
-                  <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-3">
-                    <span className="text-slate-500 flex items-center gap-1.5">
-                      <User className="w-4 h-4 text-slate-600" />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: '0.875rem', borderTop: '1px solid #E2E8F0', paddingTop: '0.75rem' }}>
+                    <span style={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                      <User size={16} color="#475569" />
                       Authorized Candidate
                     </span>
-                    <span className="font-bold text-slate-900">
+                    <span style={{ fontWeight: 800, color: '#0F1B38', textAlign: 'right' }}>
                       {data.candidateName}
                     </span>
                   </div>
                 )}
 
                 {data.designation && (
-                  <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-3">
-                    <span className="text-slate-500 flex items-center gap-1.5">
-                      <Briefcase className="w-4 h-4 text-slate-600" />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: '0.875rem', borderTop: '1px solid #E2E8F0', paddingTop: '0.75rem' }}>
+                    <span style={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                      <Briefcase size={16} color="#475569" />
                       Designation / Role
                     </span>
-                    <span className="font-medium text-slate-800">
+                    <span style={{ fontWeight: 600, color: '#1E293B', textAlign: 'right' }}>
                       {data.designation}
                     </span>
                   </div>
                 )}
 
                 {data.companyName && (
-                  <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-3">
-                    <span className="text-slate-500 flex items-center gap-1.5">
-                      <Building2 className="w-4 h-4 text-slate-600" />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: '0.875rem', borderTop: '1px solid #E2E8F0', paddingTop: '0.75rem' }}>
+                    <span style={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                      <Building2 size={16} color="#475569" />
                       Sponsoring Company
                     </span>
-                    <span className="font-medium text-slate-800 text-right">
+                    <span style={{ fontWeight: 600, color: '#1E293B', textAlign: 'right' }}>
                       {data.companyName}
                     </span>
                   </div>
                 )}
 
                 {data.issuanceDate && (
-                  <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-3">
-                    <span className="text-slate-500 flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-slate-600" />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem 0.75rem', fontSize: '0.875rem', borderTop: '1px solid #E2E8F0', paddingTop: '0.75rem' }}>
+                    <span style={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                      <Calendar size={16} color="#475569" />
                       Date of Issuance
                     </span>
-                    <span className="font-medium text-slate-800">
+                    <span style={{ fontWeight: 600, color: '#1E293B', textAlign: 'right' }}>
                       {data.issuanceDate}
                     </span>
                   </div>
@@ -253,46 +423,88 @@ export const PublicVerificationPage: React.FC = () => {
               </div>
 
               {/* Fee & Payment Verification Box */}
-              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200 flex items-start gap-3">
-                <CreditCard className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  <div className="font-bold text-emerald-950 flex items-center gap-2">
+              <div
+                style={{
+                  backgroundColor: '#ECFDF5',
+                  borderRadius: '12px',
+                  border: '1px solid #A7F3D0',
+                  padding: '1rem 1.25rem',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem'
+                }}
+              >
+                <CreditCard size={20} color="#047857" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: '0.85rem' }}>
+                  <div style={{ fontWeight: 800, color: '#064E3B', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <span>Registration &amp; Verification Fee:</span>
-                    <span className="text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded font-mono text-xs font-bold">
+                    <span
+                      style={{
+                        backgroundColor: '#DCFCE7',
+                        color: '#15803D',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '4px',
+                        fontFamily: 'monospace',
+                        fontSize: '0.75rem',
+                        fontWeight: 800
+                      }}
+                    >
                       {data.feeStatus || 'PAID & VERIFIED'}
                     </span>
                   </div>
-                  <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
+                  <p style={{ fontSize: '0.75rem', color: '#065F46', margin: '0.35rem 0 0 0', lineHeight: 1.5 }}>
                     Transaction confirmed. Reference:{' '}
-                    <span className="font-mono font-semibold">{data.paymentReference || 'VERIFIED'}</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700, wordBreak: 'break-all' }}>{data.paymentReference || 'VERIFIED'}</span>
                     {data.receiptNumber ? ` • Receipt: ${data.receiptNumber}` : ''}.
                   </p>
                 </div>
               </div>
 
               {/* Legal Attestation Banner */}
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-xs text-slate-600 space-y-1.5 leading-relaxed">
-                <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  Official Compliance Attestation
+              <div
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0',
+                  padding: '1rem 1.25rem',
+                  fontSize: '0.75rem',
+                  color: '#475569',
+                  lineHeight: 1.55
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, color: '#1E293B', marginBottom: '0.35rem' }}>
+                  <CheckCircle2 size={16} color="#16A34A" />
+                  <span>Official Compliance Attestation</span>
                 </div>
-                <p>
+                <p style={{ margin: 0 }}>
                   This official document has been issued by{' '}
-                  <span className="font-semibold text-slate-900">
+                  <strong style={{ color: '#0F1B38' }}>
                     A TIGER GLOBAL Career Solution &amp; Consultancy
-                  </span>{' '}
+                  </strong>{' '}
                   (Reg. No.: 106157392603 | GSTIN: 27DIFPA0273P1Z4). The candidate is authorized for interview and reporting at the client organization.
                 </p>
               </div>
 
               {/* Actions */}
-              <div className="pt-2 text-center">
+              <div style={{ paddingTop: '0.5rem', textAlign: 'center' }}>
                 <Link
                   to="/"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors shadow-sm"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.65rem 1.35rem',
+                    backgroundColor: '#0F1B38',
+                    color: '#FFFFFF',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    transition: 'all 0.15s ease'
+                  }}
                 >
-                  <ArrowLeft className="w-4 h-4" />
-                  Return to Home
+                  <ArrowLeft size={16} />
+                  <span>Return to Home</span>
                 </Link>
               </div>
             </div>

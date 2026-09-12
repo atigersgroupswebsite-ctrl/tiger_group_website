@@ -78,14 +78,8 @@ export const Navbar: React.FC = () => {
 
             {/* Desktop Action & Mobile Toggle */}
             <div className="navbar-actions">
-              <div style={{ display: 'none' }} className="d-lg-flex">
-                <Button to="/enquiry/job-seeker" variant="primary" size="sm" icon={<ArrowRight size={15} />}>
-                  APPLY NOW
-                </Button>
-              </div>
-
               {/* Explicit Apply Button visible on desktop */}
-              <div className="desktop-cta" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <div className="desktop-cta">
                 <a
                   href="tel:+918349353946"
                   className="btn btn-outline btn-sm"

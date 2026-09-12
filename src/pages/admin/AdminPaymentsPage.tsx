@@ -361,7 +361,7 @@ export const AdminPaymentsPage: React.FC = () => {
       <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '1.25rem', marginBottom: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', alignItems: 'end' }}>
           {/* Search Input */}
-          <div style={{ gridColumn: 'span 2' }}>
+          <div className="admin-col-span-2">
             <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#192A56', marginBottom: '0.35rem' }}>
               Search Payment Records
             </label>

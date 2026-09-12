@@ -468,12 +468,12 @@ export const CandidatePaymentPage: React.FC = () => {
 
           {/* Candidate & Application Snapshot */}
           <div style={{ backgroundColor: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '1.25rem', marginBottom: '1.75rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
               <div>
                 <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
                   Application Number
                 </span>
-                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#192A56', fontFamily: 'monospace', marginTop: '2px' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#192A56', fontFamily: 'monospace', marginTop: '2px', wordBreak: 'break-all' }}>
                   {app?.application_number}
                 </div>
               </div>
@@ -491,7 +491,7 @@ export const CandidatePaymentPage: React.FC = () => {
                 <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
                   Registered Email
                 </span>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '2px', wordBreak: 'break-all' }}>
                   {app?.email}
                 </div>
               </div>
@@ -509,7 +509,7 @@ export const CandidatePaymentPage: React.FC = () => {
 
           {/* Amount Breakdown Box */}
           <div style={{ border: '1px solid #CBD5E1', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid #E2E8F0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Briefcase size={16} color="#64748B" />
                 <span style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>Candidate Registration & Dossier Verification</span>
@@ -519,7 +519,7 @@ export const CandidatePaymentPage: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.85rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#192A56' }}>Total Payable Now</span>
               <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#192A56' }}>
                 {paymentConfig?.amount ? `₹${Number(paymentConfig.amount).toFixed(2)}` : '—'}
@@ -557,7 +557,9 @@ export const CandidatePaymentPage: React.FC = () => {
               fontWeight: 800,
               cursor: isProcessing ? 'not-allowed' : 'pointer',
               boxShadow: '0 4px 14px rgba(25, 42, 86, 0.2)',
-              transition: 'background-color 0.15s ease'
+              transition: 'background-color 0.15s ease',
+              lineHeight: 1.35,
+              whiteSpace: 'normal'
             }}
           >
             {isProcessing ? (
@@ -573,7 +575,7 @@ export const CandidatePaymentPage: React.FC = () => {
             )}
           </button>
 
-          <div style={{ textAlign: 'center', marginTop: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', fontSize: '0.75rem', color: '#64748B' }}>
+          <div style={{ textAlign: 'center', marginTop: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem 0.75rem', fontSize: '0.75rem', color: '#64748B', flexWrap: 'wrap' }}>
             <span>Cashfree Sandbox Checkout</span>
             <span>•</span>
             <span>UPI / Cards / Net Banking</span>

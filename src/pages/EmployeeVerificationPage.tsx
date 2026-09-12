@@ -196,7 +196,7 @@ export const EmployeeVerificationPage: React.FC = () => {
             </div>
 
             {/* Content Body */}
-            <div style={{ padding: '1.75rem' }}>
+            <div style={{ padding: 'clamp(1.25rem, 3vw, 1.75rem)' }}>
               {/* Employee Summary Cardlet */}
               <div
                 style={{
@@ -207,7 +207,8 @@ export const EmployeeVerificationPage: React.FC = () => {
                   backgroundColor: '#F8FAFC',
                   borderRadius: '10px',
                   border: '1px solid #E2E8F0',
-                  marginBottom: '1.5rem'
+                  marginBottom: '1.5rem',
+                  flexWrap: 'wrap'
                 }}
               >
                 <div
@@ -265,7 +266,7 @@ export const EmployeeVerificationPage: React.FC = () => {
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
                   gap: '1rem',
                   marginBottom: '1.5rem'
                 }}

@@ -353,7 +353,7 @@ export const AdminExportsPage: React.FC = () => {
           recordCountText={jobSeekerTotal !== null ? `Total Records: ${jobSeekerTotal}` : undefined}
           icon={Users}
           filtersSlot={
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
               {/* Status filter */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#192A56', marginBottom: '3px' }}>
@@ -489,9 +489,9 @@ export const AdminExportsPage: React.FC = () => {
           recordCountText={employerTotal !== null ? `Total Records: ${employerTotal}` : undefined}
           icon={Building2}
           filtersSlot={
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
               {/* Status filter */}
-              <div style={{ gridColumn: 'span 2' }}>
+              <div className="admin-col-span-2">
                 <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#192A56', marginBottom: '3px' }}>
                   Enquiry Status
                 </label>

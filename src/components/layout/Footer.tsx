@@ -146,7 +146,7 @@ export const Footer: React.FC = () => {
           <div>
             © {new Date().getFullYear()} A TIGER GLOBAL Career Solution & Consultancy. All rights reserved.
           </div>
-          <div style={{ display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap' }}>
+          <div className="footer-bottom-links">
             <Link to="/terms-and-conditions" style={{ color: 'inherit' }}>Policy & Terms</Link>
             <Link to="/joining" style={{ color: 'inherit' }}>Joining Guidelines</Link>
             <span>Proprietorship Enterprise</span>
