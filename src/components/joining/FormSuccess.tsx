@@ -3,7 +3,7 @@ import { CheckCircle, Download, Eye, FileText, ArrowRight, Loader2, RefreshCw, C
 import { Button } from '../common/Button';
 import type { JoiningFormData } from '../../types/joining';
 import { downloadJoiningPacketPdf } from '../../services/joiningPdfGenerator';
-import { createPaymentOrder, launchCashfreeCheckout } from '../../services/paymentService';
+import { createPaymentOrder, launchCashfreeCheckout, getPaymentConfig } from '../../services/paymentService';
 import { supabase } from '../../lib/supabaseClient';
 import { downloadPaymentReceiptPdf } from '../../utils/paymentReceiptGenerator';
 
@@ -23,6 +23,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [loadingPayment, setLoadingPayment] = useState<boolean>(true);
   const [paymentRecord, setPaymentRecord] = useState<any | null>(null);
+  const [configuredFee, setConfiguredFee] = useState<number>(500);
 
   // Check live payment state for this dossier
   useEffect(() => {
@@ -52,6 +53,19 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
           const pendingPayment = payments.find((p: any) => p.status === 'PENDING');
           setPaymentRecord(successPayment || pendingPayment || payments[0]);
         }
+
+        // Fetch authoritative payment configuration
+        try {
+          const cfg = await getPaymentConfig({
+            joiningFormId: targetId,
+            applicationId: appId
+          });
+          if (cfg.success && cfg.amount && isMounted) {
+            setConfiguredFee(cfg.amount);
+          }
+        } catch (cfgErr) {
+          console.warn('Payment config query notice:', cfgErr);
+        }
       } catch (err) {
         console.warn('Payment status query notice:', err);
       } finally {
@@ -75,7 +89,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
       candidateName: formData.personal.employeeName || 'Candidate',
       candidateEmail: formData.personal.emailId || formData.userEmail || '',
       paymentPurpose: 'Candidate Registration & Dossier Verification Fee',
-      amount: Number(paymentRecord.amount) || 500,
+      amount: Number(paymentRecord.amount) || configuredFee,
       currency: paymentRecord.currency || 'INR',
       paymentDate: paymentRecord.paid_at || paymentRecord.created_at || new Date().toISOString(),
       paymentStatus: 'SUCCESS',
@@ -114,7 +128,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
           status: 'SUCCESS',
           payment_reference: res.paymentReference,
           receipt_number: res.receiptNumber,
-          amount: res.amount || 500,
+          amount: res.amount,
           currency: res.currency || 'INR',
           paid_at: (res as any).paidAt || new Date().toISOString()
         });
@@ -275,7 +289,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
                     border: '1px solid #A7F3D0'
                   }}
                 >
-                  ● PAID & VERIFIED (₹500)
+                  ● PAID & VERIFIED (₹{Number(paymentRecord?.amount || configuredFee).toFixed(0)})
                 </span>
               ) : paymentRecord?.status === 'PENDING' ? (
                 <span
@@ -293,7 +307,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
                     border: '1px solid #FDE68A'
                   }}
                 >
-                  ● PAYMENT PENDING (₹500)
+                  ● PAYMENT PENDING (₹{configuredFee})
                 </span>
               ) : (
                 <span
@@ -311,7 +325,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
                     border: '1px solid #FECACA'
                   }}
                 >
-                  ● NOT PAID (₹500)
+                  ● NOT PAID (₹{configuredFee})
                 </span>
               )}
             </div>
@@ -399,7 +413,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
               <span>REGISTRATION & VERIFICATION FEE PAID</span>
             </div>
             <p style={{ margin: 0, fontSize: '0.85rem', color: '#14532D', lineHeight: 1.5 }}>
-              Your ₹500 fee has been verified via Cashfree. Ref: <strong style={{ fontFamily: 'monospace' }}>{paymentRecord?.payment_reference || paymentRecord?.receipt_number || 'PAID'}</strong>. Your joining dossier is currently under HR onboarding validation.
+              Your ₹{Number(paymentRecord?.amount || configuredFee).toFixed(0)} fee has been verified via Cashfree. Ref: <strong style={{ fontFamily: 'monospace' }}>{paymentRecord?.payment_reference || paymentRecord?.receipt_number || 'PAID'}</strong>. Your joining dossier is currently under HR onboarding validation.
             </p>
             <button
               type="button"
@@ -422,7 +436,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
           <>
             <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--color-midnight-navy)', fontWeight: 700, display: 'block' }}>
-                Registration & Verification Fee: ₹500
+                Registration & Verification Fee: ₹{configuredFee}
               </span>
               <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
                 Cashfree Sandbox checkout supports UPI, Cards, Net Banking & Wallets
@@ -456,7 +470,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
               ) : (
                 <>
                   <CreditCard size={16} />
-                  <span>PAY REGISTRATION & VERIFICATION FEE (₹500)</span>
+                  <span>PAY REGISTRATION & VERIFICATION FEE (₹{configuredFee})</span>
                 </>
               )}
             </button>

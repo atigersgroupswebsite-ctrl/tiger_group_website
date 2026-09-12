@@ -63,7 +63,8 @@ export default async function handler(req: VercelReq, res: VercelRes) {
           return sendResponse(res, 405, { success: false, error: 'Method Not Allowed. Use GET.' });
         }
         const appId = urlObj.searchParams.get('appId') || (req.query?.appId as string) || '';
-        const result = await getPaymentConfigHandler(appId, authHeader);
+        const joiningFormId = urlObj.searchParams.get('joiningFormId') || (req.query?.joiningFormId as string) || '';
+        const result = await getPaymentConfigHandler({ appId, joiningFormId }, authHeader);
         return sendResponse(res, result.status, result.data);
       }
 

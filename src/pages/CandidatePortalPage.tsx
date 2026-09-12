@@ -40,7 +40,7 @@ import {
   candidateResubmitJoiningForm,
   uploadCandidateDocument
 } from '../services/joiningService';
-import { createPaymentOrder, launchCashfreeCheckout, downloadReferenceSlipPdf } from '../services/paymentService';
+import { createPaymentOrder, launchCashfreeCheckout, downloadReferenceSlipPdf, getPaymentConfig } from '../services/paymentService';
 import type { DocumentCategory } from '../types/joining';
 
 export const CandidatePortalPage: React.FC = () => {
@@ -48,7 +48,8 @@ export const CandidatePortalPage: React.FC = () => {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [candidateEmail, setCandidateEmail] = useState<string>('');
-  const [candidateName, setCandidateName] = useState<string>('');
+  const [candidateName, setCandidateName] = useState<string>('Candidate');
+  const [configuredFee, setConfiguredFee] = useState<number>(500);
   const [dossiers, setDossiers] = useState<any[]>([]);
   const [selectedDossierId, setSelectedDossierId] = useState<string | null>(null);
 
@@ -125,6 +126,16 @@ export const CandidatePortalPage: React.FC = () => {
         setPaymentRecord(successPayment || pendingPayment || payments[0]);
       } else {
         setPaymentRecord(null);
+      }
+
+      // Fetch authoritative payment configuration
+      try {
+        const configRes = await getPaymentConfig({ joiningFormId: formId });
+        if (configRes.success && configRes.amount) {
+          setConfiguredFee(configRes.amount);
+        }
+      } catch (cfgErr) {
+        console.warn('[CandidatePortal] Failed to fetch payment config:', cfgErr);
       }
     } catch (err: any) {
       setActionNotice({ type: 'error', message: err.message || 'Error loading dossier details.' });
@@ -629,17 +640,17 @@ export const CandidatePortalPage: React.FC = () => {
                         {isPaymentPaid ? (
                           <>
                             <CheckCircle2 size={13} />
-                            <span>PAID &amp; VERIFIED (₹500)</span>
+                            <span>PAID &amp; VERIFIED (₹{Number(paymentRecord?.amount || configuredFee).toFixed(0)})</span>
                           </>
                         ) : isPaymentPending ? (
                           <>
                             <Clock size={13} />
-                            <span>PAYMENT PENDING (₹500)</span>
+                            <span>PAYMENT PENDING (₹{configuredFee})</span>
                           </>
                         ) : (
                           <>
                             <AlertCircle size={13} />
-                            <span>NOT PAID (₹500)</span>
+                            <span>NOT PAID (₹{configuredFee})</span>
                           </>
                         )}
                       </span>
@@ -648,7 +659,7 @@ export const CandidatePortalPage: React.FC = () => {
                     <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: '0.35rem 0 0 0' }}>
                       {isPaymentPaid
                         ? `Official payment confirmed via ${paymentRecord?.gateway || 'Cashfree'} (Ref: ${paymentRecord?.payment_reference || paymentRecord?.gateway_order_id || 'N/A'}). Your Joining dossier is authorized for processing.`
-                        : 'A mandatory non-refundable fee of ₹500 is required for identity verification, document compliance checks, and issuance of your official Joining Reference Slip.'}
+                        : `A mandatory non-refundable fee of ₹${configuredFee} is required for identity verification, document compliance checks, and issuance of your official Joining Reference Slip.`}
                     </p>
                   </div>
                 </div>
@@ -672,7 +683,7 @@ export const CandidatePortalPage: React.FC = () => {
                       onClick={handleProceedPayment}
                       disabled={isProcessingPayment || dossierLoading}
                     >
-                      {isProcessingPayment ? 'Connecting to Cashfree...' : 'PAY REGISTRATION & VERIFICATION FEE (₹500)'}
+                      {isProcessingPayment ? 'Connecting to Cashfree...' : `PAY REGISTRATION & VERIFICATION FEE (₹${configuredFee})`}
                     </Button>
                   )}
                 </div>

@@ -259,7 +259,7 @@ export const PublicVerificationPage: React.FC = () => {
                   <div className="font-bold text-emerald-950 flex items-center gap-2">
                     <span>Registration &amp; Verification Fee:</span>
                     <span className="text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded font-mono text-xs font-bold">
-                      {data.feeStatus || 'PAID & VERIFIED (INR 500.00)'}
+                      {data.feeStatus || 'PAID & VERIFIED'}
                     </span>
                   </div>
                   <p className="text-xs text-emerald-800 mt-1 leading-relaxed">

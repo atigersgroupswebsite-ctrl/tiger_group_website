@@ -29,9 +29,49 @@ export const CASHFREE_ENVIRONMENT = (process.env.CASHFREE_ENVIRONMENT || 'SANDBO
 export const CASHFREE_BASE_URL = 'https://sandbox.cashfree.com/pg';
 export const CASHFREE_API_VERSION = '2023-08-01';
 
-// Authoritative Joining Registration Fee
-export const AUTHORITATIVE_JOINING_FEE = 500;
+// Default consultancy fee reference
 export const TOTAL_CONSULTANCY_FEE = 1000;
+
+/**
+ * Authoritative Server Resolver: Reads default_registration_fee from system_settings.
+ * Throws a descriptive configuration error if missing, unreadable, or invalid.
+ * Never silently falls back to 500.
+ */
+export async function resolveAuthoritativeRegistrationFee(supabase: any): Promise<number> {
+  const { data, error } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'default_registration_fee')
+    .maybeSingle();
+
+  if (error) {
+    console.error('[SERVER_PAYMENT] Failed to query authoritative registration fee:', error);
+    throw new Error(`Authoritative registration fee query failed: ${error.message}`);
+  }
+
+  if (!data || data.value === null || data.value === undefined) {
+    console.error('[SERVER_PAYMENT] Authoritative registration fee setting is missing');
+    throw new Error('Authoritative registration fee setting is missing from system_settings');
+  }
+
+  let feeRaw = data.value;
+  if (typeof feeRaw === 'string') {
+    try {
+      const parsed = JSON.parse(feeRaw);
+      if (typeof parsed === 'number') feeRaw = parsed;
+    } catch {
+      // Keep as string
+    }
+  }
+
+  const fee = Number(feeRaw);
+  if (Number.isNaN(fee) || !Number.isFinite(fee) || fee <= 0) {
+    console.error('[SERVER_PAYMENT] Authoritative registration fee is invalid:', data.value);
+    throw new Error(`Authoritative registration fee setting is invalid: ${JSON.stringify(data.value)}`);
+  }
+
+  return fee;
+}
 
 function getCashfreeHeaders(): Record<string, string> {
   return {
@@ -53,12 +93,46 @@ function resolveSiteBaseUrl(reqHeaders?: Record<string, string | string[] | unde
 }
 
 /**
- * Handler: GET /api/payment/config?appId=...
- * Returns payment config, purpose, amount, and existing payment state for an application.
+ * Handler: GET /api/payment/config?appId=... or ?joiningFormId=...
+ * Returns payment config, purpose, authoritative amount, and existing payment state.
  */
-export async function getPaymentConfigHandler(appId: string, authHeader?: string) {
-  if (!appId) {
-    return { status: 400, data: { success: false, error: 'Application ID is required' } };
+export async function getPaymentConfigHandler(
+  queryParam?: string | { appId?: string; joiningFormId?: string },
+  authHeader?: string
+) {
+  const appId = typeof queryParam === 'string' ? queryParam : (queryParam?.appId || '');
+  const joiningFormId = typeof queryParam === 'object' ? (queryParam?.joiningFormId || '') : '';
+
+  const supabase = getSupabaseServer();
+  let authoritativeFee: number;
+  try {
+    authoritativeFee = await resolveAuthoritativeRegistrationFee(supabase);
+  } catch (err: any) {
+    return {
+      status: 500,
+      data: {
+        success: false,
+        error: `Server configuration error: ${err.message || 'Unable to resolve authoritative registration fee'}`
+      }
+    };
+  }
+
+  // If neither appId nor joiningFormId is provided, return public system payment configuration
+  if (!appId && !joiningFormId) {
+    return {
+      status: 200,
+      data: {
+        success: true,
+        purpose: 'REGISTRATION',
+        purposeTitle: 'Candidate Registration & Dossier Verification Fee',
+        amount: authoritativeFee,
+        currency: 'INR',
+        totalConsultancyFee: TOTAL_CONSULTANCY_FEE,
+        policyNote: `Authoritative registration fee of ₹${authoritativeFee} is payable upon joining form submission.`,
+        gateway: 'CASHFREE',
+        environment: 'SANDBOX'
+      }
+    };
   }
 
   const auth = await authenticateRequest(authHeader);
@@ -66,62 +140,120 @@ export async function getPaymentConfigHandler(appId: string, authHeader?: string
     return { status: 401, data: { success: false, error: auth.error || 'Unauthorized' } };
   }
 
-  // Verify application exists
-  const { data: app, error: appErr } = await getSupabaseServer()
-    .from('applications')
-    .select('id, application_number, full_name, email, mobile, status, joining_access_enabled')
-    .eq('id', appId)
-    .single();
+  // Handle application payment config
+  if (appId) {
+    const { data: app, error: appErr } = await supabase
+      .from('applications')
+      .select('id, application_number, full_name, email, mobile, status, joining_access_enabled')
+      .eq('id', appId)
+      .single();
 
-  if (appErr || !app) {
-    return { status: 404, data: { success: false, error: 'Application record not found' } };
+    if (appErr || !app) {
+      return { status: 404, data: { success: false, error: 'Application record not found' } };
+    }
+
+    const candidateEmail = auth.user.email?.toLowerCase().trim();
+    const isCandidate = app.email.toLowerCase().trim() === candidateEmail;
+
+    if (!isCandidate) {
+      const { data: adminProfile } = await supabase
+        .from('admin_profiles')
+        .select('role, active')
+        .eq('id', auth.user.id)
+        .eq('active', true)
+        .maybeSingle();
+
+      if (!adminProfile) {
+        return { status: 403, data: { success: false, error: 'Access denied for this application' } };
+      }
+    }
+
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('application_id', appId)
+      .order('created_at', { ascending: false });
+
+    return {
+      status: 200,
+      data: {
+        success: true,
+        applicationId: app.id,
+        applicationNumber: app.application_number,
+        candidateName: app.full_name,
+        candidateEmail: app.email,
+        candidateMobile: app.mobile,
+        applicationStatus: app.status,
+        purpose: 'REGISTRATION',
+        purposeTitle: 'Candidate Registration & Dossier Verification Fee',
+        amount: authoritativeFee,
+        currency: 'INR',
+        totalConsultancyFee: TOTAL_CONSULTANCY_FEE,
+        policyNote: `Authoritative registration fee of ₹${authoritativeFee} is payable upon joining form submission.`,
+        gateway: 'CASHFREE',
+        environment: 'SANDBOX',
+        payments: payments || []
+      }
+    };
   }
 
-  // Authorization check: Must be the candidate whose email matches OR an active admin
-  const candidateEmail = auth.user.email?.toLowerCase().trim();
-  const isCandidate = app.email.toLowerCase().trim() === candidateEmail;
+  // Handle standalone joining form payment config
+  if (joiningFormId) {
+    const { data: jf, error: jfErr } = await supabase
+      .from('joining_forms')
+      .select('id, application_id, candidate_name, email, employee_contact_number, other_contact_number, candidate_auth_user_id, joining_reference, submission_status')
+      .eq('id', joiningFormId)
+      .single();
 
-  if (!isCandidate) {
-    const { data: adminProfile } = await getSupabaseServer()
-      .from('admin_profiles')
-      .select('role, active')
-      .eq('id', auth.user.id)
-      .eq('active', true)
-      .maybeSingle();
-
-    if (!adminProfile) {
-      return { status: 403, data: { success: false, error: 'Access denied for this application' } };
+    if (jfErr || !jf) {
+      return { status: 404, data: { success: false, error: 'Joining Form record not found' } };
     }
+
+    const isOwner = Boolean(jf.candidate_auth_user_id && jf.candidate_auth_user_id === auth.user.id);
+    if (!isOwner) {
+      const { data: adminProfile } = await supabase
+        .from('admin_profiles')
+        .select('role, active')
+        .eq('id', auth.user.id)
+        .eq('active', true)
+        .maybeSingle();
+
+      if (!adminProfile) {
+        return { status: 403, data: { success: false, error: 'Unauthorized: Candidate ownership verification failed.' } };
+      }
+    }
+
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('joining_form_id', joiningFormId)
+      .order('created_at', { ascending: false });
+
+    return {
+      status: 200,
+      data: {
+        success: true,
+        joiningFormId: jf.id,
+        applicationId: jf.application_id,
+        candidateName: jf.candidate_name,
+        candidateEmail: jf.email,
+        candidateMobile: jf.employee_contact_number || jf.other_contact_number,
+        joiningReference: jf.joining_reference,
+        submissionStatus: jf.submission_status,
+        purpose: 'REGISTRATION',
+        purposeTitle: 'Candidate Registration & Dossier Verification Fee',
+        amount: authoritativeFee,
+        currency: 'INR',
+        totalConsultancyFee: TOTAL_CONSULTANCY_FEE,
+        policyNote: `Authoritative registration fee of ₹${authoritativeFee} is payable upon joining form submission.`,
+        gateway: 'CASHFREE',
+        environment: 'SANDBOX',
+        payments: payments || []
+      }
+    };
   }
 
-  // Check existing payments
-  const { data: payments } = await getSupabaseServer()
-    .from('payments')
-    .select('*')
-    .eq('application_id', appId)
-    .order('created_at', { ascending: false });
-
-  return {
-    status: 200,
-    data: {
-      success: true,
-      applicationId: app.id,
-      applicationNumber: app.application_number,
-      candidateName: app.full_name,
-      candidateEmail: app.email,
-      candidateMobile: app.mobile,
-      applicationStatus: app.status,
-      purpose: 'REGISTRATION',
-      purposeTitle: 'Candidate Registration & Dossier Verification Fee',
-      amount: AUTHORITATIVE_JOINING_FEE,
-      currency: 'INR',
-      totalConsultancyFee: TOTAL_CONSULTANCY_FEE,
-      policyNote: 'Rs. 500 is payable upon joining form submission. The remaining Rs. 500 is coordinated after 1 month of active placement.',
-      gateway: 'CASHFREE',
-      environment: 'SANDBOX',
-      payments: payments || []
-    }
-  };
+  return { status: 400, data: { success: false, error: 'Application ID or Joining Form ID is required' } };
 }
 
 /**
@@ -145,7 +277,20 @@ export async function createPaymentOrderHandler(
   }
 
   const supabase = getSupabaseServer();
-  const payableAmount = AUTHORITATIVE_JOINING_FEE;
+
+  // Authoritative Fee Resolution: NEVER trust candidate/frontend amount
+  let payableAmount: number;
+  try {
+    payableAmount = await resolveAuthoritativeRegistrationFee(supabase);
+  } catch (err: any) {
+    return {
+      status: 500,
+      data: {
+        success: false,
+        error: `Server configuration error: ${err.message || 'Unable to resolve authoritative registration fee'}`
+      }
+    };
+  }
 
   let candidateName = 'Candidate';
   let candidateEmail = '';

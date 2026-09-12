@@ -276,11 +276,12 @@ export function paymentApiPlugin(): Plugin {
             resendReceiptEmailHandler
           } = await import('./paymentServer');
 
-          // 1. GET /api/payment/config?appId=...
+          // 1. GET /api/payment/config?appId=... or ?joiningFormId=...
           if (normalizedUrl.startsWith('/api/payment/config') && method === 'GET') {
             const parsedUrl = new URL(url, 'http://localhost');
             const appId = parsedUrl.searchParams.get('appId') || '';
-            const result = await getPaymentConfigHandler(appId, authHeader);
+            const joiningFormId = parsedUrl.searchParams.get('joiningFormId') || '';
+            const result = await getPaymentConfigHandler({ appId, joiningFormId }, authHeader);
             return sendJsonResponse(res, result.status, result.data);
           }
 

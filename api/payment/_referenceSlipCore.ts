@@ -1280,7 +1280,9 @@ export async function verifyDocumentTokenHandler(token: string): Promise<{ statu
           paymentVerified: Boolean(payment?.status === 'SUCCESS'),
           paymentReference: payment?.payment_reference || 'VERIFIED',
           receiptNumber: payment?.receipt_number || 'REC-VERIFIED',
-          feeStatus: payment?.status === 'SUCCESS' ? 'PAID & VERIFIED (INR 500.00)' : 'CONFIRMED',
+          feeStatus: payment?.status === 'SUCCESS'
+            ? `PAID & VERIFIED (INR ${Number(payment?.amount || 500).toFixed(2)})`
+            : 'CONFIRMED',
           verificationStatus: 'OFFICIALLY ISSUED & AUTHENTIC DOCUMENT',
           verifiedAt: new Date().toISOString(),
         }

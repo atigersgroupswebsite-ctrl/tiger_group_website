@@ -29,7 +29,14 @@ export function validateSystemSettingValue(key: string, value: any): { valid: bo
       return { valid: true };
     }
 
-    case 'default_registration_fee':
+    case 'default_registration_fee': {
+      const num = Number(value);
+      if (isNaN(num) || !Number.isFinite(num) || num <= 0) {
+        return { valid: false, error: 'Authoritative registration fee must be a positive number greater than 0.' };
+      }
+      return { valid: true };
+    }
+
     case 'default_consultancy_fee': {
       const num = Number(value);
       if (isNaN(num) || num < 0) {
@@ -169,6 +176,30 @@ export async function updateSystemSetting(
     const userRes = await supabase.auth.getUser();
     const userId = userRes.data.user?.id || null;
 
+    // Requirement 14: Prefer SUPER_ADMIN-only modification for the registration fee
+    if (key === 'default_registration_fee') {
+      if (!userId) {
+        return { success: false, error: 'Authentication required to update registration fee.' };
+      }
+      const { data: profile } = await supabase
+        .from('admin_profiles')
+        .select('role, active')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (!profile || !profile.active || profile.role !== 'SUPER_ADMIN') {
+        return { success: false, error: 'Only Super Administrators can modify the authoritative registration fee.' };
+      }
+    }
+
+    // Fetch existing value for audit logging (Requirement 15)
+    const { data: currentSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', key)
+      .maybeSingle();
+    const oldValue = currentSetting ? currentSetting.value : null;
+
     const updatePayload: SystemSettingUpdate = {
       value,
       updated_by: userId,
@@ -189,15 +220,20 @@ export async function updateSystemSetting(
       return { success: false, error: error.message };
     }
 
-    // 2. Audit logging in public.activity_logs
+    // 2. Audit logging in public.activity_logs (Requirement 15: old value, new value, setting key, administrator, timestamp)
     await logActivity({
       entityType: 'SETTINGS',
       entityId: key,
       action: 'SETTINGS_UPDATED',
-      description: `System setting '${key}' successfully updated by administrator.`,
+      description: key === 'default_registration_fee'
+        ? `Authoritative registration fee changed from ₹${oldValue} to ₹${value} by administrator.`
+        : `System setting '${key}' successfully updated by administrator.`,
       metadata: {
         setting_key: key,
-        updated_at: new Date().toISOString()
+        old_value: oldValue,
+        new_value: value,
+        administrator: userId,
+        timestamp: new Date().toISOString()
       }
     });
 

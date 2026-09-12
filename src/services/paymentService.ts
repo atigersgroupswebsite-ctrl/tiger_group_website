@@ -129,14 +129,25 @@ async function getAuthHeader(): Promise<string> {
 /**
  * Retrieves payment requirements and current payments list.
  */
-export async function getPaymentConfig(applicationId: string): Promise<PaymentConfigResponse> {
+export async function getPaymentConfig(
+  params?: string | { applicationId?: string; joiningFormId?: string }
+): Promise<PaymentConfigResponse> {
   try {
     const authHeader = await getAuthHeader();
-    const res = await fetch(`/api/payment/config?appId=${encodeURIComponent(applicationId)}`, {
-      headers: {
-        Authorization: authHeader
-      }
-    });
+    let query = '';
+    if (typeof params === 'string') {
+      query = params ? `?appId=${encodeURIComponent(params)}` : '';
+    } else if (params) {
+      const parts: string[] = [];
+      if (params.applicationId) parts.push(`appId=${encodeURIComponent(params.applicationId)}`);
+      if (params.joiningFormId) parts.push(`joiningFormId=${encodeURIComponent(params.joiningFormId)}`);
+      if (parts.length > 0) query = `?${parts.join('&')}`;
+    }
+
+    const headers: Record<string, string> = {};
+    if (authHeader) headers['Authorization'] = authHeader;
+
+    const res = await fetch(`/api/payment/config${query}`, { headers });
     return await res.json();
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to fetch payment configuration' };
@@ -153,22 +164,21 @@ export interface CreateOrderParams {
 /**
  * Initiates order creation on the server with Cashfree Sandbox.
  * Supports either applicationId or standalone joiningFormId.
+ * Server authoritatively resolves amount from system_settings.
  */
 export async function createPaymentOrder(
   params: string | CreateOrderParams,
-  purpose = 'REGISTRATION',
-  amount = 500
+  purpose = 'REGISTRATION'
 ): Promise<CreateOrderResponse> {
   try {
     let bodyPayload: CreateOrderParams;
     if (typeof params === 'string') {
-      bodyPayload = { applicationId: params, purpose, amount };
+      bodyPayload = { applicationId: params, purpose };
     } else {
       bodyPayload = {
         applicationId: params.applicationId,
         joiningFormId: params.joiningFormId,
-        purpose: params.purpose || purpose,
-        amount: params.amount || amount
+        purpose: params.purpose || purpose
       };
     }
 

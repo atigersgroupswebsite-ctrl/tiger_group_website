@@ -158,8 +158,7 @@ export const CandidatePaymentPage: React.FC = () => {
       setProcessStep('Connecting to Cashfree Sandbox...');
       const orderRes = await createPaymentOrder(
         app.id,
-        paymentConfig.purpose || 'REGISTRATION',
-        paymentConfig.amount || 500
+        paymentConfig.purpose || 'REGISTRATION'
       );
 
       if (!orderRes.success) {
@@ -172,7 +171,7 @@ export const CandidatePaymentPage: React.FC = () => {
           paymentReference: orderRes.paymentReference || 'N/A',
           receiptNumber: orderRes.receiptNumber || 'N/A',
           applicationNumber: app.application_number,
-          amount: orderRes.amount || 500,
+          amount: orderRes.amount || paymentConfig.amount || 0,
           currency: orderRes.currency || 'INR',
           paidAt: new Date().toISOString(),
           gatewayPaymentId: (orderRes as any).gatewayPaymentId,
@@ -516,14 +515,14 @@ export const CandidatePaymentPage: React.FC = () => {
                 <span style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>Candidate Registration & Dossier Verification</span>
               </div>
               <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#192A56' }}>
-                ₹{Number(paymentConfig?.amount || 500).toFixed(2)}
+                {paymentConfig?.amount ? `₹${Number(paymentConfig.amount).toFixed(2)}` : '—'}
               </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.85rem' }}>
               <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#192A56' }}>Total Payable Now</span>
               <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#192A56' }}>
-                ₹{Number(paymentConfig?.amount || 500).toFixed(2)}
+                {paymentConfig?.amount ? `₹${Number(paymentConfig.amount).toFixed(2)}` : '—'}
                 <span style={{ fontSize: '0.75rem', color: '#64748B', marginLeft: '4px', fontWeight: 600 }}>INR</span>
               </span>
             </div>
@@ -534,8 +533,7 @@ export const CandidatePaymentPage: React.FC = () => {
             <FileText size={20} color="#B45309" style={{ flexShrink: 0, marginTop: '2px' }} />
             <div style={{ fontSize: '0.775rem', color: '#92400E', lineHeight: 1.5 }}>
               <strong>A Tiger Global Consultancy Fee Policy:</strong><br />
-              Total consultancy charge is ₹1,000/-. ₹500/- is collected upon registration and joining dossier submission.
-              The remaining ₹500/- will be coordinated after one month of active placement at the assigned plant/firm.
+              {paymentConfig?.policyNote || `Authoritative registration fee of ₹${paymentConfig?.amount ?? 500} is payable upon joining form submission.`}
             </div>
           </div>
 
@@ -570,7 +568,7 @@ export const CandidatePaymentPage: React.FC = () => {
             ) : (
               <>
                 <CreditCard size={20} color="#C5A059" />
-                <span>PAY NOW WITH CASHFREE — ₹{Number(paymentConfig?.amount || 500).toFixed(2)}</span>
+                <span>PAY NOW WITH CASHFREE — {paymentConfig?.amount ? `₹${Number(paymentConfig.amount).toFixed(2)}` : 'PROCEED'}</span>
               </>
             )}
           </button>

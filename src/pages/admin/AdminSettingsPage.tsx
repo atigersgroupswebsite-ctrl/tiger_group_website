@@ -101,8 +101,14 @@ export const AdminSettingsPage: React.FC = () => {
   };
 
   const handleSaveSetting = async (key: string) => {
-    if (!canEdit) {
-      setStatusMessage({ key, type: 'error', text: 'Permission denied. Your role has read-only access to settings.' });
+    if (!canEdit || (key === 'default_registration_fee' && !isSuperAdmin)) {
+      setStatusMessage({
+        key,
+        type: 'error',
+        text: key === 'default_registration_fee'
+          ? 'Permission denied. Only Super Administrators can modify the authoritative registration fee.'
+          : 'Permission denied. Your role has read-only access to settings.'
+      });
       return;
     }
 
@@ -441,9 +447,9 @@ export const AdminSettingsPage: React.FC = () => {
                           </span>
                           <input
                             type="number"
-                            min="0"
+                            min="1"
                             step="50"
-                            disabled={!canEdit || isSaving}
+                            disabled={(s.key === 'default_registration_fee' ? !isSuperAdmin : !canEdit) || isSaving}
                             value={currentVal ?? ''}
                             onChange={(e) => handleFieldChange(s.key, Number(e.target.value))}
                             className="admin-input"
@@ -451,8 +457,15 @@ export const AdminSettingsPage: React.FC = () => {
                           />
                         </div>
                         <p style={{ fontSize: '0.725rem', color: '#94A3B8', marginTop: '0.4rem', margin: '0.4rem 0 0 0' }}>
-                          Reference standard fee. Does not alter payment gateway execution while payments are postponed.
+                          {s.key === 'default_registration_fee'
+                            ? 'Authoritative registration and verification fee charged to new candidates through Cashfree.'
+                            : 'Reference standard fee coordinated after 1 month of active placement.'}
                         </p>
+                        {!isSuperAdmin && s.key === 'default_registration_fee' && (
+                          <p style={{ fontSize: '0.725rem', color: '#EF4444', marginTop: '0.25rem', margin: '0.25rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <Lock size={12} /> Super Admin privileges required to modify registration fee.
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -617,7 +630,7 @@ export const AdminSettingsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {canEdit ? (
+                    {(s.key === 'default_registration_fee' ? isSuperAdmin : canEdit) ? (
                       <button
                         onClick={() => handleSaveSetting(s.key)}
                         disabled={isSaving}
@@ -653,7 +666,7 @@ export const AdminSettingsPage: React.FC = () => {
                         }}
                       >
                         <Lock size={12} />
-                        View Only
+                        {s.key === 'default_registration_fee' ? 'Super Admin Only' : 'View Only'}
                       </span>
                     )}
                   </div>
