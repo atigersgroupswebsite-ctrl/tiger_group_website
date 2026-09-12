@@ -155,7 +155,7 @@ export const CandidatePaymentPage: React.FC = () => {
       }
 
       // Step B: Request server to create atomic payment order
-      setProcessStep('Connecting to Cashfree Sandbox...');
+      setProcessStep('Connecting to Cashfree...');
       const orderRes = await createPaymentOrder(
         app.id,
         paymentConfig.purpose || 'REGISTRATION'
@@ -190,8 +190,8 @@ export const CandidatePaymentPage: React.FC = () => {
 
       setProcessStep('Launching Cashfree Checkout...');
 
-      // Step C: Trigger Cashfree V3 Web Checkout in SANDBOX
-      await launchCashfreeCheckout(paymentSessionId);
+      // Step C: Trigger Cashfree V3 Web Checkout
+      await launchCashfreeCheckout(paymentSessionId, orderRes.environment);
     } catch (err: any) {
       console.error('[CASHFREE_CHECKOUT_ERROR]', err);
       setError(err.message || 'Payment initiation encountered an issue.');
@@ -215,7 +215,7 @@ export const CandidatePaymentPage: React.FC = () => {
       currency: paymentSuccessData.currency,
       paymentDate: paymentSuccessData.paidAt,
       paymentStatus: 'SUCCESS',
-      paymentMethod: 'ONLINE / CASHFREE (SANDBOX)',
+      paymentMethod: 'ONLINE / CASHFREE',
       gateway: 'CASHFREE',
       gatewayPaymentId: paymentSuccessData.gatewayPaymentId
     };
@@ -295,7 +295,7 @@ export const CandidatePaymentPage: React.FC = () => {
               Payment Verified Successfully!
             </h1>
             <p style={{ margin: '0.5rem 0 0 0', color: '#D1FAE5', fontSize: '0.9rem' }}>
-              Dossier registration fee confirmed via Cashfree Sandbox
+              Dossier registration fee confirmed via Cashfree Payment Gateway
             </p>
           </div>
 
@@ -444,7 +444,7 @@ export const CandidatePaymentPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#C5A059', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                CASHFREE GATEWAY • SANDBOX MODE
+                CASHFREE GATEWAY • SECURE PAYMENT
               </span>
               <h1 style={{ margin: '0.25rem 0 0 0', fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
                 Candidate Registration Fee
@@ -576,7 +576,7 @@ export const CandidatePaymentPage: React.FC = () => {
           </button>
 
           <div style={{ textAlign: 'center', marginTop: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem 0.75rem', fontSize: '0.75rem', color: '#64748B', flexWrap: 'wrap' }}>
-            <span>Cashfree Sandbox Checkout</span>
+            <span>Cashfree Secure Checkout</span>
             <span>•</span>
             <span>UPI / Cards / Net Banking</span>
             <span>•</span>

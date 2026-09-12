@@ -93,7 +93,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
       currency: paymentRecord.currency || 'INR',
       paymentDate: paymentRecord.paid_at || paymentRecord.created_at || new Date().toISOString(),
       paymentStatus: 'SUCCESS',
-      paymentMethod: paymentRecord.payment_method || 'ONLINE / CASHFREE (SANDBOX)',
+      paymentMethod: paymentRecord.payment_method || 'ONLINE / CASHFREE',
       gateway: paymentRecord.gateway || 'CASHFREE',
       gatewayOrderId: paymentRecord.gateway_order_id,
       gatewayPaymentId: paymentRecord.gateway_payment_id
@@ -140,8 +140,8 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
         throw new Error('Cashfree payment session was not established. Please retry.');
       }
 
-      // Launch Cashfree V3 SDK checkout in sandbox mode
-      await launchCashfreeCheckout(res.payment_session_id);
+      // Launch Cashfree V3 SDK checkout
+      await launchCashfreeCheckout(res.payment_session_id, res.environment);
     } catch (err: any) {
       console.error('[JOINING_PAYMENT_ERROR]', err);
       setPaymentError(err.message || 'Payment initiation failed. Please try again.');
@@ -439,7 +439,7 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
                 Registration & Verification Fee: ₹{configuredFee}
               </span>
               <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
-                Cashfree Sandbox checkout supports UPI, Cards, Net Banking & Wallets
+                Cashfree checkout supports UPI, Cards, Net Banking & Wallets
               </span>
             </div>
 

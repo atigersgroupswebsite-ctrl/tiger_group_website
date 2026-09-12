@@ -96,9 +96,12 @@ export function loadCashfreeCheckoutScript(): Promise<boolean> {
 }
 
 /**
- * Initializes and triggers Cashfree Web Checkout in Sandbox mode.
+ * Initializes and triggers Cashfree Web Checkout in production or sandbox mode.
  */
-export async function launchCashfreeCheckout(paymentSessionId: string): Promise<void> {
+export async function launchCashfreeCheckout(
+  paymentSessionId: string,
+  environment?: string
+): Promise<void> {
   const isLoaded = await loadCashfreeCheckoutScript();
   if (!isLoaded) {
     throw new Error('Could not load Cashfree payment gateway SDK. Please check your internet connection.');
@@ -109,9 +112,15 @@ export async function launchCashfreeCheckout(paymentSessionId: string): Promise<
     throw new Error('Cashfree SDK is not available in window context.');
   }
 
-  // Strictly Sandbox mode per project specification
+  // Resolve mode dynamically: PRODUCTION -> 'production', otherwise 'sandbox'
+  const isProd =
+    environment?.toUpperCase() === 'PRODUCTION' ||
+    (typeof import.meta !== 'undefined' &&
+      import.meta.env?.VITE_CASHFREE_ENVIRONMENT &&
+      String(import.meta.env.VITE_CASHFREE_ENVIRONMENT).toUpperCase() === 'PRODUCTION');
+
   const cashfree = CashfreeSDK({
-    mode: 'sandbox'
+    mode: isProd ? 'production' : 'sandbox'
   });
 
   cashfree.checkout({

@@ -122,7 +122,7 @@ export const PaymentResultPage: React.FC = () => {
             }}
           >
             <ShieldCheck size={16} color="#192A56" />
-            <span>Cashfree Gateway &bull; Sandbox Mode</span>
+            <span>Cashfree Gateway &bull; Secure Payment</span>
           </div>
           <h1
             style={{
@@ -158,7 +158,7 @@ export const PaymentResultPage: React.FC = () => {
               Verifying with Cashfree...
             </h2>
             <p style={{ fontSize: 'var(--text-sm, 0.875rem)', color: 'var(--color-text-secondary, #4A5568)', maxWidth: '440px', margin: '0 auto', lineHeight: 1.5 }}>
-              Please wait while our server cryptographically queries the Cashfree Sandbox API to confirm your payment state.
+              Please wait while our server cryptographically queries the Cashfree API to confirm your payment state.
             </p>
             {orderId && (
               <div style={{ marginTop: '1.25rem', display: 'inline-block', fontFamily: 'monospace', fontSize: '0.75rem', backgroundColor: '#F1F5F9', padding: '0.35rem 0.75rem', borderRadius: '4px', color: '#334155' }}>

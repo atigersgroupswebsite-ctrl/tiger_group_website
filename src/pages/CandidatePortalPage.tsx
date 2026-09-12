@@ -172,7 +172,7 @@ export const CandidatePortalPage: React.FC = () => {
         throw new Error('Payment session ID was not returned by gateway.');
       }
 
-      await launchCashfreeCheckout(res.payment_session_id);
+      await launchCashfreeCheckout(res.payment_session_id, res.environment);
     } catch (err: any) {
       setActionNotice({ type: 'error', message: err.message || 'Payment failed to initiate.' });
       setIsProcessingPayment(false);

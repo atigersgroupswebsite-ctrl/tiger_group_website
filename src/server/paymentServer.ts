@@ -25,8 +25,9 @@ export const CASHFREE_APP_ID = process.env.CASHFREE_APP_ID || '';
 export const CASHFREE_SECRET_KEY = process.env.CASHFREE_SECRET_KEY || '';
 export const CASHFREE_ENVIRONMENT = (process.env.CASHFREE_ENVIRONMENT || 'SANDBOX').toUpperCase();
 
-// CRITICAL SAFETY REQUIREMENT: Production payment strictly disabled, SANDBOX only
-export const CASHFREE_BASE_URL = 'https://sandbox.cashfree.com/pg';
+export const CASHFREE_BASE_URL = CASHFREE_ENVIRONMENT === 'PRODUCTION'
+  ? 'https://api.cashfree.com/pg'
+  : 'https://sandbox.cashfree.com/pg';
 export const CASHFREE_API_VERSION = '2023-08-01';
 
 // Default consultancy fee reference
@@ -130,7 +131,7 @@ export async function getPaymentConfigHandler(
         totalConsultancyFee: TOTAL_CONSULTANCY_FEE,
         policyNote: `Authoritative registration fee of ₹${authoritativeFee} is payable upon joining form submission.`,
         gateway: 'CASHFREE',
-        environment: 'SANDBOX'
+        environment: CASHFREE_ENVIRONMENT
       }
     };
   }
@@ -191,7 +192,7 @@ export async function getPaymentConfigHandler(
         totalConsultancyFee: TOTAL_CONSULTANCY_FEE,
         policyNote: `Authoritative registration fee of ₹${authoritativeFee} is payable upon joining form submission.`,
         gateway: 'CASHFREE',
-        environment: 'SANDBOX',
+        environment: CASHFREE_ENVIRONMENT,
         payments: payments || []
       }
     };
@@ -247,7 +248,7 @@ export async function getPaymentConfigHandler(
         totalConsultancyFee: TOTAL_CONSULTANCY_FEE,
         policyNote: `Authoritative registration fee of ₹${authoritativeFee} is payable upon joining form submission.`,
         gateway: 'CASHFREE',
-        environment: 'SANDBOX',
+        environment: CASHFREE_ENVIRONMENT,
         payments: payments || []
       }
     };
@@ -622,7 +623,7 @@ export async function createPaymentOrderHandler(
       payment_session_id: paymentSessionId,
       amount: payableAmount,
       currency: 'INR',
-      environment: 'SANDBOX',
+      environment: CASHFREE_ENVIRONMENT,
       candidate: {
         name: candidateName,
         email: candidateEmail,
@@ -889,7 +890,7 @@ export async function verifyPaymentHandler(
       status: 502,
       data: {
         success: false,
-        error: `Error communicating with Cashfree Sandbox: ${err?.message || err}`
+        error: `Error communicating with Cashfree gateway: ${err?.message || err}`
       }
     };
   }
