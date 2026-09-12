@@ -97,6 +97,14 @@ export function loadCashfreeCheckoutScript(): Promise<boolean> {
 
 /**
  * Initializes and triggers Cashfree Web Checkout in production or sandbox mode.
+ * 
+ * Rules:
+ * 1. Server remains authoritative: environment returned by server takes precedence.
+ * 2. On production domain (atigerglobal.com):
+ *    If environment is missing or invalid, NEVER silently fall back to Sandbox.
+ *    Throws an explicit configuration error instead.
+ * 3. On localhost/development:
+ *    Sandbox fallback is strictly constrained to local development.
  */
 export async function launchCashfreeCheckout(
   paymentSessionId: string,
@@ -112,15 +120,46 @@ export async function launchCashfreeCheckout(
     throw new Error('Cashfree SDK is not available in window context.');
   }
 
-  // Resolve mode dynamically: PRODUCTION -> 'production', otherwise 'sandbox'
-  const isProd =
-    environment?.toUpperCase() === 'PRODUCTION' ||
-    (typeof import.meta !== 'undefined' &&
-      import.meta.env?.VITE_CASHFREE_ENVIRONMENT &&
-      String(import.meta.env.VITE_CASHFREE_ENVIRONMENT).toUpperCase() === 'PRODUCTION');
+  const hostname = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
+  const isProdDomain = hostname === 'www.atigerglobal.com' || hostname === 'atigerglobal.com';
+  const isLocalDev =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.endsWith('.local') ||
+    hostname === '';
+
+  // Server-returned environment is preferred; client build-time env is secondary fallback
+  const clientEnv =
+    typeof import.meta !== 'undefined' && import.meta.env?.VITE_CASHFREE_ENVIRONMENT
+      ? String(import.meta.env.VITE_CASHFREE_ENVIRONMENT).trim().toUpperCase()
+      : undefined;
+
+  const targetEnv = (environment?.trim().toUpperCase() || clientEnv);
+
+  let mode: 'production' | 'sandbox';
+
+  if (targetEnv === 'PRODUCTION') {
+    mode = 'production';
+  } else if (targetEnv === 'SANDBOX') {
+    mode = 'sandbox';
+  } else {
+    // Missing, omitted, or invalid environment
+    if (isProdDomain) {
+      throw new Error(
+        'Cashfree payment environment configuration is missing on the production domain. Checkout cannot be initialized.'
+      );
+    } else if (isLocalDev) {
+      // Local development fallback is explicitly constrained to localhost
+      mode = 'sandbox';
+    } else {
+      throw new Error(
+        'Cashfree payment environment configuration is missing or invalid. Checkout cannot be initialized.'
+      );
+    }
+  }
 
   const cashfree = CashfreeSDK({
-    mode: isProd ? 'production' : 'sandbox'
+    mode
   });
 
   cashfree.checkout({

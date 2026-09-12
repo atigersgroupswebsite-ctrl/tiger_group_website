@@ -281,7 +281,7 @@ export function paymentApiPlugin(): Plugin {
             const parsedUrl = new URL(url, 'http://localhost');
             const appId = parsedUrl.searchParams.get('appId') || '';
             const joiningFormId = parsedUrl.searchParams.get('joiningFormId') || '';
-            const result = await getPaymentConfigHandler({ appId, joiningFormId }, authHeader);
+            const result = await getPaymentConfigHandler({ appId, joiningFormId }, authHeader, req.headers as any);
             return sendJsonResponse(res, result.status, result.data);
           }
 
@@ -307,7 +307,7 @@ export function paymentApiPlugin(): Plugin {
               orderId = body.orderId || body.order_id || body.gateway_order_id || '';
               paymentId = body.paymentId || body.payment_id || '';
             }
-            const result = await verifyPaymentHandler({ orderId, paymentId }, authHeader);
+            const result = await verifyPaymentHandler({ orderId, paymentId }, authHeader, req.headers as any);
             return sendJsonResponse(res, result.status, result.data);
           }
 

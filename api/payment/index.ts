@@ -64,7 +64,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
         }
         const appId = urlObj.searchParams.get('appId') || (req.query?.appId as string) || '';
         const joiningFormId = urlObj.searchParams.get('joiningFormId') || (req.query?.joiningFormId as string) || '';
-        const result = await getPaymentConfigHandler({ appId, joiningFormId }, authHeader);
+        const result = await getPaymentConfigHandler({ appId, joiningFormId }, authHeader, req.headers);
         return sendResponse(res, result.status, result.data);
       }
 
@@ -100,7 +100,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
         } else {
           body = await parseBody(req);
         }
-        const result = await verifyPaymentHandler(body, authHeader);
+        const result = await verifyPaymentHandler(body, authHeader, req.headers);
         return sendResponse(res, result.status, result.data);
       }
 

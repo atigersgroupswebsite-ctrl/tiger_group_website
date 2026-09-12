@@ -28,6 +28,57 @@ export const CASHFREE_BASE_URL = CASHFREE_ENVIRONMENT === 'PRODUCTION'
   : 'https://sandbox.cashfree.com/pg';
 export const CASHFREE_API_VERSION = '2023-08-01';
 
+export interface CashfreeRuntimeConfig {
+  environment: 'PRODUCTION' | 'SANDBOX';
+  baseUrl: string;
+}
+
+/**
+ * Authoritative runtime resolver for Cashfree gateway configuration.
+ * On production hosts (atigerglobal.com or VERCEL_ENV=production):
+ * - CASHFREE_ENVIRONMENT is strictly required and must be PRODUCTION or SANDBOX.
+ * - Missing or invalid configuration throws an error and NEVER silently falls back to Sandbox.
+ * On non-production hosts (e.g. localhost):
+ * - Defaults to SANDBOX if not explicitly set.
+ */
+export function resolveCashfreeConfig(
+  reqHeaders?: Record<string, string | string[] | undefined>
+): CashfreeRuntimeConfig {
+  const getHeader = (key: string): string => {
+    if (!reqHeaders) return '';
+    const val = reqHeaders[key] || reqHeaders[key.toLowerCase()];
+    if (Array.isArray(val)) return val[0] || '';
+    return typeof val === 'string' ? val : '';
+  };
+
+  const host = (getHeader('x-forwarded-host') || getHeader('host')).toLowerCase();
+  const isProductionHost =
+    host.includes('atigerglobal.com') ||
+    process.env.VERCEL_ENV === 'production';
+
+  const rawEnv = (process.env.CASHFREE_ENVIRONMENT || '').trim().toUpperCase();
+
+  if (isProductionHost) {
+    if (!rawEnv) {
+      throw new Error(
+        'Cashfree environment is not configured in production runtime (CASHFREE_ENVIRONMENT is required).'
+      );
+    }
+    if (rawEnv !== 'PRODUCTION' && rawEnv !== 'SANDBOX') {
+      throw new Error(
+        `Invalid CASHFREE_ENVIRONMENT "${rawEnv}". Expected PRODUCTION or SANDBOX.`
+      );
+    }
+  }
+
+  const environment: 'PRODUCTION' | 'SANDBOX' = rawEnv === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
+  const baseUrl = environment === 'PRODUCTION'
+    ? 'https://api.cashfree.com/pg'
+    : 'https://sandbox.cashfree.com/pg';
+
+  return { environment, baseUrl };
+}
+
 // Authoritative Joining Registration Fee
 export const AUTHORITATIVE_JOINING_FEE = 500;
 export const TOTAL_CONSULTANCY_FEE = 1000;
@@ -324,7 +375,8 @@ export async function resolveAuthoritativeRegistrationFee(supabase: any): Promis
  */
 export async function getPaymentConfigHandler(
   queryParam: string | { appId?: string; joiningFormId?: string },
-  authHeader?: string
+  authHeader?: string,
+  reqHeaders?: Record<string, string | string[] | undefined>
 ) {
   let appId = '';
   let joiningFormId = '';
@@ -338,6 +390,14 @@ export async function getPaymentConfigHandler(
   const auth = await authenticateRequest(authHeader);
   if (!auth.authenticated || !auth.user) {
     return { status: 401, data: { success: false, error: auth.error || 'Unauthorized' } };
+  }
+
+  let cfConfig: CashfreeRuntimeConfig;
+  try {
+    cfConfig = resolveCashfreeConfig(reqHeaders);
+  } catch (cfgErr: any) {
+    console.error('[getPaymentConfigHandler] Cashfree configuration error:', cfgErr.message);
+    return { status: 500, data: { success: false, error: cfgErr.message || 'Payment configuration error' } };
   }
 
   const supabase = getSupabaseServer();
@@ -400,7 +460,7 @@ export async function getPaymentConfigHandler(
         totalConsultancyFee: TOTAL_CONSULTANCY_FEE,
         policyNote: `Rs. ${feeAmount} is payable upon registration. The remaining fee is coordinated after 1 month of active placement.`,
         gateway: 'CASHFREE',
-        environment: CASHFREE_ENVIRONMENT,
+        environment: cfConfig.environment,
         payments: payments || [],
       },
     };
@@ -456,7 +516,7 @@ export async function getPaymentConfigHandler(
         totalConsultancyFee: TOTAL_CONSULTANCY_FEE,
         policyNote: `Rs. ${feeAmount} is payable upon registration. The remaining fee is coordinated after 1 month of active placement.`,
         gateway: 'CASHFREE',
-        environment: CASHFREE_ENVIRONMENT,
+        environment: cfConfig.environment,
         payments: payments || [],
       },
     };
@@ -474,7 +534,7 @@ export async function getPaymentConfigHandler(
       totalConsultancyFee: TOTAL_CONSULTANCY_FEE,
       policyNote: `Rs. ${feeAmount} is payable upon registration. The remaining fee is coordinated after 1 month of active placement.`,
       gateway: 'CASHFREE',
-      environment: CASHFREE_ENVIRONMENT,
+      environment: cfConfig.environment,
     },
   };
 }
@@ -522,6 +582,20 @@ export async function createPaymentOrderHandler(
       data: {
         success: false,
         error: feeErr.message || 'Payment system configuration error: Authoritative registration fee could not be determined.'
+      }
+    };
+  }
+
+  let cfConfig: CashfreeRuntimeConfig;
+  try {
+    cfConfig = resolveCashfreeConfig(reqHeaders);
+  } catch (cfgErr: any) {
+    console.error('[createPaymentOrderHandler] Cashfree configuration error:', cfgErr.message);
+    return {
+      status: 500,
+      data: {
+        success: false,
+        error: cfgErr.message || 'Payment gateway configuration error.'
       }
     };
   }
@@ -776,7 +850,7 @@ export async function createPaymentOrderHandler(
 
   let cfOrderResponse: any = null;
   try {
-    const response = await fetch(`${CASHFREE_BASE_URL}/orders`, {
+    const response = await fetch(`${cfConfig.baseUrl}/orders`, {
       method: 'POST',
       headers: getCashfreeHeaders(),
       body: JSON.stringify(cfPayload),
@@ -856,7 +930,7 @@ export async function createPaymentOrderHandler(
       payment_session_id: paymentSessionId,
       amount: payableAmount,
       currency: 'INR',
-      environment: CASHFREE_ENVIRONMENT,
+      environment: cfConfig.environment,
       candidate: {
         name: candidateName,
         email: candidateEmail,
@@ -980,7 +1054,8 @@ export async function verifyPaymentHandler(
     order_id?: string;
     payment_id?: string;
   },
-  authHeader?: string
+  authHeader?: string,
+  reqHeaders?: Record<string, string | string[] | undefined>
 ) {
   const targetOrderId = body.orderId || body.order_id;
   const targetPaymentId = body.paymentId || body.payment_id;
@@ -1043,12 +1118,26 @@ export async function verifyPaymentHandler(
     };
   }
 
-  // 3. Query Cashfree Sandbox API
+  // 3. Query Cashfree API
+  let cfConfig: CashfreeRuntimeConfig;
+  try {
+    cfConfig = resolveCashfreeConfig(reqHeaders);
+  } catch (cfgErr: any) {
+    console.error('[CASHFREE_VERIFY] Cashfree configuration error:', cfgErr.message);
+    return {
+      status: 500,
+      data: {
+        success: false,
+        error: cfgErr.message || 'Payment gateway configuration error',
+      },
+    };
+  }
+
   let cfOrder: any = null;
   let cfPayments: any[] = [];
 
   try {
-    const orderRes = await fetch(`${CASHFREE_BASE_URL}/orders/${encodeURIComponent(orderId)}`, {
+    const orderRes = await fetch(`${cfConfig.baseUrl}/orders/${encodeURIComponent(orderId)}`, {
       method: 'GET',
       headers: getCashfreeHeaders(),
     });
@@ -1061,7 +1150,7 @@ export async function verifyPaymentHandler(
 
     cfOrder = await orderRes.json();
 
-    const paymentsRes = await fetch(`${CASHFREE_BASE_URL}/orders/${encodeURIComponent(orderId)}/payments`, {
+    const paymentsRes = await fetch(`${cfConfig.baseUrl}/orders/${encodeURIComponent(orderId)}/payments`, {
       method: 'GET',
       headers: getCashfreeHeaders(),
     });
