@@ -54,6 +54,8 @@ export interface VerifyPaymentResponse {
   paymentReference?: string;
   receiptNumber?: string;
   applicationNumber?: string;
+  applicationId?: string;
+  joiningFormId?: string;
   amount?: number;
   currency?: string;
   paidAt?: string;

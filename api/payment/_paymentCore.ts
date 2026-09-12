@@ -1172,9 +1172,14 @@ export async function verifyPaymentHandler(
       data: {
         success: false,
         paymentStatus: 'USER_DROPPED',
+        paymentId: paymentRecord.id,
         orderId,
         paymentReference: paymentRecord.payment_reference,
-        message: latestAttempt?.payment_message || 'Checkout was cancelled before completing payment. No funds were deducted.',
+        applicationId: paymentRecord.application_id,
+        joiningFormId: paymentRecord.joining_form_id,
+        amount: paymentRecord.amount,
+        currency: paymentRecord.currency,
+        message: latestAttempt?.payment_message || 'Payment process was exited before completion.',
       },
     };
   }
@@ -1202,8 +1207,13 @@ export async function verifyPaymentHandler(
       data: {
         success: false,
         paymentStatus: 'FAILED',
+        paymentId: paymentRecord.id,
         orderId,
         paymentReference: paymentRecord.payment_reference,
+        applicationId: paymentRecord.application_id,
+        joiningFormId: paymentRecord.joining_form_id,
+        amount: paymentRecord.amount,
+        currency: paymentRecord.currency,
         error: failureReason,
       },
     };
@@ -1217,8 +1227,13 @@ export async function verifyPaymentHandler(
     data: {
       success: true,
       paymentStatus: 'PENDING',
+      paymentId: paymentRecord.id,
       orderId,
       paymentReference: paymentRecord.payment_reference,
+      applicationId: paymentRecord.application_id,
+      joiningFormId: paymentRecord.joining_form_id,
+      amount: paymentRecord.amount,
+      currency: paymentRecord.currency,
       message: 'Payment is pending or awaiting candidate completion in checkout.',
     },
   };
