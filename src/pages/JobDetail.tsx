@@ -133,12 +133,7 @@ export const JobDetail: React.FC = () => {
       {/* Main Details Layout */}
       <section className="section" style={{ background: '#FFFFFF' }}>
         <Container size="xl">
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 2fr) minmax(300px, 1fr)',
-            gap: 'var(--space-12)',
-            alignItems: 'start'
-          }}>
+          <div className="job-detail-grid">
             {/* Left Column: Scope & Requirements */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-10)' }}>
               {/* Role Overview */}

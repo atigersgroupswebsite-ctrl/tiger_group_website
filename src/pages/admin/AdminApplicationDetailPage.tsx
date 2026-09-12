@@ -544,7 +544,7 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
           }}
         >
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.25rem' }}>
               <h1
                 style={{
                   fontFamily: 'Plus Jakarta Sans, sans-serif',
@@ -604,7 +604,7 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
           </div>
 
           {/* Application Status Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem' }}>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value as ApplicationStatus)}
@@ -848,7 +848,7 @@ export const AdminApplicationDetailPage: React.FC<AdminApplicationDetailPageProp
           </div>
 
           {/* Grid: Overview Details */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(0, 1.2fr)', gap: '1.5rem' }}>
+          <div className="admin-detail-split-grid">
             {/* Left Column */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* Joining Access Control Panel */}

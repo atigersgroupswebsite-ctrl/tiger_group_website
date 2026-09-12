@@ -455,7 +455,7 @@ export const CandidatePortalPage: React.FC = () => {
                 backgroundColor: '#FFFFFF',
                 borderRadius: 'var(--radius-xl)',
                 border: '1px solid var(--color-border)',
-                padding: '2rem',
+                padding: 'clamp(1.25rem, 4vw, 2rem)',
                 boxShadow: 'var(--shadow-sm)'
               }}
             >
@@ -574,7 +574,7 @@ export const CandidatePortalPage: React.FC = () => {
                 backgroundColor: '#FFFFFF',
                 borderRadius: 'var(--radius-xl)',
                 border: isPaymentPaid ? '1px solid #86EFAC' : '1px solid var(--color-border)',
-                padding: '1.75rem 2rem',
+                padding: '1.5rem clamp(1.25rem, 4vw, 2rem)',
                 boxShadow: 'var(--shadow-sm)',
                 marginBottom: '2rem'
               }}
@@ -697,7 +697,7 @@ export const CandidatePortalPage: React.FC = () => {
                 backgroundColor: '#FFFFFF',
                 borderRadius: 'var(--radius-xl)',
                 border: '1px solid var(--color-border)',
-                padding: '2rem',
+                padding: 'clamp(1.25rem, 4vw, 2rem)',
                 boxShadow: 'var(--shadow-sm)'
               }}
             >

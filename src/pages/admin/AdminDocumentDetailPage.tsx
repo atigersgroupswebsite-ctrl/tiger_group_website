@@ -541,15 +541,7 @@ export const AdminDocumentDetailPage: React.FC = () => {
       </div>
 
       {/* Two-Column Workspace: Left = Document View / Right = Audit & Context */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.8fr) minmax(320px, 1fr)',
-          gap: '1.5rem',
-          alignItems: 'start',
-          marginBottom: '2rem'
-        }}
-      >
+      <div className="admin-detail-split-grid">
         {/* Left Column: Private Storage Document Preview */}
         <div
           style={{

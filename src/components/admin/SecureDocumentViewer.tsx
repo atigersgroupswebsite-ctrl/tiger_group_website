@@ -73,6 +73,8 @@ export const SecureDocumentViewer: React.FC<SecureDocumentViewerProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.6rem',
             backgroundColor: '#F8FAFC'
           }}
         >
@@ -187,7 +189,7 @@ export const SecureDocumentViewer: React.FC<SecureDocumentViewerProps> = ({
         <div
           style={{
             flex: 1,
-            minHeight: '400px',
+            minHeight: 'min(400px, 45vh)',
             maxHeight: 'calc(90vh - 120px)',
             backgroundColor: '#0F172A',
             display: 'flex',

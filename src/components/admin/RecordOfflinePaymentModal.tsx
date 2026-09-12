@@ -157,7 +157,7 @@ export const RecordOfflinePaymentModal: React.FC<RecordOfflinePaymentModalProps>
           borderRadius: '12px',
           maxWidth: '520px',
           width: '100%',
-          padding: '2rem',
+          padding: 'clamp(1.25rem, 4vw, 2rem)',
           boxShadow: '0 20px 40px -10px rgba(25, 42, 86, 0.3)',
           border: '1px solid #E2E8F0'
         }}

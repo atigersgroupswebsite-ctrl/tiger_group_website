@@ -250,7 +250,7 @@ export const ReferenceSlipFormModal: React.FC<ReferenceSlipFormModalProps> = ({
               <Building2 size={15} />
               <span>1. Employer / Referring Company</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="admin-modal-grid-2col">
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
                   Select Partner Company
@@ -312,7 +312,7 @@ export const ReferenceSlipFormModal: React.FC<ReferenceSlipFormModalProps> = ({
               <Calendar size={15} />
               <span>2. Interview & Reporting Schedule</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+            <div className="admin-modal-grid-3col">
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
                   Date of Interview
@@ -376,7 +376,7 @@ export const ReferenceSlipFormModal: React.FC<ReferenceSlipFormModalProps> = ({
               <Briefcase size={15} />
               <span>3. Department, Role & Salary (CTC)</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+            <div className="admin-modal-grid-3col">
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
                   Department
@@ -449,7 +449,7 @@ export const ReferenceSlipFormModal: React.FC<ReferenceSlipFormModalProps> = ({
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.5rem' }}>
                 Interview Decision *
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+              <div className="admin-modal-grid-3col" style={{ gap: '0.75rem' }}>
                 <label
                   style={{
                     display: 'flex',
@@ -527,7 +527,7 @@ export const ReferenceSlipFormModal: React.FC<ReferenceSlipFormModalProps> = ({
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+            <div className="admin-modal-grid-3col">
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
                   Interview Conducted By

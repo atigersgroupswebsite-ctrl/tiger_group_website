@@ -473,7 +473,7 @@ export const AdminCompanyDetailPage: React.FC = () => {
       </div>
 
       {/* Grid: Details & Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+      <div className="admin-cards-grid-2col">
         {/* Contact & Location Details */}
         <div
           style={{

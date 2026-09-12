@@ -114,7 +114,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 1.5rem',
+        padding: '0 clamp(0.75rem, 2.5vw, 1.5rem)',
         position: 'sticky',
         top: 0,
         zIndex: 40
@@ -143,7 +143,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
       </div>
 
       {/* Far Right Corner: Notifications Bell & Profile Trigger */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginLeft: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginLeft: 'auto', flexShrink: 0 }}>
         {/* Realtime Notification Bell */}
         <div ref={notifRef} style={{ position: 'relative' }}>
           <button
@@ -601,7 +601,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
             </div>
 
             {/* Name & Role Text */}
-            <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: 1.2 }}>
+            <div className="admin-header-user-info" style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: 1.2 }}>
               <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#FCFBFB' }}>
                 {profile?.full_name || 'Administrator'}
               </span>

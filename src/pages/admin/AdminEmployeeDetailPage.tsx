@@ -446,7 +446,7 @@ export const AdminEmployeeDetailPage: React.FC = () => {
 
         {/* Header Action Buttons */}
         {canManage && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
             <button
               type="button"
               onClick={() => setIsStatusModalOpen(true)}
@@ -513,14 +513,7 @@ export const AdminEmployeeDetailPage: React.FC = () => {
       )}
 
       {/* Main Grid: Left Column (Profile & Origin) + Right Column (ID Card Panel) */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-          gap: '1.5rem',
-          alignItems: 'start'
-        }}
-      >
+      <div className="admin-cards-grid-2col" style={{ alignItems: 'start' }}>
         {/* Left Column: Operational Details */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Operational Details Card */}

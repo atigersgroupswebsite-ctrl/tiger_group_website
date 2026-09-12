@@ -1036,7 +1036,7 @@ export const AdminEmployeesPage: React.FC = () => {
                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-midnight-navy)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
                   1. Candidate Origin Source
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: '#F1F5F9', padding: '0.35rem', borderRadius: '8px' }}>
+                <div className="admin-modal-grid-2col" style={{ gap: '0.5rem', backgroundColor: '#F1F5F9', padding: '0.35rem', borderRadius: '8px' }}>
                   <button
                     type="button"
                     onClick={() => {
@@ -1134,7 +1134,7 @@ export const AdminEmployeesPage: React.FC = () => {
                   3. Operational Master Fields
                 </label>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div className="admin-modal-grid-2col" style={{ gap: '0.85rem' }}>
                   {/* Code */}
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: '0.3rem' }}>

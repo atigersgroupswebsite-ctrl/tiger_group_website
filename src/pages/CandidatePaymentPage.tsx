@@ -300,7 +300,7 @@ export const CandidatePaymentPage: React.FC = () => {
           </div>
 
           {/* Receipt Content */}
-          <div style={{ padding: '2rem' }}>
+          <div style={{ padding: 'clamp(1.25rem, 4vw, 2rem)' }}>
             <div style={{ backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '1.5rem', marginBottom: '1.75rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
                 <div>

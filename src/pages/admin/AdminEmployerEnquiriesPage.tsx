@@ -520,7 +520,7 @@ export const AdminEmployerEnquiriesPage: React.FC = () => {
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
-              padding: '2rem',
+              padding: 'clamp(1.25rem, 4vw, 2rem)',
               boxShadow: '0 20px 40px -10px rgba(25, 42, 86, 0.25)',
               position: 'relative'
             }}
@@ -815,7 +815,7 @@ export const AdminEmployerEnquiriesPage: React.FC = () => {
               borderRadius: '12px',
               maxWidth: '480px',
               width: '100%',
-              padding: '2rem',
+              padding: 'clamp(1.25rem, 4vw, 2rem)',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)'
             }}
           >

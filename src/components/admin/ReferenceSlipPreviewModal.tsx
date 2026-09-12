@@ -173,6 +173,8 @@ export const ReferenceSlipPreviewModal: React.FC<ReferenceSlipPreviewModalProps>
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
             backgroundColor: '#F8FAFC'
           }}
         >

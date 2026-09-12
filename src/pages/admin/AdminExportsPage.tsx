@@ -345,7 +345,7 @@ export const AdminExportsPage: React.FC = () => {
       )}
 
       {/* Two Main Export Sections */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))', gap: '1.75rem' }}>
+      <div className="admin-exports-grid">
         {/* Section 1: JOB SEEKER ENQUIRIES */}
         <ExportCard
           title="JOB SEEKER ENQUIRIES"

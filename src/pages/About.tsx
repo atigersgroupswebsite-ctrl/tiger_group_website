@@ -123,7 +123,7 @@ export const About: React.FC = () => {
       {/* Mission & Vision Cards */}
       <section className="section section-pearl">
         <Container size="xl">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-8)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 'var(--space-8)' }}>
             <div className="card">
               <div style={{
                 width: '48px',
@@ -178,7 +178,7 @@ export const About: React.FC = () => {
             subtitle="Built on structured accountability for both employers and prospective employees."
           />
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-8)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 'var(--space-8)' }}>
             {/* For Businesses */}
             <div className="card card-navy" style={{ padding: 'var(--space-8)' }}>
               <span className="eyebrow eyebrow-navy" style={{ marginBottom: 'var(--space-4)' }}>

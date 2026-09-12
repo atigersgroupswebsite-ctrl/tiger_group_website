@@ -640,13 +640,7 @@ export const AdminJobDetailPage: React.FC = () => {
       </div>
 
       {/* Two Column Layout: Specifications & Company Profile */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 2fr) minmax(320px, 1fr)',
-        gap: '1.5rem',
-        alignItems: 'start',
-        marginBottom: '2rem'
-      }}>
+      <div className="admin-detail-split-grid">
         {/* Left Column: Scope, Responsibilities, Requirements */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Job Overview */}
@@ -1097,7 +1091,7 @@ export const AdminJobDetailPage: React.FC = () => {
             )}
 
             <form onSubmit={handleEditSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
                     Job Title *

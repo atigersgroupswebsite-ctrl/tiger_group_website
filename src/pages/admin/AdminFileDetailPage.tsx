@@ -294,7 +294,7 @@ export const AdminFileDetailPage: React.FC = () => {
       </div>
 
       {/* 2-Column Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(0, 1.2fr)', gap: '1.5rem' }}>
+      <div className="admin-detail-split-grid">
         {/* Left Column: File Details & Preview */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* File Metadata Card */}

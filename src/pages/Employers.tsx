@@ -69,7 +69,7 @@ export const Employers: React.FC = () => {
             subtitle="Supplying qualified personnel to fit your production schedules, assembly lines, and perimeter security requirements."
           />
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-8)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 'var(--space-8)' }}>
             {/* Capability 1 */}
             <div className="card">
               <div style={{

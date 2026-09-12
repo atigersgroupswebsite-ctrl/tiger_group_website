@@ -33,7 +33,7 @@ export const ServicesOverview: React.FC = () => {
           subtitle="Five specialized commercial ventures operating under the parent group across career solutions, industrial contracting, real estate, and lifestyle retail."
         />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-8)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 'var(--space-8)' }}>
           {BUSINESS_VERTICALS.map((vertical, index) => (
             <ScrollReveal key={vertical.id} delay={index * 0.1} direction="up">
               <div className="service-card">

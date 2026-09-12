@@ -216,7 +216,7 @@ export const AdminPaymentPanel: React.FC<AdminPaymentPanelProps> = ({
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem' }}>
             <button
               type="button"
               onClick={onRefresh}

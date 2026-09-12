@@ -518,7 +518,7 @@ export const ReferenceSlipApplicationTab: React.FC<ReferenceSlipApplicationTabPr
       </div>
 
       {/* Grid: 2 Columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+      <div className="admin-cards-grid-2col">
         {/* Card 1: Page 1 Data - Reference Details */}
         <div className="admin-card" style={{ padding: '1.25rem' }}>
           <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

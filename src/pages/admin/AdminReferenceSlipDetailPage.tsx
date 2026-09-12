@@ -402,7 +402,7 @@ export const AdminReferenceSlipDetailPage: React.FC = () => {
       </div>
 
       {/* 2-Column Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', marginBottom: '1.75rem' }}>
+      <div className="admin-cards-grid-2col">
         {/* Section 1: Candidate Demographic Summary */}
         <div className="admin-card" style={{ padding: '1.5rem' }}>
           <h3 style={{ margin: '0 0 1.25rem 0', fontSize: '1rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

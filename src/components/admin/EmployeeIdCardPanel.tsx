@@ -599,9 +599,8 @@ export const EmployeeIdCardPanel: React.FC<EmployeeIdCardPanelProps> = ({
             </div>
 
             <div
+              className="admin-modal-grid-2col"
               style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
                 gap: '0.75rem',
                 marginBottom: '0.85rem'
               }}
@@ -815,7 +814,7 @@ export const EmployeeIdCardPanel: React.FC<EmployeeIdCardPanelProps> = ({
 
           {/* Action Buttons */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.6rem' }}>
               <button
                 type="button"
                 onClick={handleGenerateIdCard}

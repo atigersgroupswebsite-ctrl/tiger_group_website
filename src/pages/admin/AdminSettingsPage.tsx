@@ -301,7 +301,7 @@ export const AdminSettingsPage: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1.5rem' }}>
+        <div className="admin-settings-grid">
           {filteredSettings.map((s) => {
             const isSaving = savingKey === s.key;
             const currentVal = formState[s.key];

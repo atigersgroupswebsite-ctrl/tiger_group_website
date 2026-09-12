@@ -347,7 +347,7 @@ export const AdminPaymentDetailPage: React.FC = () => {
       </div>
 
       {/* Main Grid: 2 Columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div className="admin-cards-grid-2col" style={{ marginBottom: '2rem' }}>
         {/* Left Column: Transaction Details */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Card: Financial Summary */}

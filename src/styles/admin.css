@@ -313,6 +313,50 @@
   }
 }
 
+/* Detail Split Grid (e.g. Specification & Sidebar) */
+.admin-detail-split-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(320px, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+  margin-bottom: 2rem;
+}
+
+/* 2-Column Cards Grid for Detail Summary Panels */
+.admin-cards-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.75rem;
+}
+
+/* Exports Section Grid */
+.admin-exports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+  gap: 1.75rem;
+}
+
+/* Settings Cards Grid */
+.admin-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Modal Inner Grids */
+.admin-modal-grid-3col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.admin-modal-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
 @media (max-width: 1024px) {
   .admin-sidebar {
     transform: translateX(-100%);
@@ -326,6 +370,10 @@
   .admin-mobile-toggle {
     display: block !important;
   }
+  .admin-detail-split-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
 }
 
 @media (max-width: 768px) {
@@ -334,6 +382,9 @@
   }
   .admin-header {
     padding: 0 1rem;
+  }
+  .admin-exports-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -347,4 +398,22 @@
     display: inline-block;
     vertical-align: middle;
   }
+  .admin-cards-grid-2col {
+    grid-template-columns: 1fr;
+  }
+  .admin-settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-modal-grid-3col {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  .admin-modal-grid-2col {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  .admin-header-user-info {
+    display: none !important;
+  }
 }
+

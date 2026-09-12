@@ -663,3 +663,19 @@
   color: var(--color-text-secondary);
   line-height: 1.6;
 }
+
+/* Job Detail Page Responsive Split Grid */
+.job-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: var(--space-12);
+  align-items: start;
+}
+
+@media (max-width: 991px) {
+  .job-detail-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-8);
+  }
+}
+

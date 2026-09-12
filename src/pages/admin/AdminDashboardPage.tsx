@@ -284,6 +284,8 @@ export const AdminDashboardPage: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
             padding: '1.25rem 1.5rem',
             borderBottom: '1px solid #E2DFD8',
             backgroundColor: '#FFFFFF'
