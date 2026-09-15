@@ -102,6 +102,7 @@ export const AdminDocumentsPage: React.FC = () => {
   const [selectedDocForView, setSelectedDocForView] = useState<DocumentQueueItem | null>(null);
   const [viewerSignedUrl, setViewerSignedUrl] = useState<string | null>(null);
   const [isViewerLoading, setIsViewerLoading] = useState<boolean>(false);
+  const [viewerError, setViewerError] = useState<string | null>(null);
 
   // Rejection Dialog State
   const [selectedDocForReject, setSelectedDocForReject] = useState<DocumentQueueItem | null>(null);
@@ -155,16 +156,21 @@ export const AdminDocumentsPage: React.FC = () => {
     setSelectedDocForView(doc);
     setIsViewerLoading(true);
     setViewerSignedUrl(null);
+    setViewerError(null);
 
     try {
       const res = await getDocumentSignedUrl(doc.storage_path);
       if (res.success && res.signedUrl) {
         setViewerSignedUrl(res.signedUrl);
       } else {
-        setError(res.error || 'Could not generate secure view URL for document.');
+        const err = res.error || 'Could not generate secure view URL for document.';
+        setViewerError(err);
+        setError(err);
       }
     } catch (err: any) {
-      setError(err?.message || 'Failed to generate signed document view URL.');
+      const msg = err?.message || 'Failed to generate signed document view URL.';
+      setViewerError(msg);
+      setError(msg);
     } finally {
       setIsViewerLoading(false);
     }
@@ -173,6 +179,7 @@ export const AdminDocumentsPage: React.FC = () => {
   const handleCloseViewer = () => {
     setSelectedDocForView(null);
     setViewerSignedUrl(null);
+    setViewerError(null);
   };
 
   // Handle Verify via RPC
@@ -970,6 +977,7 @@ export const AdminDocumentsPage: React.FC = () => {
         isOpen={Boolean(selectedDocForView)}
         isLoading={isViewerLoading}
         onClose={handleCloseViewer}
+        errorMessage={viewerError}
       />
 
       {/* REJECTION REASON DIALOG */}

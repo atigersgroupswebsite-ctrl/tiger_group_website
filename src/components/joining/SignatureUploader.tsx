@@ -51,10 +51,18 @@ export const SignatureUploader: React.FC<SignatureUploaderProps> = ({
           storagePath: res.data.storagePath
         });
       } else {
-        alert(res.error || 'Signature upload failed.');
+        alert(res.error || 'Signature upload failed. Please select the signature image again.');
+        onSignatureChange(undefined);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     } catch (err: any) {
-      alert(err.message || 'Signature upload error.');
+      alert(err.message || 'Signature upload error. Please try again.');
+      onSignatureChange(undefined);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } finally {
       setIsUploading(false);
     }

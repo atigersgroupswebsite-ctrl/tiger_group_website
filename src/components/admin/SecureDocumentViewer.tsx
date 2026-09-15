@@ -14,6 +14,7 @@ interface SecureDocumentViewerProps {
   isOpen: boolean;
   isLoading: boolean;
   onClose: () => void;
+  errorMessage?: string | null;
 }
 
 export const SecureDocumentViewer: React.FC<SecureDocumentViewerProps> = ({
@@ -21,7 +22,8 @@ export const SecureDocumentViewer: React.FC<SecureDocumentViewerProps> = ({
   signedUrl,
   isOpen,
   isLoading,
-  onClose
+  onClose,
+  errorMessage
 }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(1);
 
@@ -205,15 +207,35 @@ export const SecureDocumentViewer: React.FC<SecureDocumentViewerProps> = ({
               <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', marginBottom: '0.5rem' }} />
               <div style={{ fontSize: '0.85rem' }}>Generating secure view...</div>
             </div>
-          ) : !signedUrl ? (
-            <div style={{ textAlign: 'center', color: '#FDA4AF', padding: '2rem' }}>
-              <AlertCircle size={32} style={{ marginBottom: '0.5rem' }} />
-              <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>Unable to load document preview.</div>
-              <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '0.25rem' }}>
-                The storage file might be missing or access expired.
+          ) : !signedUrl ? (() => {
+            const errLower = (errorMessage || '').toLowerCase();
+            let errTitle = 'Unable to load document preview.';
+            let errDetail = 'The storage file might be missing or access expired.';
+
+            if (errLower.includes('not found') || errLower.includes('missing') || errLower.includes('404')) {
+              errTitle = 'Storage Object Not Found';
+              errDetail = 'The physical document file does not exist in the candidate-documents bucket. The candidate must re-upload this document.';
+            } else if (errLower.includes('jwt') || errLower.includes('expired') || errLower.includes('401')) {
+              errTitle = 'Signed Access Token Expired';
+              errDetail = 'The temporary preview security token has expired. Please re-open the preview to refresh access.';
+            } else if (errLower.includes('permission') || errLower.includes('denied') || errLower.includes('unauthorized') || errLower.includes('403')) {
+              errTitle = 'Access Restricted';
+              errDetail = 'Active administrator privileges are required to view private candidate documents.';
+            } else if (errorMessage) {
+              errTitle = 'Preview Generation Failed';
+              errDetail = errorMessage;
+            }
+
+            return (
+              <div style={{ textAlign: 'center', color: '#FDA4AF', padding: '2rem', maxWidth: '440px' }}>
+                <AlertCircle size={32} style={{ marginBottom: '0.5rem' }} />
+                <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{errTitle}</div>
+                <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '0.35rem', lineHeight: 1.4 }}>
+                  {errDetail}
+                </div>
               </div>
-            </div>
-          ) : isPdf ? (
+            );
+          })() : isPdf ? (
             <iframe
               src={`${signedUrl}#toolbar=1&navpanes=0`}
               title={docTitle}

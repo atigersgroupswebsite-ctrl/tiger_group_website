@@ -935,25 +935,27 @@ export async function uploadCandidateDocument(
     const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const storagePath = `candidates/${candidateOwner}/${category.toLowerCase()}_${Date.now()}_${cleanFileName}`;
 
+    const resolvedContentType = file.type || (
+      cleanFileName.toLowerCase().endsWith('.pdf') ? 'application/pdf' :
+      cleanFileName.toLowerCase().endsWith('.png') ? 'image/png' :
+      cleanFileName.toLowerCase().endsWith('.webp') ? 'image/webp' :
+      'image/jpeg'
+    );
+
     // Upload to Supabase private storage
     const { error: uploadErr } = await supabase.storage
       .from('candidate-documents')
       .upload(storagePath, file, {
+        contentType: resolvedContentType,
         cacheControl: '3600',
         upsert: true
       });
 
     if (uploadErr) {
-      console.warn('[uploadCandidateDocument] Storage warning, using local preview:', uploadErr.message);
+      console.error('[uploadCandidateDocument] Storage upload failed:', uploadErr.message);
       return {
-        success: true,
-        data: {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          dataUrl,
-          storagePath
-        }
+        success: false,
+        error: uploadErr.message || 'Failed to upload document to secure storage. Please try again.'
       };
     }
 
@@ -962,7 +964,7 @@ export async function uploadCandidateDocument(
       data: {
         name: file.name,
         size: file.size,
-        type: file.type,
+        type: resolvedContentType,
         dataUrl,
         storagePath
       }

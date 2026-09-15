@@ -59,10 +59,18 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           storagePath: res.data.storagePath
         });
       } else {
-        alert(res.error || 'Document upload failed.');
+        alert(res.error || 'Document upload failed. Please select the file again.');
+        onDocumentChange(category, undefined);
+        if (e.target) {
+          e.target.value = '';
+        }
       }
     } catch (err: any) {
-      alert(err.message || 'Document upload error.');
+      alert(err.message || 'Document upload error. Please try again.');
+      onDocumentChange(category, undefined);
+      if (e.target) {
+        e.target.value = '';
+      }
     } finally {
       setUploadingCategory(null);
     }

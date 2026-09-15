@@ -89,6 +89,7 @@ export const AdminDocumentDetailPage: React.FC = () => {
 
   const [document, setDocument] = useState<DocumentQueueItem | null>(null);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [signedUrlError, setSignedUrlError] = useState<string | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLogRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +105,8 @@ export const AdminDocumentDetailPage: React.FC = () => {
     if (!id) return;
     setLoading(true);
     setError(null);
+    setSignedUrl(null);
+    setSignedUrlError(null);
 
     try {
       // 1. Fetch Document
@@ -121,6 +124,8 @@ export const AdminDocumentDetailPage: React.FC = () => {
         const urlRes = await getDocumentSignedUrl(doc.storage_path);
         if (urlRes.success && urlRes.signedUrl) {
           setSignedUrl(urlRes.signedUrl);
+        } else {
+          setSignedUrlError(urlRes.error || 'Could not generate secure view URL.');
         }
       }
 
@@ -583,14 +588,28 @@ export const AdminDocumentDetailPage: React.FC = () => {
               backgroundColor: '#F1F5F9'
             }}
           >
-            {!signedUrl ? (
-              <div style={{ textAlign: 'center', color: '#64748B', padding: '2rem' }}>
-                <AlertCircle size={32} style={{ margin: '0 auto 0.5rem', color: '#94A3B8' }} />
-                <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                  Unable to load signed storage preview. The file path may not exist or has expired.
-                </p>
-              </div>
-            ) : isPdf ? (
+            {!signedUrl ? (() => {
+              const errLower = (signedUrlError || '').toLowerCase();
+              let detail = 'Unable to load signed storage preview. The file path may not exist or has expired.';
+              if (errLower.includes('not found') || errLower.includes('missing') || errLower.includes('404')) {
+                detail = 'Storage Object Not Found: The physical document file does not exist in the candidate-documents bucket. The candidate must re-upload this document.';
+              } else if (errLower.includes('jwt') || errLower.includes('expired') || errLower.includes('401')) {
+                detail = 'Signed Access Token Expired: The temporary security preview token has expired. Please refresh the page to generate a new token.';
+              } else if (errLower.includes('permission') || errLower.includes('denied') || errLower.includes('unauthorized') || errLower.includes('403')) {
+                detail = 'Access Restricted: Active administrator privileges are required to view private candidate documents.';
+              } else if (signedUrlError) {
+                detail = `Preview Generation Failed: ${signedUrlError}`;
+              }
+
+              return (
+                <div style={{ textAlign: 'center', color: '#64748B', padding: '2rem', maxWidth: '440px' }}>
+                  <AlertCircle size={32} style={{ margin: '0 auto 0.5rem', color: '#94A3B8' }} />
+                  <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.4 }}>
+                    {detail}
+                  </p>
+                </div>
+              );
+            })() : isPdf ? (
               <iframe
                 src={`${signedUrl}#toolbar=0`}
                 title={docTypeTitle}
@@ -814,6 +833,7 @@ export const AdminDocumentDetailPage: React.FC = () => {
         isOpen={isViewerOpen}
         isLoading={false}
         onClose={() => setIsViewerOpen(false)}
+        errorMessage={signedUrlError}
       />
 
       {/* REJECTION REASON DIALOG */}

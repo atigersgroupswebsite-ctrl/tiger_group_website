@@ -51,10 +51,18 @@ export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
           storagePath: res.data.storagePath
         });
       } else {
-        alert(res.error || 'Photograph upload failed.');
+        alert(res.error || 'Photograph upload failed. Please select the photograph again.');
+        onPhotoChange(undefined);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     } catch (err: any) {
-      alert(err.message || 'Photograph upload error.');
+      alert(err.message || 'Photograph upload error. Please try again.');
+      onPhotoChange(undefined);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } finally {
       setIsUploading(false);
     }

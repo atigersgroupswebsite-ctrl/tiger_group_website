@@ -84,22 +84,28 @@ export const DocumentVerificationPanel: React.FC<DocumentVerificationPanelProps>
   const [processingDocId, setProcessingDocId] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panelSuccess, setPanelSuccess] = useState<string | null>(null);
+  const [viewerError, setViewerError] = useState<string | null>(null);
 
   // Handle View / Preview
   const handleOpenViewer = async (doc: DocumentRow) => {
     setSelectedDocForView(doc);
     setIsViewerLoading(true);
     setViewerSignedUrl(null);
+    setViewerError(null);
 
     try {
       const res = await getDocumentSignedUrl(doc.storage_path);
       if (res.success && res.signedUrl) {
         setViewerSignedUrl(res.signedUrl);
       } else {
-        setPanelError(res.error || 'Could not generate secure document preview.');
+        const err = res.error || 'Could not generate secure document preview.';
+        setViewerError(err);
+        setPanelError(err);
       }
     } catch (err: any) {
-      setPanelError(err.message || 'Failed to open document preview.');
+      const msg = err.message || 'Failed to open document preview.';
+      setViewerError(msg);
+      setPanelError(msg);
     } finally {
       setIsViewerLoading(false);
     }
@@ -108,6 +114,7 @@ export const DocumentVerificationPanel: React.FC<DocumentVerificationPanelProps>
   const handleCloseViewer = () => {
     setSelectedDocForView(null);
     setViewerSignedUrl(null);
+    setViewerError(null);
   };
 
   // Handle Verify
@@ -558,6 +565,7 @@ export const DocumentVerificationPanel: React.FC<DocumentVerificationPanelProps>
         isOpen={!!selectedDocForView}
         isLoading={isViewerLoading}
         onClose={handleCloseViewer}
+        errorMessage={viewerError}
       />
 
       {/* Rejection Reason Dialog */}
