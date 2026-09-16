@@ -466,9 +466,14 @@
    -------------------------------------------------------------------------- */
 .regional-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-10);
   align-items: center;
+}
+
+.regional-grid > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 @media (min-width: 992px) {
@@ -485,6 +490,8 @@
   border: 1px solid rgba(247, 215, 148, 0.25);
   position: relative;
   overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
 }
 
 @media (max-width: 640px) {
@@ -495,6 +502,8 @@
 
 .regional-diagram-scroll-wrapper {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;

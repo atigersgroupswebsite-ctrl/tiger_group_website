@@ -47,7 +47,7 @@ export const ScrollReveal: React.FC<ScrollRevealProps> = ({
         ease: [0.16, 1, 0.3, 1]
       }}
       className={className}
-      style={style}
+      style={{ maxWidth: '100%', ...style }}
     >
       {children}
     </motion.div>
