@@ -7,6 +7,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { Footer } from './Footer';
+import { FloatingWhatsAppButton } from '../common/FloatingWhatsAppButton';
 
 export const PublicLayout: React.FC = () => {
   return (
@@ -16,6 +17,7 @@ export const PublicLayout: React.FC = () => {
         <Outlet />
       </div>
       <Footer />
+      <FloatingWhatsAppButton />
     </div>
   );
 };
