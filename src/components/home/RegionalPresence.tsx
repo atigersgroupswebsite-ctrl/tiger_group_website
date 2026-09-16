@@ -16,15 +16,7 @@ export const RegionalPresence: React.FC = () => {
         <div className="regional-grid">
           {/* Left: Interactive Regional Visual Representation */}
           <ScrollReveal direction="left">
-            <div style={{
-              background: 'linear-gradient(145deg, #192A56 0%, #101C3A 100%)',
-              borderRadius: 'var(--radius-2xl)',
-              padding: 'clamp(2rem, 4vw, 3rem)',
-              color: 'var(--color-pearl-white)',
-              border: '1px solid rgba(247, 215, 148, 0.25)',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
+            <div className="regional-hub-card">
               <div style={{ marginBottom: 'var(--space-6)' }}>
                 <span className="eyebrow eyebrow-navy" style={{ marginBottom: 'var(--space-2)' }}>
                   Operational Hub • Nagpur, MH
@@ -37,41 +29,44 @@ export const RegionalPresence: React.FC = () => {
                 </p>
               </div>
 
-              {/* Regional Map Diagram */}
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.04)',
-                borderRadius: 'var(--radius-lg)',
-                padding: '1.5rem',
-                border: '1px solid rgba(247, 215, 148, 0.15)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: 'var(--color-champagne)' }} />
-                    <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Nagpur Headquarters</span>
+              {/* Regional Map Diagram with Scoped Horizontal Swipe Container */}
+              <div
+                className="regional-diagram-scroll-wrapper"
+                role="region"
+                aria-label="Central India operational corridor diagram"
+                tabIndex={0}
+              >
+                <div className="regional-diagram-track">
+                  <div className="regional-diagram-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: 'var(--color-champagne)' }} />
+                      <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Nagpur Headquarters</span>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-champagne)' }}>Central Operations</span>
                   </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--color-champagne)' }}>Central Operations</span>
-                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', textAlign: 'center' }}>
-                  <div style={{ background: 'rgba(25, 42, 86, 0.6)', padding: '0.8rem 0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(247, 215, 148, 0.3)' }}>
-                    <div style={{ color: 'var(--color-champagne)', fontWeight: 800, fontSize: '1.1rem' }}>MH</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-pearl-white)', fontWeight: 600 }}>Maharashtra</div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--color-text-inverse-muted)' }}>Nagpur & Vidarbha Hub</div>
-                  </div>
-                  <div style={{ background: 'rgba(25, 42, 86, 0.6)', padding: '0.8rem 0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(247, 215, 148, 0.3)' }}>
-                    <div style={{ color: 'var(--color-champagne)', fontWeight: 800, fontSize: '1.1rem' }}>MP</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-pearl-white)', fontWeight: 600 }}>Madhya Pradesh</div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--color-text-inverse-muted)' }}>Indore / Bhopal Belt</div>
-                  </div>
-                  <div style={{ background: 'rgba(25, 42, 86, 0.6)', padding: '0.8rem 0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(247, 215, 148, 0.3)' }}>
-                    <div style={{ color: 'var(--color-champagne)', fontWeight: 800, fontSize: '1.1rem' }}>CG</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-pearl-white)', fontWeight: 600 }}>Chhattisgarh</div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--color-text-inverse-muted)' }}>Raipur / Bilaspur Belt</div>
+                  <div className="regional-diagram-grid">
+                    <div className="regional-state-box">
+                      <div className="regional-state-code">MH</div>
+                      <div className="regional-state-name">Maharashtra</div>
+                      <div className="regional-state-hub">Nagpur &amp; Vidarbha Hub</div>
+                    </div>
+                    <div className="regional-state-box">
+                      <div className="regional-state-code">MP</div>
+                      <div className="regional-state-name">Madhya Pradesh</div>
+                      <div className="regional-state-hub">Indore / Bhopal Belt</div>
+                    </div>
+                    <div className="regional-state-box">
+                      <div className="regional-state-code">CG</div>
+                      <div className="regional-state-name">Chhattisgarh</div>
+                      <div className="regional-state-hub">Raipur / Bilaspur Belt</div>
+                    </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="regional-scroll-hint" aria-hidden="true">
+                <span>← Swipe horizontally to view full corridor →</span>
               </div>
 
               {/* Compliance & Regional Delivery Note */}

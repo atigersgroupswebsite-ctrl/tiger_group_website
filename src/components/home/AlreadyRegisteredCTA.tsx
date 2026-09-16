@@ -10,6 +10,7 @@ export const AlreadyRegisteredCTA: React.FC = () => {
       <Container size="xl">
         <ScrollReveal direction="up" delay={0.1}>
           <div
+            className="already-registered-card"
             style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '16px',

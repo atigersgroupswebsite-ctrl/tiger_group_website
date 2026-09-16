@@ -55,7 +55,7 @@ export const FinalCTA: React.FC = () => {
               Whether you're looking for work or building a workforce, A Tiger Global is here to help you move forward.
             </p>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 'var(--space-4)' }}>
+            <div className="final-cta-actions" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 'var(--space-4)' }}>
               <Button to="/enquiry/job-seeker" variant="primary" size="lg" icon={<UserPlus size={18} />}>
                 I'M LOOKING FOR WORK
               </Button>
