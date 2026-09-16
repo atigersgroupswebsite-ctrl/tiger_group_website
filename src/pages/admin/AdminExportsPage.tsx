@@ -19,9 +19,11 @@ import {
 import {
   Users,
   Building2,
+  FileCheck2,
   AlertCircle,
   CheckCircle2
 } from 'lucide-react';
+import { exportJoiningFormsXlsx } from '../../services/adminJoiningExportService';
 
 const JOB_SEEKER_CSV_HEADERS = [
   { key: 'srNo', label: 'Sr. No.' },
@@ -79,6 +81,15 @@ export const AdminExportsPage: React.FC = () => {
   // Counts for display
   const [jobSeekerTotal, setJobSeekerTotal] = useState<number | null>(null);
   const [employerTotal, setEmployerTotal] = useState<number | null>(null);
+  const [joiningTotal, setJoiningTotal] = useState<number | null>(null);
+
+  // Joining Form Filters
+  const [jfStatusFilter, setJfStatusFilter] = useState<string>('ALL');
+  const [jfCompanyFilter, setJfCompanyFilter] = useState<string>('ALL');
+  const [jfDepartmentFilter, setJfDepartmentFilter] = useState<string>('');
+  const [jfDocStatusFilter, setJfDocStatusFilter] = useState<'ALL' | 'ALL_VERIFIED' | 'PENDING_REVIEW' | 'HAS_REJECTIONS'>('ALL');
+  const [jfStartDate, setJfStartDate] = useState<string>('');
+  const [jfEndDate, setJfEndDate] = useState<string>('');
 
   useEffect(() => {
     // Fetch active companies
@@ -101,6 +112,11 @@ export const AdminExportsPage: React.FC = () => {
       .from('employer_enquiries')
       .select('*', { count: 'exact', head: true })
       .then(({ count }) => setEmployerTotal(count ?? 0));
+
+    supabase
+      .from('joining_forms')
+      .select('*', { count: 'exact', head: true })
+      .then(({ count }) => setJoiningTotal(count ?? 0));
   }, []);
 
   // Fetch Job Seeker enquiries from database with filters
@@ -281,6 +297,35 @@ export const AdminExportsPage: React.FC = () => {
       setSuccessNotice(`Successfully exported ${records.length} Employer records to ${filename}`);
     } catch (err: unknown) {
       setErrorNotice(err instanceof Error ? err.message : 'Employer Excel export failed.');
+    } finally {
+      setLoadingType(null);
+    }
+  };
+
+  // Joining Dossiers Export Handler (5-Sheet Excel Workbook)
+  const handleExportJoiningXlsx = async (all = false) => {
+    const typeKey = all ? 'jf-xlsx-all' : 'jf-xlsx';
+    setLoadingType(typeKey);
+    setErrorNotice(null);
+    setSuccessNotice(null);
+
+    try {
+      const result = await exportJoiningFormsXlsx(
+        {
+          status: jfStatusFilter,
+          companyId: jfCompanyFilter,
+          department: jfDepartmentFilter,
+          startDate: jfStartDate,
+          endDate: jfEndDate,
+          documentStatus: jfDocStatusFilter
+        },
+        !all
+      );
+      setSuccessNotice(
+        `Successfully exported ${result.recordCount} Joining Submission dossiers to ${result.filename} (includes 5 sheets: Submissions, Documents, Education, Family, Emergency Contacts).`
+      );
+    } catch (err: unknown) {
+      setErrorNotice(err instanceof Error ? err.message : 'Joining dossiers Excel export failed.');
     } finally {
       setLoadingType(null);
     }
@@ -584,6 +629,189 @@ export const AdminExportsPage: React.FC = () => {
                 onClick={() => handleExportEmployerXlsx(true)}
                 loading={loadingType === 'emp-xlsx-all'}
                 label="Export All (Excel)"
+              />
+            </>
+          }
+        />
+
+        {/* Section 3: JOINING DOSSIERS & FORMS */}
+        <ExportCard
+          title="CANDIDATE JOINING DOSSIERS"
+          description="Export full candidate onboarding dossiers to a comprehensive 5-sheet Excel workbook: Submissions (core personal, address & employment data), Uploaded Documents audit ledger, Education, Family details, and Emergency Contacts."
+          recordCountText={joiningTotal !== null ? `Total Submissions: ${joiningTotal}` : undefined}
+          icon={FileCheck2}
+          filtersSlot={
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+              {/* Submission Status filter */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#192A56', marginBottom: '3px' }}>
+                  Submission Status
+                </label>
+                <select
+                  value={jfStatusFilter}
+                  onChange={(e) => setJfStatusFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #D2CECE',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    color: '#192A56',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="DRAFT">Draft</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="SUBMITTED">Submitted</option>
+                  <option value="UNDER_REVIEW">Under Review</option>
+                  <option value="REUPLOAD_REQUIRED">Re-upload Required</option>
+                  <option value="RESUBMITTED">Resubmitted</option>
+                  <option value="VERIFIED">Verified</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                </select>
+              </div>
+
+              {/* Company filter */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#192A56', marginBottom: '3px' }}>
+                  Allocated Company
+                </label>
+                <select
+                  value={jfCompanyFilter}
+                  onChange={(e) => setJfCompanyFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #D2CECE',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    color: '#192A56',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="ALL">All Companies</option>
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Department filter */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#192A56', marginBottom: '3px' }}>
+                  Department
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Operations"
+                  value={jfDepartmentFilter}
+                  onChange={(e) => setJfDepartmentFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '0.45rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #D2CECE',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    color: '#192A56',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Document Status filter */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#192A56', marginBottom: '3px' }}>
+                  Document Status
+                </label>
+                <select
+                  value={jfDocStatusFilter}
+                  onChange={(e) => setJfDocStatusFilter(e.target.value as any)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #D2CECE',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    color: '#192A56',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="ALL">All Document States</option>
+                  <option value="ALL_VERIFIED">All Verified</option>
+                  <option value="PENDING_REVIEW">Pending Review</option>
+                  <option value="HAS_REJECTIONS">Has Rejections</option>
+                </select>
+              </div>
+
+              {/* Start Date */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#192A56', marginBottom: '3px' }}>
+                  From Date
+                </label>
+                <input
+                  type="date"
+                  value={jfStartDate}
+                  onChange={(e) => setJfStartDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '0.45rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #D2CECE',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    color: '#192A56',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* End Date */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#192A56', marginBottom: '3px' }}>
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  value={jfEndDate}
+                  onChange={(e) => setJfEndDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '0.45rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #D2CECE',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    color: '#192A56',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+            </div>
+          }
+          actionsSlot={
+            <>
+              <ExportButton
+                format="xlsx"
+                onClick={() => handleExportJoiningXlsx(false)}
+                loading={loadingType === 'jf-xlsx'}
+                label="Export Filtered Excel (5 Sheets)"
+              />
+              <ExportButton
+                format="all"
+                onClick={() => handleExportJoiningXlsx(true)}
+                loading={loadingType === 'jf-xlsx-all'}
+                label="Export All Submissions (Excel)"
               />
             </>
           }

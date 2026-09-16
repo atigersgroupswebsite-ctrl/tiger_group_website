@@ -19,9 +19,11 @@ import {
   User,
   CheckCircle2,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Download
 } from 'lucide-react';
 import { formatIndianPhoneNumber } from '../../utils/phoneUtils';
+import { exportJoiningFormsXlsx } from '../../services/adminJoiningExportService';
 
 interface JoiningListItem {
   id: string;
@@ -39,6 +41,8 @@ export const AdminJoiningListPage: React.FC = () => {
   const [items, setItems] = useState<JoiningListItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<boolean>(false);
+  const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -109,6 +113,26 @@ export const AdminJoiningListPage: React.FC = () => {
     );
   });
 
+  // Handler: Quick Export to Excel (5 Sheets)
+  const handleQuickExportXlsx = async () => {
+    try {
+      setExporting(true);
+      setError(null);
+      setExportSuccessNotice(null);
+      const res = await exportJoiningFormsXlsx({
+        status: statusFilter !== 'ALL' ? statusFilter : undefined
+      });
+      setExportSuccessNotice(
+        `Successfully exported ${res.recordCount} Joining Submission dossiers to ${res.filename} (5 worksheets).`
+      );
+      setTimeout(() => setExportSuccessNotice(null), 6000);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to export joining submissions to Excel.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header Banner */}
@@ -138,26 +162,72 @@ export const AdminJoiningListPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={fetchJoiningList}
-          disabled={loading}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={handleQuickExportXlsx}
+            disabled={exporting || loading}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.55rem 1rem',
+              border: '1px solid #1E3A8A',
+              borderRadius: '6px',
+              backgroundColor: '#1E3A8A',
+              color: '#FFFFFF',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: exporting || loading ? 'not-allowed' : 'pointer',
+              opacity: exporting || loading ? 0.7 : 1,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Download size={14} />
+            <span>{exporting ? 'Generating Excel...' : 'Export Excel (5 Sheets)'}</span>
+          </button>
+
+          <button
+            onClick={fetchJoiningList}
+            disabled={loading}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.55rem 1rem',
+              border: '1px solid #CBD5E1',
+              borderRadius: '6px',
+              backgroundColor: '#F8FAFC',
+              color: '#475569',
+              fontSize: '0.85rem',
+              cursor: 'pointer'
+            }}
+          >
+            <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+            <span>Refresh Data</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Success alert */}
+      {exportSuccessNotice && (
+        <div
           style={{
-            display: 'inline-flex',
+            display: 'flex',
             alignItems: 'center',
-            gap: '0.35rem',
-            padding: '0.55rem 1rem',
-            border: '1px solid #CBD5E1',
-            borderRadius: '6px',
-            backgroundColor: '#F8FAFC',
-            color: '#475569',
-            fontSize: '0.85rem',
-            cursor: 'pointer'
+            gap: '0.75rem',
+            backgroundColor: '#E8F5E9',
+            border: '1px solid #A5D6A7',
+            color: '#2E7D32',
+            padding: '1rem',
+            borderRadius: '8px',
+            fontSize: '0.875rem'
           }}
         >
-          <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-          <span>Refresh Data</span>
-        </button>
-      </div>
+          <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
+          <span>{exportSuccessNotice}</span>
+        </div>
+      )}
 
       {/* Error alert */}
       {error && (
