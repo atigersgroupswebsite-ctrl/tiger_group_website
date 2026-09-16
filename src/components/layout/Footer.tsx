@@ -104,6 +104,14 @@ export const Footer: React.FC = () => {
           <div>
             <h5 className="footer-title">Headquarters</h5>
             <div className="footer-contact-item">
+              <span>GSTIN - 27DIFPA0273P1Z4</span>
+            </div>
+
+            <div className="footer-contact-item">
+              <span>REG. NO. - 106157392603</span>
+            </div>
+
+            <div className="footer-contact-item">
               <MapPin size={18} />
               <span>
                 Plot No. 440, Behind Royal Club,<br />
@@ -129,14 +137,6 @@ export const Footer: React.FC = () => {
             <div className="footer-contact-item">
               <Clock size={18} />
               <span>Office Hours: 11:00 AM – 4:00 PM</span>
-            </div>
-
-            <div className="footer-contact-item">
-              <span>GSTIN - 27DIFPA0273P1Z4</span>
-            </div>
-
-            <div className="footer-contact-item">
-              <span>REG. NO. - 106157392603</span>
             </div>
           </div>
         </div>
