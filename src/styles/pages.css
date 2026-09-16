@@ -312,16 +312,28 @@
   .stats-grid {
     grid-template-columns: repeat(4, 1fr);
   }
+}
 
-  .stats-grid-two {
-    grid-template-columns: repeat(2, 1fr);
+.stats-grid-three {
+  max-width: 1040px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 768px) {
+  .stats-grid-three {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .stats-grid-three .stat-item:not(:last-child)::after {
+    display: block;
   }
 }
 
-.stats-grid-two {
-  max-width: 760px;
-  margin-left: auto;
-  margin-right: auto;
+@media (max-width: 767px) {
+  .stats-grid-three .stat-item:last-child {
+    grid-column: span 2;
+  }
 }
 
 .stat-item {
