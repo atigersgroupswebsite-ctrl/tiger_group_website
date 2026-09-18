@@ -6,7 +6,7 @@ export const StatsSection: React.FC = () => {
   return (
     <section className="stats-section" aria-label="Company scale statistics">
       <Container size="xl">
-        <div className="stats-grid stats-grid-three">
+        <div className="stats-grid stats-grid-two">
           <StatCounter
             value={1500}
             suffix="+"
@@ -14,14 +14,8 @@ export const StatsSection: React.FC = () => {
             duration={1.8}
           />
           <StatCounter
-            value={700}
-            suffix="+"
-            label="Active Employees"
-            duration={1.8}
-          />
-          <StatCounter
-            value={3}
-            label="States Served"
+            value={7}
+            label="States Currently Serving"
             duration={1.2}
           />
         </div>
