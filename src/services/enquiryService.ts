@@ -114,34 +114,35 @@ export async function createJobSeekerApplication(
   activeJobSeekerSubmissions.add(lockKey);
 
   try {
-    // 3. Database Insertion — Do NOT pass application_number; PostgreSQL triggers assign INQ-YYYY-000001
-    const { data, error } = await supabase
-      .from('applications')
-      .insert({
-        job_id: input.jobId || null,
-        full_name: trimmedName,
-        father_name: trimmedFatherName,
+    // 3. Server-Side Submission — Authoritative insert via dedicated endpoint to protect database RLS
+    const res = await fetch('/api/enquiries/submit-job-seeker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jobId: input.jobId || null,
+        fullName: trimmedName,
+        fatherName: trimmedFatherName,
         mobile: mobileNorm.normalized,
         email: trimmedEmail,
         address: trimmedAddress,
-        desired_company: trimmedCompany,
+        desiredCompany: trimmedCompany,
         designation: trimmedDesignation,
-        description: trimmedDescription,
-        status: 'NEW_ENQUIRY',
-        joining_access_enabled: false
+        description: trimmedDescription
       })
-      .select('id, application_number')
-      .single();
+    });
 
-    if (error) {
-      console.error('[createJobSeekerApplication] Supabase database error:', error.message);
+    const resJson = await res.json().catch(() => null);
+
+    if (!res.ok || !resJson?.success) {
+      const errMsg = resJson?.error || 'Failed to submit candidate application to server.';
+      console.error('[createJobSeekerApplication] Server error:', errMsg);
       return {
         success: false,
-        error: error.message || 'Failed to submit candidate application to database.'
+        error: errMsg
       };
     }
 
-    if (!data || !data.id || !data.application_number) {
+    if (!resJson.applicationId || !resJson.applicationNumber) {
       return {
         success: false,
         error: 'Application was processed but failed to return confirmation details from server.'
@@ -154,7 +155,7 @@ export async function createJobSeekerApplication(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          applicationNumber: data.application_number,
+          applicationNumber: resJson.applicationNumber,
           fullName: trimmedName,
           email: trimmedEmail,
           mobile: mobileNorm.normalized,
@@ -168,8 +169,8 @@ export async function createJobSeekerApplication(
 
     return {
       success: true,
-      applicationId: data.id,
-      applicationNumber: data.application_number
+      applicationId: resJson.applicationId,
+      applicationNumber: resJson.applicationNumber
     };
   } catch (err: unknown) {
     console.error('[createJobSeekerApplication] Unexpected exception during submission:', err);
