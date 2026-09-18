@@ -195,6 +195,20 @@ export function paymentApiPlugin(): Plugin {
           }
         }
 
+        // Handle Employer Enquiry Submission
+        if ((url === '/api/enquiries/submit-employer' || url === '/api/enquiries/submit-employer-enquiry') && req.method?.toUpperCase() === 'POST') {
+          try {
+            const rawBody = await parseRequestBody(req);
+            const body = JSON.parse(rawBody || '{}');
+            const { submitEmployerEnquiryServerHandler } = await import('./enquirySubmissionService');
+            const result = await submitEmployerEnquiryServerHandler(body);
+            return sendJsonResponse(res, result.status || 200, result.data);
+          } catch (submitErr: any) {
+            console.error('[API_ENQUIRY_EMPLOYER_SUBMIT_ERROR]', submitErr);
+            return sendJsonResponse(res, 500, { success: false, error: submitErr.message || 'Failed to submit employer enquiry' });
+          }
+        }
+
         // Handle Job Seeker Enquiry Admin Email Notification
         if (url === '/api/enquiries/notify-job-seeker' && req.method?.toUpperCase() === 'POST') {
           try {

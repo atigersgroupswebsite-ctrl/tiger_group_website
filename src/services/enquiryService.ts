@@ -6,7 +6,6 @@
 //           in-flight duplicate submission locking, and real Supabase persistence.
 // ==============================================================================
 
-import { supabase } from '../lib/supabaseClient';
 import { normalizeIndianMobile } from '../utils/phoneUtils';
 
 export interface CreateJobSeekerInput {
@@ -243,36 +242,38 @@ export async function createEmployerEnquiry(
   activeEmployerSubmissions.add(lockKey);
 
   try {
-    // 3. Database Insertion — Do NOT pass enquiry_number; PostgreSQL triggers assign EMP-YYYY-000001
-    const { data, error } = await supabase
-      .from('employer_enquiries')
-      .insert({
-        company_name: trimmedCompany,
+    // 3. Server-Side Submission — Authoritative insert via dedicated endpoint to protect database RLS
+    const res = await fetch('/api/enquiries/submit-employer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyName: trimmedCompany,
         email: trimmedEmail,
         phone: phoneNorm.normalized,
         address: trimmedAddress,
         district: trimmedDistrict,
         state: trimmedState,
-        employees_required: employeesRequired,
-        job_role: trimmedRole,
-        description: trimmedDescription,
-        status: 'NEW'
+        employeesRequired,
+        jobRole: trimmedRole,
+        description: trimmedDescription
       })
-      .select('id, enquiry_number')
-      .single();
+    });
 
-    if (error) {
-      console.error('[createEmployerEnquiry] Supabase database error:', error.message);
+    const resJson = await res.json().catch(() => null);
+
+    if (!res.ok || !resJson?.success) {
+      const errMsg = resJson?.error || 'Failed to submit employer requirement to server.';
+      console.error('[createEmployerEnquiry] Server error:', errMsg);
       return {
         success: false,
-        error: error.message || 'Failed to submit employer requirement to database.'
+        error: errMsg
       };
     }
 
-    if (!data || !data.id) {
+    if (!resJson.enquiryId) {
       return {
         success: false,
-        error: 'Employer enquiry was submitted but failed to return confirmation ID.'
+        error: 'Employer enquiry was processed but failed to return confirmation ID from server.'
       };
     }
 
@@ -282,7 +283,7 @@ export async function createEmployerEnquiry(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          enquiryNumber: data.enquiry_number || 'EMP-ENQUIRY',
+          enquiryNumber: resJson.enquiryNumber || 'EMP-ENQUIRY',
           companyName: trimmedCompany,
           email: trimmedEmail,
           phone: phoneNorm.normalized,
@@ -296,8 +297,8 @@ export async function createEmployerEnquiry(
 
     return {
       success: true,
-      enquiryId: data.id,
-      enquiryNumber: data.enquiry_number || undefined
+      enquiryId: resJson.enquiryId,
+      enquiryNumber: resJson.enquiryNumber || undefined
     };
   } catch (err: unknown) {
     console.error('[createEmployerEnquiry] Unexpected exception during submission:', err);

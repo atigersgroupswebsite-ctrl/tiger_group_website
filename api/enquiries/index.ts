@@ -13,7 +13,10 @@ import {
   sendJobSeekerEnquiryNotificationServerHandler,
   sendEmployerEnquiryNotificationServerHandler
 } from '../../src/server/enquiryNotificationService.js';
-import { submitJobSeekerEnquiryServerHandler } from '../../src/server/enquirySubmissionService.js';
+import {
+  submitJobSeekerEnquiryServerHandler,
+  submitEmployerEnquiryServerHandler
+} from '../../src/server/enquirySubmissionService.js';
 
 function resolveAction(req: VercelReq): string {
   const urlObj = new URL(req.url || '', 'http://localhost');
@@ -47,6 +50,12 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     switch (action) {
       case 'submit-job-seeker': {
         const result = await submitJobSeekerEnquiryServerHandler(body);
+        return sendResponse(res, result.status || 200, result.data);
+      }
+
+      case 'submit-employer':
+      case 'submit-employer-enquiry': {
+        const result = await submitEmployerEnquiryServerHandler(body);
         return sendResponse(res, result.status || 200, result.data);
       }
 
