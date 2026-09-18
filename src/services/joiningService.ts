@@ -948,7 +948,7 @@ export async function uploadCandidateDocument(
       .upload(storagePath, file, {
         contentType: resolvedContentType,
         cacheControl: '3600',
-        upsert: true
+        upsert: false
       });
 
     if (uploadErr) {
