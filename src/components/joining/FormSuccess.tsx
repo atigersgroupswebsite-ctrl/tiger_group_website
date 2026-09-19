@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CheckCircle, Download, Eye, FileText, ArrowRight, Loader2, RefreshCw, CreditCard, AlertCircle, ShieldCheck } from 'lucide-react';
 import { Button } from '../common/Button';
 import type { JoiningFormData } from '../../types/joining';
@@ -6,6 +6,7 @@ import { downloadJoiningPacketPdf } from '../../services/joiningPdfGenerator';
 import { createPaymentOrder, launchCashfreeCheckout, getPaymentConfig } from '../../services/paymentService';
 import { supabase } from '../../lib/supabaseClient';
 import { downloadPaymentReceiptPdf } from '../../utils/paymentReceiptGenerator';
+import { JoiningFormPrintPreview } from './JoiningFormPrintPreview';
 
 interface FormSuccessProps {
   formData: JoiningFormData;
@@ -19,6 +20,8 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
   onReset
 }) => {
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [isMountingPreview, setIsMountingPreview] = useState<boolean>(false);
+  const previewMountRef = useRef<HTMLDivElement | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [loadingPayment, setLoadingPayment] = useState<boolean>(true);
@@ -149,23 +152,85 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
     }
   };
 
-  const handleDownloadPacket = async () => {
+  const handleDownloadPacket = () => {
+    if (isDownloading || isMountingPreview) return;
     setIsDownloading(true);
-    try {
-      await downloadJoiningPacketPdf(formData);
-    } catch (err: any) {
-      alert('Unable to generate joining packet PDF. Please view and print your submission.');
-    } finally {
-      setIsDownloading(false);
-    }
+    setIsMountingPreview(true);
   };
+
+  // Synchronized temporary preview mount for authoritative DOM capture
+  useEffect(() => {
+    if (!isMountingPreview) return;
+
+    let isCancelled = false;
+
+    const executeDownload = async () => {
+      try {
+        // Wait for browser paint cycles so JoiningFormPrintPreview is mounted and layout computed
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              resolve();
+            });
+          });
+        });
+
+        if (isCancelled) return;
+
+        // Ensure all images within the temporary preview have completed loading
+        if (previewMountRef.current) {
+          const images = Array.from(previewMountRef.current.querySelectorAll('img'));
+          await Promise.all(
+            images.map(
+              (img) =>
+                new Promise<void>((res) => {
+                  if (img.complete) return res();
+                  img.onload = () => res();
+                  img.onerror = () => res();
+                  setTimeout(res, 1500);
+                })
+            )
+          );
+        }
+
+        // Ensure browser fonts (including Devanagari) are loaded
+        if (typeof document !== 'undefined' && 'fonts' in document) {
+          try {
+            await document.fonts.ready;
+          } catch (_) {
+            // Ignore font API failure
+          }
+        }
+
+        if (isCancelled) return;
+
+        // Authoritative DOM capture and candidate annexure assembly
+        await downloadJoiningPacketPdf(formData);
+      } catch (err: any) {
+        console.error('[FormSuccess] Failed to generate joining packet PDF:', err);
+        alert('Unable to generate joining packet PDF. Please view and print your submission.');
+      } finally {
+        if (!isCancelled) {
+          setIsMountingPreview(false);
+          setIsDownloading(false);
+        }
+      }
+    };
+
+    executeDownload();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isMountingPreview, formData]);
 
   const referenceNumber = formData.joiningReference || formData.applicationId || 'JOIN-CONFIRMED';
   const isPaid = paymentRecord?.status === 'SUCCESS';
 
   return (
-    <div
-      className="joining-success-card"
+    <>
+      <div
+        className="joining-success-card"
       style={{
         maxWidth: '740px',
         margin: '0 auto',
@@ -548,5 +613,25 @@ export const FormSuccess: React.FC<FormSuccessProps> = ({
         )}
       </div>
     </div>
+
+    {/* Temporary off-screen container for authoritative DOM-based Joining Packet PDF generation */}
+    {isMountingPreview && (
+      <div
+        ref={previewMountRef}
+        style={{
+          position: 'fixed',
+          left: '-9999px',
+          top: 0,
+          width: '794px',
+          zIndex: -9999,
+          pointerEvents: 'none',
+          overflow: 'hidden'
+        }}
+        aria-hidden="true"
+      >
+        <JoiningFormPrintPreview formData={formData} isSubmitted={true} />
+      </div>
+    )}
+  </>
   );
 };

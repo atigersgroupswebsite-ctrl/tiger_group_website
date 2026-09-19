@@ -876,6 +876,176 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
       </div>
 
       {/* ---------------------------------------------------------------------- */}
+      {/* OFFICIAL HINDI VOLUNTARY RESIGNATION / TYAGPATRA                       */}
+      {/* ---------------------------------------------------------------------- */}
+      <div className="pdf-page-sheet">
+        <div className="pdf-page-inner">
+          <div
+            style={{
+              border: '1px solid #000000',
+              padding: '36px 40px',
+              minHeight: '960px',
+              boxSizing: 'border-box',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'flex-start',
+              color: '#0F172A',
+              fontSize: '15px',
+              lineHeight: 1.8,
+              background: '#FFFFFF',
+            }}
+          >
+            {/* Centered Underlined Heading */}
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <span
+                style={{
+                  fontSize: '22px',
+                  fontWeight: 'bold',
+                  textDecoration: 'underline',
+                  letterSpacing: '1px',
+                }}
+              >
+                त्यागपत्र
+              </span>
+            </div>
+
+            {/* Top-Right Date Field */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '28px' }}>
+              <span style={{ fontSize: '15px', fontWeight: 500 }}>
+                दिनांक: _____ / _____ /20____
+              </span>
+            </div>
+
+            {/* Addressee Section */}
+            <div style={{ marginBottom: '22px', lineHeight: 1.7, fontSize: '15px' }}>
+              <div>सेवा में,</div>
+              <div>प्रबंधक महोदय (HR Department)</div>
+              <div style={{ fontWeight: 'bold' }}>A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY</div>
+            </div>
+
+            {/* Subject Line */}
+            <div style={{ marginBottom: '22px', fontSize: '15px', fontWeight: 'bold' }}>
+              विषय:- स्वैच्छिक त्यागपत्र
+            </div>
+
+            {/* Salutation */}
+            <div style={{ marginBottom: '18px', fontSize: '15px' }}>
+              महोदय,
+            </div>
+
+            {/* Body Paragraph 1 */}
+            <p style={{ margin: '0 0 18px 0', fontSize: '15px', lineHeight: 2.1, textAlign: 'justify' }}>
+              सविनय निवेदन है कि मैं A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY में{' '}
+              {emp.designation ? (
+                <span style={{ textDecoration: 'underline', fontWeight: 600, padding: '0 6px' }}>
+                  {emp.designation}
+                </span>
+              ) : (
+                '___________________________________'
+              )}{' '}
+              पद पर कार्यरत हूँ। व्यक्तिगत कारणों से मैं अपनी सेवाएँ आगे जारी रखने में असमर्थ हूँ।
+            </p>
+
+            {/* Body Paragraph 2 */}
+            <p style={{ margin: '0 0 18px 0', fontSize: '15px', lineHeight: 2.1, textAlign: 'justify' }}>
+              अतः कृपया मेरा त्यागपत्र दिनांक _____ / _____ /20____ से स्वीकार करने का कष्ट करें तथा नियमानुसार मेरी अंतिम कार्यवाही (Full & Final Settlement) पूर्ण करने की कृपा करें।
+            </p>
+
+            {/* Body Paragraph 3 */}
+            <p style={{ margin: '0 0 28px 0', fontSize: '15px', lineHeight: 2.1, textAlign: 'justify' }}>
+              मैं A TIGER GROUP'S द्वारा दिए गए अवसर, सहयोग एवं मार्गदर्शन के लिए हृदय से धन्यवाद देता/देती हूँ। यहाँ कार्य करना मेरे लिए एक महत्वपूर्ण अनुभव रहा है।
+            </p>
+
+            {/* Closing & Bottom Date */}
+            <div style={{ marginBottom: '32px', fontSize: '15px' }}>
+              <div style={{ marginBottom: '18px' }}>धन्यवाद।</div>
+              <div>दिनांक: _____ / _____ /20____</div>
+            </div>
+
+            {/* Employee Section */}
+            <div style={{ width: '100%', maxWidth: '440px', fontSize: '15px' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '14px', fontSize: '16px' }}>
+                कर्मचारी
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '12px' }}>
+                <span style={{ minWidth: '130px', fontWeight: 600 }}>कर्मचारी का नाम:</span>
+                <span
+                  style={{
+                    flex: 1,
+                    borderBottom: '1px solid #000000',
+                    paddingLeft: '8px',
+                    minHeight: '22px',
+                    fontWeight: 600,
+                  }}
+                >
+                  {p.employeeName || '\u00A0'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '12px' }}>
+                <span style={{ minWidth: '130px', fontWeight: 600 }}>कर्मचारी आईडी:</span>
+                <span
+                  style={{
+                    flex: 1,
+                    borderBottom: '1px solid #000000',
+                    paddingLeft: '8px',
+                    minHeight: '22px',
+                    fontWeight: 600,
+                  }}
+                >
+                  {emp.employeeCode || '\u00A0'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '12px' }}>
+                <span style={{ minWidth: '130px', fontWeight: 600 }}>पद:</span>
+                <span
+                  style={{
+                    flex: 1,
+                    borderBottom: '1px solid #000000',
+                    paddingLeft: '8px',
+                    minHeight: '22px',
+                    fontWeight: 600,
+                  }}
+                >
+                  {emp.designation || '\u00A0'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '12px' }}>
+                <span style={{ minWidth: '130px', fontWeight: 600 }}>मोबाइल नंबर:</span>
+                <span
+                  style={{
+                    flex: 1,
+                    borderBottom: '1px solid #000000',
+                    paddingLeft: '8px',
+                    minHeight: '22px',
+                    fontWeight: 600,
+                  }}
+                >
+                  {p.employeeContactNumber || p.otherContactNumber || '\u00A0'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '12px' }}>
+                <span style={{ minWidth: '130px', fontWeight: 600 }}>हस्ताक्षर:</span>
+                <span
+                  style={{
+                    flex: 1,
+                    borderBottom: '1px solid #000000',
+                    minHeight: '22px',
+                  }}
+                >
+                  {'\u00A0'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ---------------------------------------------------------------------- */}
       {/* ANNEXURES: CANDIDATE STATUTORY ATTACHMENTS (EXCLUDING PHOTO & SIGNATURE)*/}
       {/* ---------------------------------------------------------------------- */}
       {annexureDocs.map((doc, idx) => {
