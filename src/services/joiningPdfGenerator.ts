@@ -164,22 +164,32 @@ function buildProgrammaticJoiningPdf(formData: JoiningFormData): jsPDF {
 
   // Table Row Helper
   let y = 45;
-  const drawRow = (l1: string, v1: any, l2: string, v2: any) => {
+  const drawRow = (l1: string, v1: any, l2?: string, v2?: any) => {
     doc.setDrawColor(203, 213, 225);
     doc.rect(15, y, 180, 7);
     doc.line(55, y, 55, y + 7);
-    doc.line(105, y, 105, y + 7);
-    doc.line(145, y, 145, y + 7);
+    if (l2) {
+      doc.line(105, y, 105, y + 7);
+      doc.line(145, y, 145, y + 7);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(...navy);
-    doc.text(l1, 17, y + 4.8);
-    doc.text(l2, 107, y + 4.8);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...navy);
+      doc.text(l1, 17, y + 4.8);
+      doc.text(l2, 107, y + 4.8);
 
-    doc.setFont('helvetica', 'normal');
-    doc.text(String(v1 || '—'), 57, y + 4.8);
-    doc.text(String(v2 || '—'), 147, y + 4.8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(String(v1 || '—'), 57, y + 4.8);
+      doc.text(String(v2 || '—'), 147, y + 4.8);
+    } else {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...navy);
+      doc.text(l1, 17, y + 4.8);
+
+      doc.setFont('helvetica', 'normal');
+      doc.text(String(v1 || '—'), 57, y + 4.8);
+    }
     y += 7;
   };
 
@@ -302,7 +312,19 @@ function buildProgrammaticJoiningPdf(formData: JoiningFormData): jsPDF {
   y = 45;
   drawRow('Account Holder:', bank.accountHolderName, 'Bank Name:', bank.bankName);
   drawRow('Account Number:', bank.bankAccountNumber, 'IFSC Code:', bank.ifscCode);
-  drawRow('Branch Name:', bank.branchName, 'Disbursement Mode:', 'NEFT / RTGS / Bank Transfer');
+  drawRow('Branch Name:', bank.branchName);
+  drawRow(
+    'UAN (PF Number):',
+    bank.uanNumber || 'Not Enrolled / N/A',
+    'ESIC IP Number:',
+    bank.esicNumber || 'Not Enrolled / N/A'
+  );
+  drawRow(
+    'Professional Tax (PT):',
+    bank.ptNumber || 'Not Enrolled / N/A',
+    'Disbursement Mode:',
+    'NEFT / RTGS / Bank Transfer'
+  );
 
   y += 4;
   addSectionTitle('2. ACADEMIC & TECHNICAL QUALIFICATIONS (OPTIONAL)', y);

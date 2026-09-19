@@ -413,6 +413,18 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
                 <td className="pdf-label">Branch Name:</td>
                 <td className="pdf-val" colSpan={3}>{bank.branchName || '—'}</td>
               </tr>
+              <tr>
+                <td className="pdf-label">UAN (PF Number):</td>
+                <td className="pdf-val pdf-mono">{bank.uanNumber || 'Not Enrolled / N/A'}</td>
+                <td className="pdf-label">ESIC IP Number:</td>
+                <td className="pdf-val pdf-mono">{bank.esicNumber || 'Not Enrolled / N/A'}</td>
+              </tr>
+              <tr>
+                <td className="pdf-label">Professional Tax (PT):</td>
+                <td className="pdf-val pdf-mono">{bank.ptNumber || 'Not Enrolled / N/A'}</td>
+                <td className="pdf-label">Disbursement Mode:</td>
+                <td className="pdf-val">NEFT / RTGS / Bank Transfer</td>
+              </tr>
             </tbody>
           </table>
 
