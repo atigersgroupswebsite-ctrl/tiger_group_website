@@ -100,7 +100,7 @@ export const AdminJoiningDetailPage: React.FC = () => {
     if (!formData) return;
     try {
       setIsDownloadingPdf(true);
-      await downloadJoiningPacketPdf(formData);
+      await downloadJoiningPacketPdf(formData, documents);
     } catch (err: any) {
       console.error('Failed to download official joining packet:', err);
       alert('Unable to generate official joining PDF packet: ' + (err?.message || 'Unknown error'));
@@ -325,6 +325,7 @@ export const AdminJoiningDetailPage: React.FC = () => {
           ========================================================================= */}
       <JoiningFormPrintPreview
         formData={formData}
+        documents={documents}
         isSubmitted={isSubmitted}
       />
 

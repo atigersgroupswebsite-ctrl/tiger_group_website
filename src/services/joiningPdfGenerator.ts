@@ -15,11 +15,18 @@
 
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import type { JoiningFormData } from '../types/joining';
+import type { DocumentRow } from '../types/database';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { getCandidateDocuments } from './adminDocumentService';
 import { persistGeneratedDocument } from './filePersistenceService';
 
 /**
  * Locates rendered official form sheets from JoiningFormPrintPreview in the active DOM.
+ * Excludes candidate-uploaded annexures (.pdf-annexure-sheet) so that html2canvas only
+ * captures the 14 core official paperwork sheets at high DPI. Annexures are appended
+ * with native vector fidelity via pdf-lib.
  */
 function findPrintPreviewSheets(): HTMLElement[] {
   if (typeof document === 'undefined') return [];
@@ -27,12 +34,12 @@ function findPrintPreviewSheets(): HTMLElement[] {
   // Preferred: sheets inside .joining-form-print-preview container
   const container = document.querySelector('.joining-form-print-preview');
   if (container) {
-    const sheets = Array.from(container.querySelectorAll<HTMLElement>('.pdf-page-sheet'));
+    const sheets = Array.from(container.querySelectorAll<HTMLElement>('.pdf-page-sheet:not(.pdf-annexure-sheet)'));
     if (sheets.length > 0) return sheets;
   }
 
   // Fallback: any .pdf-page-sheet in the document
-  return Array.from(document.querySelectorAll<HTMLElement>('.pdf-page-sheet'));
+  return Array.from(document.querySelectorAll<HTMLElement>('.pdf-page-sheet:not(.pdf-annexure-sheet)'));
 }
 
 /**
@@ -386,17 +393,17 @@ function buildProgrammaticJoiningPdf(formData: JoiningFormData): jsPDF {
   doc.text('A TIGER GLOBAL Career Solution & Consultancy', 113, y + 19);
 
   // ----------------------------------------------------
-  // PAGE 5 (CONDITIONAL): WOMEN NIGHT SHIFT CONSENT
+  // PAGE 5: SHIFT SCHEDULE & WORKER WELFARE / FORM 'L'
   // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
   if (hasWomenConsent) {
-    doc.addPage('a4', 'portrait');
     addHeader("FORM - 'L' (RULE 13) - CONSENT OF WOMEN WORKER TO WORK IN NIGHT SHIFT");
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(...navy);
     y = 45;
     doc.text(
-      `I, ${p.employeeName}, residing at ${perm.villageOrCity || perm.city || 'Nagpur'}, working as ${emp.designation || 'Associate'} in M/s A TIGER GLOBAL Career Solution & Consultancy, state that I am working as ${emp.designation || 'Associate'}.`,
+      `I, ${p.employeeName || 'Candidate'}, residing at ${perm.villageOrCity || perm.city || 'Nagpur'}, working as ${emp.designation || 'Associate'} in M/s A TIGER GLOBAL Career Solution & Consultancy, state that I am working as ${emp.designation || 'Associate'}.`,
       15,
       y,
       { maxWidth: 180 }
@@ -413,13 +420,35 @@ function buildProgrammaticJoiningPdf(formData: JoiningFormData): jsPDF {
     doc.text('I am therefore willing to work at nightshift during the applicable employment tenure.', 15, y);
     y += 16;
     drawRow('Place:', decl.womenNightShiftPlace || 'Nagpur', 'Date:', decl.declarationDate);
+  } else {
+    addHeader('PAGE 05 / 14 - STATUTORY SHIFT & WORKER WELFARE DECLARATION');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...navy);
+    y = 45;
+    doc.text(
+      `I, ${p.employeeName || 'Candidate'}, hereby agree to comply with all designated working shifts, operational schedules, and workplace safety rules established by A TIGER GLOBAL Career Solution and Consultancy.`,
+      15,
+      y,
+      { maxWidth: 180 }
+    );
+    y += 18;
+    doc.text('I confirm and acknowledge that:', 15, y);
+    y += 8;
+    doc.text('1. Operational shift allocations (General, First, Second, or Third Shift) are governed by operational requirements.', 18, y, { maxWidth: 175 });
+    y += 8;
+    doc.text('2. Adequate rest intervals, safe drinking water, hygienic workplace conditions, and personal safety gear are provided.', 18, y, { maxWidth: 175 });
+    y += 8;
+    doc.text('3. For female staff, statutory Night Shift Consent Form L is executed separately wherever applicable under Rule 13.', 18, y, { maxWidth: 175 });
+    y += 14;
+    drawRow('Signatory Name:', p.employeeName, 'Date:', decl.declarationDate);
   }
 
   // ----------------------------------------------------
   // PAGE 6: SELF DECLARATION (RELIEVING / DUAL EMPLOYMENT)
   // ----------------------------------------------------
   doc.addPage('a4', 'portrait');
-  addHeader('SELF DECLARATION (PAGE 07 - RELIEVING & DUAL EMPLOYMENT)');
+  addHeader('PAGE 06 / 14 - SELF DECLARATION (RELIEVING & DUAL EMPLOYMENT)');
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...navy);
@@ -448,7 +477,7 @@ function buildProgrammaticJoiningPdf(formData: JoiningFormData): jsPDF {
   // PAGE 7: DECLARATION (RELATIVE EMPLOYMENT POLICY)
   // ----------------------------------------------------
   doc.addPage('a4', 'portrait');
-  addHeader('DECLARATION REGARDING EMPLOYMENT OF RELATIVES (PAGE 08)');
+  addHeader('PAGE 07 / 14 - DECLARATION REGARDING EMPLOYMENT OF RELATIVES');
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...navy);
@@ -464,7 +493,7 @@ function buildProgrammaticJoiningPdf(formData: JoiningFormData): jsPDF {
   // PAGE 8: TERMS & CONDITIONS (CONDUCT & DISCIPLINE)
   // ----------------------------------------------------
   doc.addPage('a4', 'portrait');
-  addHeader('TERMS & CONDITIONS OF EMPLOYMENT, SHIFTS & OVERTIME');
+  addHeader('PAGE 08 / 14 - TERMS & CONDITIONS OF EMPLOYMENT, SHIFTS & OVERTIME');
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...navy);
@@ -477,21 +506,604 @@ function buildProgrammaticJoiningPdf(formData: JoiningFormData): jsPDF {
   y += 14;
   drawRow('Employee Name:', p.employeeName, 'Acceptance Date:', decl.declarationDate);
 
+  // ----------------------------------------------------
+  // PAGE 9: CODE OF CONDUCT & WORKPLACE DISCIPLINE
+  // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
+  addHeader('PAGE 09 / 14 - CODE OF CONDUCT & WORKPLACE DISCIPLINE');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...navy);
+  y = 44;
+  doc.text('1. Professional Integrity: Employees shall conduct all business operations with transparency and utmost honesty.', 15, y);
+  y += 8;
+  doc.text('2. Punctuality: Strict adherence to scheduled duty shifts and biometric / register attendance is mandatory.', 15, y);
+  y += 8;
+  doc.text('3. Respect in Workplace: Harassment, insubordination, or abusive behavior will result in immediate termination.', 15, y);
+  y += 14;
+  drawRow('Employee Name:', p.employeeName, 'Date:', decl.declarationDate);
+
+  // ----------------------------------------------------
+  // PAGE 10: OCCUPATIONAL HEALTH & INDUSTRIAL SAFETY
+  // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
+  addHeader('PAGE 10 / 14 - OCCUPATIONAL HEALTH, INDUSTRIAL SAFETY & SUBSTANCE POLICY');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...navy);
+  y = 44;
+  doc.text('1. Safety Protocol: Mandatory wearing of personal protective equipment (PPE), uniforms, and ID badges.', 15, y);
+  y += 8;
+  doc.text('2. Zero Substance Tolerance: Possession or consumption of alcohol, narcotics, tobacco, or bidi is strictly barred.', 15, y);
+  y += 8;
+  doc.text('3. Accident Reporting: Any injury or hazard must be reported to the safety coordinator immediately.', 15, y);
+  y += 14;
+  drawRow('Employee Name:', p.employeeName, 'Date:', decl.declarationDate);
+
+  // ----------------------------------------------------
+  // PAGE 11: STATUTORY STANDING ORDERS & WAGE RULES
+  // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
+  addHeader('PAGE 11 / 14 - STATUTORY STANDING ORDERS & WAGE ADMINISTRATION');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...navy);
+  y = 44;
+  doc.text('1. Wage Cycle: Monthly statutory disbursements are processed via electronic bank transfer between the 10th and 15th.', 15, y);
+  y += 8;
+  doc.text('2. Deductions: Statutory deductions under EPF, ESIC, and Professional Tax (PT) will be applied as prescribed.', 15, y);
+  y += 8;
+  doc.text('3. Overtime: Authorized overtime is compensated in strict compliance with statutory notifications.', 15, y);
+  y += 14;
+  drawRow('Employee Name:', p.employeeName, 'Date:', decl.declarationDate);
+
+  // ----------------------------------------------------
+  // PAGE 12: CONFIDENTIALITY & INTEGRITY UNDERTAKING
+  // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
+  addHeader('PAGE 12 / 14 - CONFIDENTIALITY, NON-DISCLOSURE & INTEGRITY UNDERTAKING');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...navy);
+  y = 44;
+  doc.text('1. Non-Disclosure: Confidential enterprise data, trade secrets, and client records must not be disclosed.', 15, y);
+  y += 8;
+  doc.text('2. Return of Assets: All equipment, documents, ID cards, and access passes remain company property.', 15, y);
+  y += 8;
+  doc.text('3. Continuing Obligation: Confidentiality obligations survive any cessation of employment.', 15, y);
+  y += 14;
+  drawRow('Employee Name:', p.employeeName, 'Date:', decl.declarationDate);
+
+  // ----------------------------------------------------
+  // PAGE 13: STATUTORY SOCIAL SECURITY & WELFARE ENROLMENT
+  // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
+  addHeader('PAGE 13 / 14 - STATUTORY SOCIAL SECURITY & WELFARE ENROLMENT');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...navy);
+  y = 44;
+  doc.text('1. Employees Provident Fund (EPFO): Enrolment under Form 11 / Form 2 with Universal Account Number (UAN).', 15, y);
+  y += 8;
+  doc.text('2. Employees State Insurance (ESIC): Medical and cash benefits under Form 1 with Insurance Number (IP).', 15, y);
+  y += 8;
+  doc.text('3. Professional Tax (PT): Enrolled under State Professional Tax schedules.', 15, y);
+  y += 14;
+  drawRow('Employee Name:', p.employeeName, 'Date:', decl.declarationDate);
+
+  // ----------------------------------------------------
+  // PAGE 14: MASTER ATTESTATION & HR AUTHORIZATION
+  // ----------------------------------------------------
+  doc.addPage('a4', 'portrait');
+  addHeader('PAGE 14 / 14 - MASTER ATTESTATION & HR AUTHORIZATION');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...navy);
+  y = 44;
+  doc.text('I, the undersigned candidate, hereby declare that all information furnished in this Joining Form is true, correct, and complete to the best of my knowledge and belief.', 15, y, { maxWidth: 180 });
+  y += 16;
+  drawRow('Candidate Name:', p.employeeName, 'Submission Date:', decl.declarationDate);
+  y += 8;
+  doc.setDrawColor(203, 213, 225);
+  doc.rect(15, y, 85, 24);
+  doc.rect(110, y, 85, 24);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...navy);
+  doc.text('Candidate Final Signature:', 18, y + 5);
+  doc.text('Authorized HR Signatory & Seal:', 113, y + 5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(p.employeeName || 'Candidate', 18, y + 20);
+  doc.text('A TIGER GLOBAL Career Solution & Consultancy', 113, y + 20);
+
   return doc;
+}
+
+/**
+ * Normalizes document type and side into an executive-grade annexure title.
+ */
+function formatAnnexureLabel(doc: { document_type?: string | null; document_side?: string | null }): string {
+  const type = doc.document_type || 'DOCUMENT';
+  const side = doc.document_side;
+  let label = type.replace(/_/g, ' ');
+  if (type === 'AADHAAR') {
+    label = 'AADHAAR CARD';
+    if (side === 'FRONT') label += ' — FRONT';
+    else if (side === 'BACK') label += ' — BACK';
+  } else if (type === 'PAN') {
+    label = 'PAN CARD';
+  } else if (type === 'BANK_PASSBOOK') {
+    label = 'BANK PASSBOOK / CANCELLED CHEQUE';
+  } else if (type === 'EDUCATION_CERTIFICATE') {
+    label = 'HIGHEST EDUCATION CERTIFICATE';
+  }
+  return label;
+}
+
+/**
+ * Sanitizes strings for standard PDF Helvetica font WinAnsi character encoding.
+ */
+function sanitizeForPdf(str?: string | null): string {
+  if (!str) return '';
+  return str.replace(/[^\x20-\x7E]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Securely retrieves the binary content of a candidate-uploaded document.
+ * Checks dataUrl, authenticated Supabase Storage download, or temporary signed URL.
+ */
+async function fetchDocumentBytes(doc: {
+  storage_path?: string | null;
+  dataUrl?: string | null;
+}): Promise<Uint8Array | null> {
+  // 1. In-memory dataUrl (draft uploads or preview)
+  if (doc.dataUrl && doc.dataUrl.startsWith('data:')) {
+    try {
+      const base64 = doc.dataUrl.split(',')[1];
+      if (base64) {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+      }
+    } catch (e) {
+      console.warn('[fetchDocumentBytes] Could not parse dataUrl:', e);
+    }
+  }
+
+  // 2. Storage path in private Supabase candidate-documents bucket
+  if (doc.storage_path) {
+    let bucket = 'candidate-documents';
+    let path = doc.storage_path;
+    if (path.startsWith('candidate-documents/')) {
+      path = path.replace(/^candidate-documents\//, '');
+    } else if (path.startsWith('generated-documents/')) {
+      bucket = 'generated-documents';
+      path = path.replace(/^generated-documents\//, '');
+    }
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase.storage.from(bucket).download(path);
+        if (!error && data) {
+          const buf = await data.arrayBuffer();
+          return new Uint8Array(buf);
+        }
+      } catch (dlErr) {
+        console.warn('[fetchDocumentBytes] Direct download failed, attempting signed URL fallback:', dlErr);
+      }
+
+      try {
+        const { data: signData, error: signErr } = await supabase.storage.from(bucket).createSignedUrl(path, 300);
+        if (!signErr && signData?.signedUrl) {
+          const resp = await fetch(signData.signedUrl);
+          if (resp.ok) {
+            const buf = await resp.arrayBuffer();
+            return new Uint8Array(buf);
+          }
+        }
+      } catch (signFetchErr) {
+        console.warn('[fetchDocumentBytes] Signed URL fetch error:', signFetchErr);
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Safely converts non-PNG/non-JPG image bytes (e.g. WEBP) to PNG bytes using browser canvas.
+ */
+async function convertImageBytesToPng(bytes: Uint8Array, mimeType?: string): Promise<Uint8Array> {
+  if (typeof document === 'undefined') return bytes;
+  return new Promise((resolve) => {
+    try {
+      const blob = new Blob([bytes as unknown as BlobPart], { type: mimeType || 'image/webp' });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve(bytes);
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((pngBlob) => {
+            if (!pngBlob) return resolve(bytes);
+            pngBlob.arrayBuffer().then((buf) => resolve(new Uint8Array(buf))).catch(() => resolve(bytes));
+          }, 'image/png');
+        } catch {
+          resolve(bytes);
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(bytes);
+      };
+      img.src = url;
+    } catch {
+      resolve(bytes);
+    }
+  });
+}
+
+/**
+ * Appends a clearly labeled Attachment Processing Notice page if an uploaded file
+ * cannot be parsed, is password-protected/encrypted, or is corrupted.
+ */
+function appendAttachmentNoticePage(
+  finalPdf: PDFDocument,
+  fontBold: any,
+  fontRegular: any,
+  doc: {
+    original_file_name?: string | null;
+    document_type?: string | null;
+    document_side?: string | null;
+    verification_status?: string | null;
+  },
+  reason: string
+) {
+  const page = finalPdf.addPage([595.28, 841.89]);
+  const docLabel = formatAnnexureLabel(doc);
+  const fileName = sanitizeForPdf(doc.original_file_name || 'Document');
+
+  // Header
+  page.drawText('A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY', {
+    x: 36,
+    y: 805,
+    size: 9,
+    font: fontBold,
+    color: rgb(0.06, 0.11, 0.22)
+  });
+  page.drawText(`ANNEXURE: ${sanitizeForPdf(docLabel.toUpperCase())}`, {
+    x: 36,
+    y: 788,
+    size: 13,
+    font: fontBold,
+    color: rgb(0.06, 0.11, 0.22)
+  });
+  page.drawLine({
+    start: { x: 36, y: 775 },
+    end: { x: 559.28, y: 775 },
+    thickness: 1,
+    color: rgb(0.85, 0.88, 0.92)
+  });
+
+  // Notice Box
+  page.drawRectangle({
+    x: 36,
+    y: 590,
+    width: 523.28,
+    height: 165,
+    borderColor: rgb(0.85, 0.6, 0.2),
+    borderWidth: 1.5,
+    color: rgb(0.99, 0.98, 0.95)
+  });
+
+  page.drawText('ATTACHMENT PROCESSING NOTICE', {
+    x: 56,
+    y: 725,
+    size: 11,
+    font: fontBold,
+    color: rgb(0.65, 0.35, 0.05)
+  });
+
+  page.drawText(`Document Type: ${sanitizeForPdf(docLabel)}`, {
+    x: 56,
+    y: 700,
+    size: 9,
+    font: fontBold,
+    color: rgb(0.1, 0.15, 0.25)
+  });
+
+  page.drawText(`Original Filename: ${fileName}`, {
+    x: 56,
+    y: 682,
+    size: 9,
+    font: fontRegular,
+    color: rgb(0.2, 0.25, 0.35)
+  });
+
+  if (doc.verification_status) {
+    page.drawText(`Verification Status: ${sanitizeForPdf(doc.verification_status)}`, {
+      x: 56,
+      y: 664,
+      size: 9,
+      font: fontRegular,
+      color: rgb(0.2, 0.25, 0.35)
+    });
+  }
+
+  page.drawText(`Notice: ${sanitizeForPdf(reason)}`, {
+    x: 56,
+    y: 642,
+    size: 9,
+    font: fontRegular,
+    color: rgb(0.7, 0.2, 0.2)
+  });
+
+  page.drawText('The original candidate document remains safely preserved in the official document repository.', {
+    x: 56,
+    y: 615,
+    size: 8,
+    font: fontRegular,
+    color: rgb(0.45, 0.5, 0.55)
+  });
+}
+
+/**
+ * Appends an image document as an executive A4 annexure page with proportional scaling.
+ */
+async function appendImageAnnexurePage(
+  finalPdf: PDFDocument,
+  fontBold: any,
+  fontRegular: any,
+  doc: {
+    original_file_name?: string | null;
+    document_type?: string | null;
+    document_side?: string | null;
+    verification_status?: string | null;
+  },
+  bytes: Uint8Array
+): Promise<boolean> {
+  const isPng = bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  const isJpg = bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xd8;
+
+  let embeddedImage;
+  try {
+    if (isPng) {
+      embeddedImage = await finalPdf.embedPng(bytes);
+    } else if (isJpg) {
+      embeddedImage = await finalPdf.embedJpg(bytes);
+    } else {
+      const pngBytes = await convertImageBytesToPng(bytes);
+      embeddedImage = await finalPdf.embedPng(pngBytes);
+    }
+  } catch (embedErr) {
+    console.warn('[appendImageAnnexurePage] Image embed error:', embedErr);
+    return false;
+  }
+
+  if (!embeddedImage) return false;
+
+  const page = finalPdf.addPage([595.28, 841.89]);
+  const docLabel = formatAnnexureLabel(doc);
+  const cleanFileName = sanitizeForPdf(doc.original_file_name || 'Document');
+  const cleanStatus = sanitizeForPdf(doc.verification_status || 'ON RECORD');
+
+  // Top header
+  page.drawText('A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY', {
+    x: 36,
+    y: 805,
+    size: 9,
+    font: fontBold,
+    color: rgb(0.06, 0.11, 0.22)
+  });
+  page.drawText(`ANNEXURE: ${sanitizeForPdf(docLabel.toUpperCase())}`, {
+    x: 36,
+    y: 788,
+    size: 13,
+    font: fontBold,
+    color: rgb(0.06, 0.11, 0.22)
+  });
+  page.drawText(`Original File: ${cleanFileName}  |  Verification Status: ${cleanStatus}`, {
+    x: 36,
+    y: 772,
+    size: 8,
+    font: fontRegular,
+    color: rgb(0.4, 0.45, 0.5)
+  });
+  page.drawLine({
+    start: { x: 36, y: 762 },
+    end: { x: 559.28, y: 762 },
+    thickness: 1,
+    color: rgb(0.85, 0.88, 0.92)
+  });
+
+  const availableWidth = 523.28;
+  const availableHeight = 710;
+  const imgDims = embeddedImage.scale(1);
+
+  const scaleFactor = Math.min(
+    availableWidth / imgDims.width,
+    availableHeight / imgDims.height,
+    1
+  );
+
+  const scaledWidth = imgDims.width * scaleFactor;
+  const scaledHeight = imgDims.height * scaleFactor;
+
+  const x = 36 + (availableWidth - scaledWidth) / 2;
+  const y = 36 + (availableHeight - scaledHeight) / 2;
+
+  page.drawImage(embeddedImage, {
+    x,
+    y,
+    width: scaledWidth,
+    height: scaledHeight
+  });
+
+  return true;
+}
+
+/**
+ * Appends qualifying candidate-uploaded documents to the 14-page official Joining Form PDF.
+ * Strictly adheres to:
+ * - is_current !== false
+ * - document_type !== 'PHOTO' && document_type !== 'SIGNATURE'
+ * - Preserves all pages of multi-page PDFs
+ * - Creates safe A4 sheets with proportional scaling for images
+ */
+async function appendCandidateAnnexuresToPdfBlob(
+  baseBlob: Blob,
+  formData: JoiningFormData,
+  documents?: DocumentRow[]
+): Promise<Blob> {
+  let docsToExamine: Array<{
+    id?: string;
+    document_type?: string | null;
+    document_side?: string | null;
+    storage_path?: string | null;
+    original_file_name?: string | null;
+    mime_type?: string | null;
+    is_current?: boolean | null;
+    verification_status?: string | null;
+    uploaded_at?: string | null;
+    dataUrl?: string | null;
+  }> = [];
+
+  if (documents && documents.length > 0) {
+    docsToExamine = documents;
+  } else if (formData.formId || formData.applicationId) {
+    const res = await getCandidateDocuments({
+      joiningFormId: formData.formId,
+      applicationId: formData.applicationId
+    });
+    if (res.success && res.data && res.data.length > 0) {
+      docsToExamine = res.data;
+    }
+  }
+
+  if (docsToExamine.length === 0 && formData.documents) {
+    docsToExamine = Object.values(formData.documents)
+      .filter((d) => d && Boolean(d.file?.dataUrl || d.file?.storagePath))
+      .map((d, index) => ({
+        id: `form-doc-${index}-${d.category}`,
+        document_type: d.category,
+        document_side: (d.side as any) || null,
+        storage_path: d.file?.storagePath || null,
+        original_file_name: d.file?.name || d.title,
+        mime_type: d.file?.type || null,
+        is_current: true,
+        verification_status: d.verificationStatus || 'UPLOADED',
+        uploaded_at: null,
+        dataUrl: d.file?.dataUrl || null
+      }));
+  }
+
+  // Strict qualifying document rules:
+  // 1. is_current !== false (exclude superseded/rejected prior uploads)
+  // 2. document_type !== 'PHOTO' && document_type !== 'SIGNATURE'
+  // 3. has storage_path or dataUrl
+  const qualifyingDocs = docsToExamine.filter((d) => {
+    const isCurrent = d.is_current !== false;
+    const notPhotoOrSig = d.document_type !== 'PHOTO' && d.document_type !== 'SIGNATURE';
+    const hasLocation = Boolean(d.storage_path || d.dataUrl);
+    return isCurrent && notPhotoOrSig && hasLocation;
+  });
+
+  if (qualifyingDocs.length === 0) {
+    return baseBlob;
+  }
+
+  try {
+    const baseArrayBuffer = await baseBlob.arrayBuffer();
+    const finalPdf = await PDFDocument.load(baseArrayBuffer);
+    const fontBold = await finalPdf.embedFont(StandardFonts.HelveticaBold);
+    const fontRegular = await finalPdf.embedFont(StandardFonts.Helvetica);
+
+    for (const doc of qualifyingDocs) {
+      const bytes = await fetchDocumentBytes(doc);
+      if (!bytes || bytes.length === 0) {
+        appendAttachmentNoticePage(
+          finalPdf,
+          fontBold,
+          fontRegular,
+          doc,
+          'Document attachment could not be retrieved from private cloud storage.'
+        );
+        continue;
+      }
+
+      // Check if PDF by magic bytes: %PDF (0x25, 0x50, 0x44, 0x46)
+      const isPdf = bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+
+      if (isPdf) {
+        try {
+          const attachedPdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
+          const pageIndices = attachedPdf.getPageIndices();
+          if (pageIndices.length === 0) {
+            appendAttachmentNoticePage(finalPdf, fontBold, fontRegular, doc, 'Uploaded PDF contains zero pages.');
+          } else {
+            const copiedPages = await finalPdf.copyPages(attachedPdf, pageIndices);
+            for (const copiedPage of copiedPages) {
+              finalPdf.addPage(copiedPage);
+            }
+          }
+        } catch (pdfLoadErr: any) {
+          console.warn('[generateJoiningPacketPdf] Error parsing candidate PDF attachment:', pdfLoadErr);
+          appendAttachmentNoticePage(
+            finalPdf,
+            fontBold,
+            fontRegular,
+            doc,
+            'Uploaded PDF document could not be incorporated (the file may be encrypted, password-protected, or corrupted).'
+          );
+        }
+      } else {
+        const success = await appendImageAnnexurePage(finalPdf, fontBold, fontRegular, doc, bytes);
+        if (!success) {
+          appendAttachmentNoticePage(
+            finalPdf,
+            fontBold,
+            fontRegular,
+            doc,
+            'Uploaded image document could not be decoded or embedded.'
+          );
+        }
+      }
+    }
+
+    const mergedPdfBytes = await finalPdf.save();
+    return new Blob([mergedPdfBytes as unknown as BlobPart], { type: 'application/pdf' });
+  } catch (mergeErr) {
+    console.error('[generateJoiningPacketPdf] Failed to append annexures to master PDF:', mergeErr);
+    return baseBlob;
+  }
 }
 
 /**
  * Generates the official candidate joining packet PDF as a binary Blob.
  * In browser: captures rendered official form sheets from JoiningFormPrintPreview directly.
  * In Node / fallback: builds the official form pages programmatically.
+ * Then appends qualifying candidate-uploaded documents as annexures via pdf-lib.
  */
-export async function generateJoiningPacketPdf(formData: JoiningFormData): Promise<Blob> {
+export async function generateJoiningPacketPdf(
+  formData: JoiningFormData,
+  documents?: DocumentRow[]
+): Promise<Blob> {
+  let baseBlob: Blob | null = null;
+
   // 1. Browser runtime: Capture actual rendered official form sheets
   if (typeof document !== 'undefined') {
     const sheets = findPrintPreviewSheets();
     if (sheets.length > 0) {
       try {
-        return await captureSheetsToPdfBlob(sheets);
+        baseBlob = await captureSheetsToPdfBlob(sheets);
       } catch (domCaptureErr) {
         console.warn('[generateJoiningPacketPdf] DOM capture warning, using programmatic builder:', domCaptureErr);
       }
@@ -499,17 +1111,25 @@ export async function generateJoiningPacketPdf(formData: JoiningFormData): Promi
   }
 
   // 2. Programmatic vector builder (Node or fallback)
-  const doc = buildProgrammaticJoiningPdf(formData);
-  return doc.output('blob');
+  if (!baseBlob) {
+    const doc = buildProgrammaticJoiningPdf(formData);
+    baseBlob = doc.output('blob');
+  }
+
+  // 3. Append candidate-uploaded document annexures
+  return await appendCandidateAnnexuresToPdfBlob(baseBlob, formData, documents);
 }
 
 /**
  * Downloads candidate-specific official joining packet PDF.
  * File format: [Reference]-[Candidate-Name].pdf (e.g. JOIN-2026-000123-John-Doe.pdf)
  */
-export async function downloadJoiningPacketPdf(formData: JoiningFormData): Promise<void> {
+export async function downloadJoiningPacketPdf(
+  formData: JoiningFormData,
+  documents?: DocumentRow[]
+): Promise<void> {
   try {
-    const blob = await generateJoiningPacketPdf(formData);
+    const blob = await generateJoiningPacketPdf(formData, documents);
     const rawName = formData.personal?.employeeName || 'Candidate';
     const cleanName = rawName.replace(/[^a-zA-Z0-9_-]/g, '_') || 'Candidate';
     const cleanRef = (formData.joiningReference || 'JOIN-DOSSIER').replace(/[^a-zA-Z0-9_-]/g, '_');

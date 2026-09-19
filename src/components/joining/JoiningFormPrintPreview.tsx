@@ -5,17 +5,22 @@
 // Form Source: Canonical joining_form.pdf Packet Structure (Pages 1 to 14)
 // ==============================================================================
 
-import React from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import type { JoiningFormData } from '../../types/joining';
+import type { DocumentRow } from '../../types/database';
+import { getDocumentSignedUrl } from '../../services/adminDocumentService';
+import { FileText, Paperclip } from 'lucide-react';
 
 interface JoiningFormPrintPreviewProps {
   formData: JoiningFormData;
+  documents?: DocumentRow[];
   onEditStep?: (stepNumber: number) => void;
   isSubmitted?: boolean;
 }
 
 export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = ({
   formData,
+  documents,
   onEditStep,
   isSubmitted = false
 }) => {
@@ -31,6 +36,89 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
 
   const isFemale = p.gender?.toLowerCase() === 'female';
   const showWomenConsent = isFemale && Boolean(decl.womenNightShiftConsent);
+
+  // Authoritative Annexure Document Selection:
+  // Strictly: is_current === true, document_type NOT IN ('PHOTO', 'SIGNATURE')
+  const annexureDocs = useMemo(() => {
+    if (documents && documents.length > 0) {
+      return documents.filter(
+        (d) =>
+          d.is_current !== false &&
+          d.document_type !== 'PHOTO' &&
+          d.document_type !== 'SIGNATURE' &&
+          Boolean(d.storage_path)
+      );
+    }
+    if (formData.documents) {
+      return Object.values(formData.documents)
+        .filter(
+          (d) =>
+            d.category !== 'PHOTO' &&
+            d.category !== 'SIGNATURE' &&
+            Boolean(d.file?.dataUrl || d.file?.storagePath)
+        )
+        .map((d, index) => ({
+          id: `draft-${index}-${d.category}`,
+          joining_form_id: formData.formId || null,
+          application_id: formData.applicationId || null,
+          document_type: (d.type || d.category) as any,
+          document_side: (d.side as any) || null,
+          storage_path: d.file?.storagePath || null,
+          original_file_name: d.file?.name || d.title,
+          mime_type: d.file?.type || null,
+          file_size: d.file?.size || null,
+          verification_status: d.verificationStatus || 'UPLOADED',
+          rejection_reason: null,
+          uploaded_at: new Date().toISOString(),
+          verified_at: null,
+          verified_by: null,
+          rejected_at: null,
+          rejected_by: null,
+          is_current: true,
+          _dataUrl: d.file?.dataUrl
+        } as DocumentRow & { _dataUrl?: string }));
+    }
+    return [];
+  }, [documents, formData.documents, formData.formId, formData.applicationId]);
+
+  const [docSignedUrls, setDocSignedUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadUrls = async () => {
+      const urlMap: Record<string, string> = {};
+      for (const doc of annexureDocs) {
+        if ((doc as any)._dataUrl) {
+          urlMap[doc.id] = (doc as any)._dataUrl;
+        } else if (doc.storage_path) {
+          const res = await getDocumentSignedUrl(doc.storage_path, 3600);
+          if (res.success && res.signedUrl) {
+            urlMap[doc.id] = res.signedUrl;
+          }
+        }
+      }
+      if (isMounted) {
+        setDocSignedUrls(urlMap);
+      }
+    };
+    if (annexureDocs.length > 0) {
+      loadUrls();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [annexureDocs]);
+
+  const formatDocLabel = (doc: DocumentRow) => {
+    if (doc.document_type === 'AADHAAR') {
+      return doc.document_side === 'BACK' ? 'AADHAAR CARD (BACK SIDE)' : 'AADHAAR CARD (FRONT SIDE)';
+    }
+    const formatted = doc.document_type ? doc.document_type.replace(/_/g, ' ') : 'DOCUMENT';
+    if (doc.document_side && doc.document_side !== 'SINGLE') {
+      return `${formatted} (${doc.document_side})`;
+    }
+    return formatted;
+  };
 
   const activeEducation = (formData.education || []).filter(
     (edu) =>
@@ -786,6 +874,124 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
           </div>
         </div>
       </div>
+
+      {/* ---------------------------------------------------------------------- */}
+      {/* ANNEXURES: CANDIDATE STATUTORY ATTACHMENTS (EXCLUDING PHOTO & SIGNATURE)*/}
+      {/* ---------------------------------------------------------------------- */}
+      {annexureDocs.map((doc, idx) => {
+        const docTitle = formatDocLabel(doc);
+        const isPdf =
+          doc.mime_type?.includes('pdf') ||
+          doc.storage_path?.toLowerCase().endsWith('.pdf') ||
+          doc.original_file_name?.toLowerCase().endsWith('.pdf');
+        const fileUrl = docSignedUrls[doc.id] || (doc as any)._dataUrl;
+
+        return (
+          <div key={doc.id || idx} className="pdf-page-sheet pdf-annexure-sheet">
+            <div className="pdf-page-inner">
+              <div className="pdf-subpage-header">
+                <span className="pdf-subpage-brand">A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY</span>
+                <span className="pdf-subpage-title">ANNEXURE: {docTitle}</span>
+              </div>
+
+              <table className="pdf-table" style={{ marginBottom: '16px' }}>
+                <tbody>
+                  <tr>
+                    <td className="pdf-label" style={{ width: '22%' }}>Document Type:</td>
+                    <td className="pdf-val pdf-bold" style={{ width: '28%' }}>{docTitle}</td>
+                    <td className="pdf-label" style={{ width: '22%' }}>Original File:</td>
+                    <td className="pdf-val" style={{ width: '28%' }}>{doc.original_file_name || 'Document'}</td>
+                  </tr>
+                  <tr>
+                    <td className="pdf-label">Verification Status:</td>
+                    <td className="pdf-val">
+                      <span style={{
+                        fontWeight: 700,
+                        color: doc.verification_status === 'VERIFIED' ? '#15803D' : doc.verification_status === 'REJECTED' ? '#B91C1C' : '#B45309'
+                      }}>
+                        {doc.verification_status || 'UPLOADED'}
+                      </span>
+                    </td>
+                    <td className="pdf-label">Upload Timestamp:</td>
+                    <td className="pdf-val">{doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString('en-GB') : 'ON RECORD'}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Document Content Box */}
+              {isPdf ? (
+                <div style={{
+                  border: '1.5px dashed #CBD5E1',
+                  borderRadius: '6px',
+                  backgroundColor: '#F8FAFC',
+                  padding: '2.5rem 1.5rem',
+                  textAlign: 'center'
+                }}>
+                  <FileText size={48} color="#0F1B38" style={{ margin: '0 auto 0.75rem auto' }} />
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#0F1B38', fontSize: '1rem', fontWeight: 800 }}>
+                    {doc.original_file_name || 'Uploaded PDF Document'}
+                  </h4>
+                  <p style={{ margin: '0 auto 1rem auto', maxWidth: '480px', fontSize: '0.825rem', color: '#475569', lineHeight: 1.5 }}>
+                    Official candidate-uploaded PDF attachment. All pages of this PDF are preserved and directly compiled into the downloadable Master Joining Packet.
+                  </p>
+                  {fileUrl && (
+                    <a
+                      href={fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="no-print"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        color: '#1D4ED8',
+                        backgroundColor: '#EFF6FF',
+                        border: '1px solid #BFDBFE',
+                        padding: '0.4rem 0.8rem',
+                        borderRadius: '6px',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      <span>Preview Uploaded PDF in New Tab</span>
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div style={{
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '6px',
+                  padding: '0.75rem',
+                  backgroundColor: '#FFFFFF',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  minHeight: '140mm'
+                }}>
+                  {fileUrl ? (
+                    <img
+                      src={fileUrl}
+                      alt={docTitle}
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '190mm',
+                        objectFit: 'contain',
+                        display: 'block'
+                      }}
+                    />
+                  ) : (
+                    <div style={{ textAlign: 'center', color: '#64748B', padding: '3rem' }}>
+                      <Paperclip size={36} style={{ margin: '0 auto 0.5rem auto' }} />
+                      <p style={{ margin: 0, fontSize: '0.85rem' }}>Image attachment on record</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
