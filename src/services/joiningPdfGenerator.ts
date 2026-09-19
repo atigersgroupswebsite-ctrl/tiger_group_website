@@ -44,6 +44,8 @@ function findPrintPreviewSheets(): HTMLElement[] {
 
 /**
  * Renders official form sheets into high-DPI canvas pages and compiles a multi-page A4 PDF.
+ * Uses isolated cloned-document geometry (794px width / A4 aspect ratio) to guarantee
+ * deterministic output independent of client viewport width.
  */
 async function captureSheetsToPdfBlob(sheets: HTMLElement[]): Promise<Blob> {
   const pdf = new jsPDF({
@@ -52,6 +54,11 @@ async function captureSheetsToPdfBlob(sheets: HTMLElement[]): Promise<Blob> {
     format: 'a4',
     compress: true
   });
+
+  // Standard A4 metrics at 96 DPI: 210mm x 297mm -> 793.7px x 1122.5px
+  const A4_WIDTH_PX = 794;
+  const A4_HEIGHT_PX = 1123;
+  const A4_RATIO = 297 / 210; // ~1.4142857
 
   for (let i = 0; i < sheets.length; i++) {
     const sheet = sheets[i];
@@ -71,21 +78,52 @@ async function captureSheetsToPdfBlob(sheets: HTMLElement[]): Promise<Blob> {
     );
 
     const canvas = await html2canvas(sheet, {
-      scale: 2, // 2x gives 150-200 DPI crisp, executive-grade print quality
+      scale: 2, // 2x gives crisp, executive-grade print quality
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#FFFFFF',
       logging: false,
       scrollX: 0,
       scrollY: 0,
+      windowWidth: 1200, // Forces desktop layout evaluation in the cloned document
       ignoreElements: (el) => el.classList?.contains('no-print'),
       onclone: (clonedDoc) => {
+        // 1. Reset body and outer containers to prevent responsive width clamping
+        if (clonedDoc.body) {
+          clonedDoc.body.style.margin = '0';
+          clonedDoc.body.style.padding = '0';
+          clonedDoc.body.style.background = '#FFFFFF';
+        }
+
+        const containers = clonedDoc.querySelectorAll<HTMLElement>(
+          '.joining-page-container, .joining-layout, .joining-main-content, .joining-form-card, .print-review-wrapper, .joining-form-print-preview'
+        );
+        containers.forEach((c) => {
+          c.style.width = `${A4_WIDTH_PX}px`;
+          c.style.maxWidth = `${A4_WIDTH_PX}px`;
+          c.style.minWidth = `${A4_WIDTH_PX}px`;
+          c.style.margin = '0';
+          c.style.padding = '0';
+          c.style.boxShadow = 'none';
+          c.style.border = 'none';
+          c.style.background = 'transparent';
+        });
+
+        // 2. Enforce deterministic A4 sheet geometry on cloned sheets
         const clonedSheets = clonedDoc.querySelectorAll<HTMLElement>('.pdf-page-sheet');
         clonedSheets.forEach((s) => {
+          s.style.width = `${A4_WIDTH_PX}px`;
+          s.style.minWidth = `${A4_WIDTH_PX}px`;
+          s.style.maxWidth = `${A4_WIDTH_PX}px`;
+          s.style.minHeight = `${A4_HEIGHT_PX}px`;
+          s.style.boxSizing = 'border-box';
           s.style.boxShadow = 'none';
           s.style.margin = '0';
           s.style.borderRadius = '0';
+          s.style.background = '#FFFFFF';
         });
+
+        // 3. Hide screen-only chrome in cloned document
         const noPrints = clonedDoc.querySelectorAll<HTMLElement>('.no-print');
         noPrints.forEach((np) => (np.style.display = 'none'));
       }
@@ -96,13 +134,32 @@ async function captureSheetsToPdfBlob(sheets: HTMLElement[]): Promise<Blob> {
       pdf.addPage('a4', 'portrait');
     }
 
-    // Standard A4 dimensions: 210mm x 297mm
+    // Standard A4 dimensions in PDF: 210mm x 297mm
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
-    const imgWidth = 210;
-    const imgHeight = Math.min(297, (canvasHeight * 210) / canvasWidth);
+    const sheetRatio = canvasHeight / canvasWidth;
 
-    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
+    let imgWidth = 210;
+    let imgHeight = 297;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (Math.abs(sheetRatio - A4_RATIO) < 0.02) {
+      // Direct A4 fit
+      imgWidth = 210;
+      imgHeight = 297;
+    } else if (sheetRatio > A4_RATIO) {
+      // Content is taller than standard A4: scale down proportionally to fit within 297mm height without cropping
+      imgHeight = 297;
+      imgWidth = (canvasWidth * 297) / canvasHeight;
+      offsetX = (210 - imgWidth) / 2; // Center horizontally on A4 sheet
+    } else {
+      // Content is shorter than standard A4: keep 210mm width and proportional height
+      imgWidth = 210;
+      imgHeight = (canvasHeight * 210) / canvasWidth;
+    }
+
+    pdf.addImage(imgData, 'JPEG', offsetX, offsetY, imgWidth, imgHeight, undefined, 'FAST');
   }
 
   return pdf.output('blob');

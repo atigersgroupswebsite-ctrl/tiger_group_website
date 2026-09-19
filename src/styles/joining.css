@@ -1496,6 +1496,7 @@
   .joining-progress-sidebar,
   .joining-mobile-progress,
   .joining-navigation,
+  .btn-edit-section,
   .pdf-edit-bar,
   .review-alert-banner,
   .submission-banner-action,
@@ -1530,6 +1531,7 @@
   .joining-page-container,
   .joining-layout,
   .joining-main-content,
+  .joining-form-card,
   .print-review-wrapper {
     display: block !important;
     width: 100% !important;
@@ -1556,9 +1558,11 @@
     box-shadow: none !important;
     border: 1px solid #000000 !important;
     margin: 0 0 0 0 !important;
-    padding: 12mm 10mm !important;
+    padding: 10mm 10mm !important;
     page-break-after: always !important;
     break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
     box-sizing: border-box !important;
     background: #FFFFFF !important;
   }
@@ -1571,7 +1575,10 @@
   /* Prevent table rows and blocks from splitting awkwardly across pages */
   .pdf-table,
   .pdf-verification-row,
-  .pdf-header-box {
+  .pdf-attestation-row,
+  .pdf-header-box,
+  .pdf-subpage-header,
+  .pdf-section-title {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }

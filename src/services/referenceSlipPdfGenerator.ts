@@ -206,6 +206,7 @@ export async function buildDynamicReferenceSlipPdf(
   const PAGE_HEIGHT = 841.89;
   const MARGIN_X = 36;
   const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_X * 2; // 523.28
+  const BORDER_INSET = 28.5; // ~10.05 mm safe margin from physical edge (10mm ≈ 28.35pt)
 
   const { slip, candidate } = detail;
 
@@ -252,19 +253,19 @@ export async function buildDynamicReferenceSlipPdf(
 
   // Outer Decorative Borders
   page1.drawRectangle({
-    x: 20,
-    y: 20,
-    width: PAGE_WIDTH - 40,
-    height: PAGE_HEIGHT - 40,
+    x: BORDER_INSET,
+    y: BORDER_INSET,
+    width: PAGE_WIDTH - BORDER_INSET * 2,
+    height: PAGE_HEIGHT - BORDER_INSET * 2,
     borderColor: navy,
     borderWidth: 1.5,
     color: white
   });
   page1.drawRectangle({
-    x: 23,
-    y: 23,
-    width: PAGE_WIDTH - 46,
-    height: PAGE_HEIGHT - 46,
+    x: BORDER_INSET + 3,
+    y: BORDER_INSET + 3,
+    width: PAGE_WIDTH - (BORDER_INSET + 3) * 2,
+    height: PAGE_HEIGHT - (BORDER_INSET + 3) * 2,
     borderColor: gold,
     borderWidth: 0.75
   });
@@ -748,19 +749,19 @@ export async function buildDynamicReferenceSlipPdf(
 
   // Outer Decorative Borders
   page2.drawRectangle({
-    x: 20,
-    y: 20,
-    width: PAGE_WIDTH - 40,
-    height: PAGE_HEIGHT - 40,
+    x: BORDER_INSET,
+    y: BORDER_INSET,
+    width: PAGE_WIDTH - BORDER_INSET * 2,
+    height: PAGE_HEIGHT - BORDER_INSET * 2,
     borderColor: navy,
     borderWidth: 1.5,
     color: white
   });
   page2.drawRectangle({
-    x: 23,
-    y: 23,
-    width: PAGE_WIDTH - 46,
-    height: PAGE_HEIGHT - 46,
+    x: BORDER_INSET + 3,
+    y: BORDER_INSET + 3,
+    width: PAGE_WIDTH - (BORDER_INSET + 3) * 2,
+    height: PAGE_HEIGHT - (BORDER_INSET + 3) * 2,
     borderColor: gold,
     borderWidth: 0.75
   });
@@ -948,7 +949,7 @@ export async function buildDynamicReferenceSlipPdf(
   // Footer
   page2.drawText('A TIGER GLOBAL Career Solution & Consultancy | GSTIN: 27DIFPA0273P1Z4 | REG. NO.: 106157392603', {
     x: MARGIN_X + 80,
-    y: 28,
+    y: 38,
     size: 7,
     font: helvetica,
     color: textMuted
