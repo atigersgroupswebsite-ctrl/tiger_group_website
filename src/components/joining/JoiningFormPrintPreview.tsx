@@ -876,7 +876,210 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
       </div>
 
       {/* ---------------------------------------------------------------------- */}
-      {/* OFFICIAL VOLUNTARY RESIGNATION DECLARATION & UNDERTAKING (SHEET 9)    */}
+      {/* OFFICIAL CONTRACT APPOINTMENT LETTER (SHEET 9)                         */}
+      {/* ---------------------------------------------------------------------- */}
+      <div className="pdf-page-sheet">
+        <div className="pdf-page-inner">
+          <div
+            style={{
+              border: '1px solid #000000',
+              padding: '28px 32px',
+              minHeight: '960px',
+              boxSizing: 'border-box',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              color: '#0F172A',
+              background: '#FFFFFF',
+            }}
+          >
+            <div>
+              {/* Header */}
+              <div style={{ textAlign: 'center', marginBottom: '14px' }}>
+                <div style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '0.5px', color: '#0F172A', textTransform: 'uppercase' }}>
+                  A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY
+                </div>
+                <div style={{ fontSize: '17px', fontWeight: 'bold', textDecoration: 'underline', letterSpacing: '0.8px', marginTop: '4px', color: '#0F172A' }}>
+                  CONTRACT APPOINTMENT LETTER
+                </div>
+              </div>
+
+              {/* Employee Particulars Table */}
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '12px',
+                  marginBottom: '12px',
+                  border: '1px solid #CBD5E1',
+                }}
+              >
+                <tbody>
+                  <tr>
+                    <td style={{ padding: '4px 8px', fontWeight: 700, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', width: '22%' }}>
+                      Employee Name:
+                    </td>
+                    <td style={{ padding: '4px 8px', fontWeight: 600, border: '1px solid #E2E8F0', width: '28%' }}>
+                      {p.employeeName || '—'}
+                    </td>
+                    <td style={{ padding: '4px 8px', fontWeight: 700, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', width: '22%' }}>
+                      Father's Name:
+                    </td>
+                    <td style={{ padding: '4px 8px', border: '1px solid #E2E8F0', width: '28%' }}>
+                      {p.fatherName || '—'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '4px 8px', fontWeight: 700, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                      Employee / Joining ID:
+                    </td>
+                    <td style={{ padding: '4px 8px', fontWeight: 600, border: '1px solid #E2E8F0' }}>
+                      {emp.employeeCode || formData.joiningReference || '—'}
+                    </td>
+                    <td style={{ padding: '4px 8px', fontWeight: 700, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                      Designation:
+                    </td>
+                    <td style={{ padding: '4px 8px', fontWeight: 600, border: '1px solid #E2E8F0' }}>
+                      {emp.designation || '—'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '4px 8px', fontWeight: 700, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                      Department:
+                    </td>
+                    <td style={{ padding: '4px 8px', border: '1px solid #E2E8F0' }}>
+                      {emp.department || 'Operations'}
+                    </td>
+                    <td style={{ padding: '4px 8px', fontWeight: 700, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                      Date of Joining:
+                    </td>
+                    <td style={{ padding: '4px 8px', border: '1px solid #E2E8F0' }}>
+                      {emp.dateOfJoining || decl.declarationDate || '—'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '4px 8px', fontWeight: 700, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                      Contact Number:
+                    </td>
+                    <td style={{ padding: '4px 8px', border: '1px solid #E2E8F0' }}>
+                      {p.employeeContactNumber || p.otherContactNumber || '—'}
+                    </td>
+                    <td style={{ padding: '4px 8px', fontWeight: 700, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                      Permanent Address:
+                    </td>
+                    <td style={{ padding: '4px 8px', border: '1px solid #E2E8F0', fontSize: '11px', lineHeight: 1.3 }}>
+                      {[perm.flatHouseRoad, perm.address, perm.villageOrCity || perm.city, perm.district, perm.state ? `${perm.state} - ${perm.pinCode}` : perm.pinCode].filter(Boolean).join(', ') || perm.address || '—'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Subject */}
+              <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '8px', color: '#0F172A' }}>
+                Subject: Appointment on Contract Basis
+              </div>
+
+              {/* Salutation */}
+              <div style={{ fontSize: '12.5px', marginBottom: '6px', color: '#0F172A' }}>
+                Dear <strong>{p.employeeName || 'Candidate'}</strong>,
+              </div>
+
+              {/* Appointment Statement */}
+              <p style={{ fontSize: '12px', lineHeight: 1.55, margin: '0 0 10px 0', textAlign: 'justify', color: '#0F172A' }}>
+                We are pleased to appoint you in A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY on a contractual basis for operational deployment with the organization/client unit under the terms and conditions outlined below:
+              </p>
+
+              {/* Terms and Conditions (1-7) */}
+              <div style={{ fontSize: '11.5px', lineHeight: 1.5, display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px', color: '#0F172A' }}>
+                <div>
+                  <strong>1. Nature of Contract Engagement:</strong> This appointment is on a contractual basis for operational deployment with the organization/client unit.
+                </div>
+                <div>
+                  <strong>2. Remuneration:</strong> You shall receive a fixed consolidated salary of <strong>₹15,000/- per month</strong>, subject to applicable statutory deductions.
+                </div>
+                <div>
+                  <strong>3. Statutory Benefits:</strong> You shall be eligible for statutory benefits, including Employees' Provident Fund (EPF) and Employee State Insurance (ESIC) where applicable, in accordance with applicable statutory provisions.
+                </div>
+                <div>
+                  <strong>4. Working Hours & Overtime:</strong> You shall observe the standard working hours and operational shift requirements assigned at your deployment facility. Any overtime work performed shall be compensated strictly according to applicable company rules and operational policies.
+                </div>
+                <div>
+                  <strong>5. Work Location / Duties:</strong> You shall diligently perform your assigned duties at the designated work location or client site, maintaining workplace discipline, safety standards, and adherence to applicable operational rules.
+                </div>
+                <div>
+                  <strong>6. Leave:</strong> Leave entitlements shall be governed by applicable company rules and require prior authorization from your designated supervisor or management.
+                </div>
+                <div>
+                  <strong>7. Transfer / Site Allocation:</strong> The employee may be transferred or reassigned to another site or location according to work requirements.
+                </div>
+              </div>
+            </div>
+
+            {/* Signature / Acceptance Section */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
+                paddingTop: '10px',
+                borderTop: '1px solid #CBD5E1',
+                gap: '24px',
+              }}
+            >
+              {/* Company Authorization Block */}
+              <div style={{ width: '48%', fontSize: '11.5px', lineHeight: 1.4 }}>
+                <div style={{ fontWeight: 'bold', color: '#0F172A', marginBottom: '2px' }}>
+                  For A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY
+                </div>
+                <div style={{ minHeight: '44px' }} />
+                <div style={{ fontWeight: 700, color: '#0F172A' }}>Authorized Management Signatory</div>
+                <div style={{ color: '#475569', fontSize: '11px' }}>HR & Operations Department</div>
+              </div>
+
+              {/* Employee Acceptance Acknowledgment Block */}
+              <div style={{ width: '48%', fontSize: '11.5px', lineHeight: 1.4 }}>
+                <div style={{ fontWeight: 'bold', color: '#0F172A', marginBottom: '2px' }}>
+                  Employee Acceptance Acknowledgment:
+                </div>
+                <div style={{ fontSize: '10.5px', color: '#475569', marginBottom: '4px', fontStyle: 'italic' }}>
+                  "I have read, understood, and accept the above terms and conditions of my appointment."
+                </div>
+                <div
+                  style={{
+                    minHeight: '44px',
+                    borderBottom: '1px solid #000000',
+                    display: 'flex',
+                    alignItems: 'center',
+                    paddingLeft: '4px',
+                    marginBottom: '4px',
+                  }}
+                >
+                  {signatureUrl ? (
+                    <img
+                      src={signatureUrl}
+                      alt="Employee Signature"
+                      className="pdf-rendered-signature"
+                      style={{ maxHeight: '40px', maxWidth: '150px', objectFit: 'contain' }}
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <span className="pdf-sign-placeholder" style={{ fontSize: '11px', color: '#64748B', fontStyle: 'italic' }}>
+                      Awaiting Upload
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                  <span style={{ fontWeight: 700 }}>Employee Signature</span>
+                  <span style={{ fontWeight: 600 }}>{p.employeeName || '\u00A0'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ---------------------------------------------------------------------- */}
+      {/* OFFICIAL VOLUNTARY RESIGNATION DECLARATION & UNDERTAKING (SHEET 10)   */}
       {/* ---------------------------------------------------------------------- */}
       <div className="pdf-page-sheet">
         <div className="pdf-page-inner">
