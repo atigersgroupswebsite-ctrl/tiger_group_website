@@ -16,6 +16,7 @@ import {
   verifyCandidateDocument,
   rejectCandidateDocument,
   getDocumentSignedUrl,
+  downloadCandidateDocument,
   type DocumentQueueItem
 } from '../../services/adminDocumentService';
 import { getEntityActivityLogs } from '../../services/activityService';
@@ -36,7 +37,8 @@ import {
   Calendar,
   Check,
   Activity,
-  Maximize2
+  Maximize2,
+  Download
 } from 'lucide-react';
 
 const STATUS_BADGES: Record<
@@ -100,6 +102,7 @@ export const AdminDocumentDetailPage: React.FC = () => {
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState<boolean>(false);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
   const loadDocumentData = useCallback(async () => {
     if (!id) return;
@@ -185,6 +188,24 @@ export const AdminDocumentDetailPage: React.FC = () => {
       setError(err?.message || 'Rejection failed.');
     } finally {
       setIsRejecting(false);
+    }
+  };
+
+  // Handle Download Action
+  const handleDownload = async () => {
+    if (!document || isDownloading) return;
+    setIsDownloading(true);
+    setError(null);
+
+    try {
+      const res = await downloadCandidateDocument(document);
+      if (!res.success) {
+        setError(res.error || 'Failed to download original document.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error occurred while downloading document.');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -467,25 +488,56 @@ export const AdminDocumentDetailPage: React.FC = () => {
           {/* Action Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
             {signedUrl && (
-              <button
-                onClick={() => setIsViewerOpen(true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  padding: '0.55rem 1rem',
-                  backgroundColor: '#FFFFFF',
-                  color: '#192A56',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '6px',
-                  fontWeight: 600,
-                  fontSize: '0.825rem',
-                  cursor: 'pointer'
-                }}
-              >
-                <Maximize2 size={14} />
-                <span>Fullscreen Viewer</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  title="Download original uploaded file"
+                  aria-label="Download original file"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.55rem 1rem',
+                    backgroundColor: '#FFFFFF',
+                    color: '#192A56',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: '6px',
+                    fontWeight: 600,
+                    fontSize: '0.825rem',
+                    cursor: isDownloading ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isDownloading ? (
+                    <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                  ) : (
+                    <Download size={14} />
+                  )}
+                  <span>{isDownloading ? 'Downloading...' : 'Download Original File'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsViewerOpen(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.55rem 1rem',
+                    backgroundColor: '#FFFFFF',
+                    color: '#192A56',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: '6px',
+                    fontWeight: 600,
+                    fontSize: '0.825rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Maximize2 size={14} />
+                  <span>Fullscreen Viewer</span>
+                </button>
+              </>
             )}
 
             {canVerify && (

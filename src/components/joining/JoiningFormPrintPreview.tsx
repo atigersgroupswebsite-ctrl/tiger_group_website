@@ -876,7 +876,7 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
       </div>
 
       {/* ---------------------------------------------------------------------- */}
-      {/* OFFICIAL HINDI VOLUNTARY RESIGNATION / TYAGPATRA                       */}
+      {/* OFFICIAL VOLUNTARY RESIGNATION DECLARATION & UNDERTAKING (SHEET 9)    */}
       {/* ---------------------------------------------------------------------- */}
       <div className="pdf-page-sheet">
         <div className="pdf-page-inner">
@@ -896,80 +896,73 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
             }}
           >
             {/* Centered Underlined Heading */}
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '28px' }}>
               <span
                 style={{
-                  fontSize: '22px',
+                  fontSize: '20px',
                   fontWeight: 'bold',
                   textDecoration: 'underline',
                   letterSpacing: '1px',
                 }}
               >
-                त्यागपत्र
-              </span>
-            </div>
-
-            {/* Top-Right Date Field */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '28px' }}>
-              <span style={{ fontSize: '15px', fontWeight: 500 }}>
-                दिनांक: _____ / _____ /20____
+                EMPLOYEE RESIGNATION DECLARATION & UNDERTAKING
               </span>
             </div>
 
             {/* Addressee Section */}
             <div style={{ marginBottom: '22px', lineHeight: 1.7, fontSize: '15px' }}>
-              <div>सेवा में,</div>
-              <div>प्रबंधक महोदय (HR Department)</div>
+              <div>To,</div>
+              <div>The Management (HR Department)</div>
               <div style={{ fontWeight: 'bold' }}>A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY</div>
             </div>
 
             {/* Subject Line */}
             <div style={{ marginBottom: '22px', fontSize: '15px', fontWeight: 'bold' }}>
-              विषय:- स्वैच्छिक त्यागपत्र
+              Subject: Employee Resignation Declaration & Exit Undertaking
             </div>
 
             {/* Salutation */}
             <div style={{ marginBottom: '18px', fontSize: '15px' }}>
-              महोदय,
+              Dear Sir / Madam,
             </div>
 
             {/* Body Paragraph 1 */}
             <p style={{ margin: '0 0 18px 0', fontSize: '15px', lineHeight: 2.1, textAlign: 'justify' }}>
-              सविनय निवेदन है कि मैं A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY में{' '}
+              I, the undersigned, am engaged with A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY in the capacity of{' '}
               {emp.designation ? (
                 <span style={{ textDecoration: 'underline', fontWeight: 600, padding: '0 6px' }}>
                   {emp.designation}
                 </span>
               ) : (
                 '___________________________________'
-              )}{' '}
-              पद पर कार्यरत हूँ। व्यक्तिगत कारणों से मैं अपनी सेवाएँ आगे जारी रखने में असमर्थ हूँ।
+              )}
+              .
             </p>
 
             {/* Body Paragraph 2 */}
             <p style={{ margin: '0 0 18px 0', fontSize: '15px', lineHeight: 2.1, textAlign: 'justify' }}>
-              अतः कृपया मेरा त्यागपत्र दिनांक _____ / _____ /20____ से स्वीकार करने का कष्ट करें तथा नियमानुसार मेरी अंतिम कार्यवाही (Full & Final Settlement) पूर्ण करने की कृपा करें।
+              I hereby declare that, upon my decision to discontinue or separate from my employment/service with the organization, this declaration may be relied upon as my voluntary resignation declaration and may be used for completing the applicable exit formalities and Full & Final Settlement, subject to the company's applicable rules and statutory requirements.
             </p>
 
             {/* Body Paragraph 3 */}
             <p style={{ margin: '0 0 28px 0', fontSize: '15px', lineHeight: 2.1, textAlign: 'justify' }}>
-              मैं A TIGER GROUP'S द्वारा दिए गए अवसर, सहयोग एवं मार्गदर्शन के लिए हृदय से धन्यवाद देता/देती हूँ। यहाँ कार्य करना मेरे लिए एक महत्वपूर्ण अनुभव रहा है।
+              I express my sincere appreciation to A TIGER GROUP'S for the opportunity, cooperation, professional guidance, and experience provided to me during my association with the organization.
             </p>
 
-            {/* Closing & Bottom Date */}
-            <div style={{ marginBottom: '32px', fontSize: '15px' }}>
-              <div style={{ marginBottom: '18px' }}>धन्यवाद।</div>
-              <div>दिनांक: _____ / _____ /20____</div>
+            {/* Closing */}
+            <div style={{ marginBottom: '28px', fontSize: '15px', lineHeight: 1.6 }}>
+              <div>Thanking you,</div>
+              <div style={{ fontWeight: 600 }}>Yours faithfully,</div>
             </div>
 
             {/* Employee Section */}
-            <div style={{ width: '100%', maxWidth: '440px', fontSize: '15px' }}>
+            <div style={{ width: '100%', maxWidth: '460px', fontSize: '15px' }}>
               <div style={{ fontWeight: 'bold', marginBottom: '14px', fontSize: '16px' }}>
-                कर्मचारी
+                Employee Particulars
               </div>
 
               <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '12px' }}>
-                <span style={{ minWidth: '130px', fontWeight: 600 }}>कर्मचारी का नाम:</span>
+                <span style={{ minWidth: '170px', fontWeight: 600 }}>Employee Name:</span>
                 <span
                   style={{
                     flex: 1,
@@ -984,7 +977,7 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
               </div>
 
               <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '12px' }}>
-                <span style={{ minWidth: '130px', fontWeight: 600 }}>कर्मचारी आईडी:</span>
+                <span style={{ minWidth: '170px', fontWeight: 600 }}>Employee / Joining ID:</span>
                 <span
                   style={{
                     flex: 1,
@@ -994,12 +987,12 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
                     fontWeight: 600,
                   }}
                 >
-                  {emp.employeeCode || '\u00A0'}
+                  {emp.employeeCode || formData.joiningReference || '\u00A0'}
                 </span>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '12px' }}>
-                <span style={{ minWidth: '130px', fontWeight: 600 }}>पद:</span>
+                <span style={{ minWidth: '170px', fontWeight: 600 }}>Designation:</span>
                 <span
                   style={{
                     flex: 1,
@@ -1014,7 +1007,7 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
               </div>
 
               <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '12px' }}>
-                <span style={{ minWidth: '130px', fontWeight: 600 }}>मोबाइल नंबर:</span>
+                <span style={{ minWidth: '170px', fontWeight: 600 }}>Contact Number:</span>
                 <span
                   style={{
                     flex: 1,
@@ -1028,17 +1021,32 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
                 </span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '12px' }}>
-                <span style={{ minWidth: '130px', fontWeight: 600 }}>हस्ताक्षर:</span>
-                <span
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ minWidth: '170px', fontWeight: 600 }}>Employee Signature:</span>
+                <div
                   style={{
                     flex: 1,
                     borderBottom: '1px solid #000000',
-                    minHeight: '22px',
+                    minHeight: '44px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    paddingLeft: '8px',
                   }}
                 >
-                  {'\u00A0'}
-                </span>
+                  {signatureUrl ? (
+                    <img
+                      src={signatureUrl}
+                      alt="Employee Signature"
+                      className="pdf-rendered-signature"
+                      style={{ maxHeight: '40px', maxWidth: '160px', objectFit: 'contain' }}
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <span className="pdf-sign-placeholder" style={{ fontSize: '13px', color: '#64748B', fontStyle: 'italic' }}>
+                      Awaiting Upload
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>

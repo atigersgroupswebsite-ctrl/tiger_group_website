@@ -215,6 +215,84 @@ export async function getDocumentSignedUrl(
 }
 
 /**
+ * Securely downloads an uploaded candidate document for administrative inspection.
+ * Obtains a short-lived signed URL, fetches binary content, and triggers client download
+ * preserving the original filename whenever available.
+ */
+export async function downloadCandidateDocument(
+  doc: {
+    id?: string;
+    storage_path?: string | null;
+    original_file_name?: string | null;
+    document_type?: string;
+    document_side?: string | null;
+    mime_type?: string | null;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  if (!doc.storage_path && !doc.id) {
+    return { success: false, error: 'Document has no storage path or identifier recorded.' };
+  }
+
+  // 1. Obtain temporary signed URL (300 seconds expiry)
+  const urlRes = await getDocumentSignedUrl(doc.storage_path, 300, doc.id);
+  if (!urlRes.success || !urlRes.signedUrl) {
+    return { success: false, error: urlRes.error || 'Failed to generate secure download URL.' };
+  }
+
+  try {
+    // 2. Fetch object binary over HTTPS
+    const response = await fetch(urlRes.signedUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to retrieve file from storage (${response.status})`);
+    }
+
+    const blob = await response.blob();
+
+    // 3. Resolve safe download filename
+    let fileName = (doc.original_file_name || '').trim().replace(/\0/g, '').replace(/[<>:"/\\|?*]/g, '_');
+    if (!fileName) {
+      const ext = doc.mime_type?.includes('pdf')
+        ? '.pdf'
+        : doc.mime_type?.includes('png')
+        ? '.png'
+        : doc.mime_type?.includes('webp')
+        ? '.webp'
+        : '.jpg';
+      let baseType = (doc.document_type || 'candidate_document').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+      if (baseType === 'pan') {
+        baseType = 'pan_card';
+      }
+      const side = doc.document_side && doc.document_side !== 'SINGLE' ? `_${doc.document_side.toLowerCase()}` : '';
+      fileName = `${baseType}${side}${ext}`;
+    }
+
+    // Ensure no unsafe characters remain
+    fileName = fileName.replace(/[<>:"/\\|?*]/g, '_');
+
+    // 4. Trigger browser download using ephemeral Object URL
+    const blobUrl = window.URL.createObjectURL(blob);
+    try {
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally {
+      // 5. Clean up ephemeral Object URL
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 1500);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[downloadCandidateDocument] Download failed:', err);
+    return { success: false, error: err?.message || 'Could not download document file.' };
+  }
+}
+
+/**
  * Verifies a candidate document via transactional RPC admin_verify_document.
  * Sets entity_type = 'DOCUMENT' on the activity log.
  */

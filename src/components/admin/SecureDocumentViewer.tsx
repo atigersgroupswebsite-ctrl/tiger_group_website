@@ -5,8 +5,9 @@
 // ==============================================================================
 
 import React, { useState } from 'react';
-import { X, ExternalLink, AlertCircle, FileText, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
+import { X, ExternalLink, Download, AlertCircle, FileText, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import type { DocumentRow } from '../../types/database';
+import { downloadCandidateDocument } from '../../services/adminDocumentService';
 
 interface SecureDocumentViewerProps {
   document: DocumentRow | null;
@@ -26,8 +27,21 @@ export const SecureDocumentViewer: React.FC<SecureDocumentViewerProps> = ({
   errorMessage
 }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
   if (!isOpen || !document) return null;
+
+  const handleDownload = async () => {
+    if (!document || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await downloadCandidateDocument(document);
+    } catch (err) {
+      console.error('Failed to download document:', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const isPdf =
     document.mime_type?.includes('pdf') ||
@@ -151,23 +165,49 @@ export const SecureDocumentViewer: React.FC<SecureDocumentViewerProps> = ({
             )}
 
             {signedUrl && (
-              <a
-                href={signedUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Open in new tab"
-                style={{
-                  padding: '0.4rem',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '6px',
-                  backgroundColor: '#FFFFFF',
-                  color: '#475569',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
-              >
-                <ExternalLink size={16} />
-              </a>
+              <>
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  title="Download original file"
+                  aria-label="Download original file"
+                  style={{
+                    padding: '0.4rem',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: '6px',
+                    backgroundColor: '#FFFFFF',
+                    color: '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    cursor: isDownloading ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isDownloading ? (
+                    <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                  ) : (
+                    <Download size={16} />
+                  )}
+                </button>
+
+                <a
+                  href={signedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open in new tab"
+                  style={{
+                    padding: '0.4rem',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: '6px',
+                    backgroundColor: '#FFFFFF',
+                    color: '#475569',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  <ExternalLink size={16} />
+                </a>
+              </>
             )}
 
             <button

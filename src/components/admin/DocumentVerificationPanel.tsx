@@ -26,6 +26,7 @@ import {
   verifyCandidateDocument,
   rejectCandidateDocument,
   getDocumentSignedUrl,
+  downloadCandidateDocument,
   CONFIGURED_REQUIRED_DOCUMENTS
 } from '../../services/adminDocumentService';
 import { DocumentSummary } from './DocumentSummary';
@@ -82,6 +83,7 @@ export const DocumentVerificationPanel: React.FC<DocumentVerificationPanelProps>
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
 
   const [processingDocId, setProcessingDocId] = useState<string | null>(null);
+  const [downloadingDocId, setDownloadingDocId] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panelSuccess, setPanelSuccess] = useState<string | null>(null);
   const [viewerError, setViewerError] = useState<string | null>(null);
@@ -94,7 +96,7 @@ export const DocumentVerificationPanel: React.FC<DocumentVerificationPanelProps>
     setViewerError(null);
 
     try {
-      const res = await getDocumentSignedUrl(doc.storage_path);
+      const res = await getDocumentSignedUrl(doc.storage_path, 3600, doc.id);
       if (res.success && res.signedUrl) {
         setViewerSignedUrl(res.signedUrl);
       } else {
@@ -115,6 +117,22 @@ export const DocumentVerificationPanel: React.FC<DocumentVerificationPanelProps>
     setSelectedDocForView(null);
     setViewerSignedUrl(null);
     setViewerError(null);
+  };
+
+  // Handle Secure Download
+  const handleDownloadDocument = async (doc: DocumentRow) => {
+    setDownloadingDocId(doc.id);
+    setPanelError(null);
+    try {
+      const res = await downloadCandidateDocument(doc);
+      if (!res.success) {
+        setPanelError(res.error || 'Failed to download candidate document.');
+      }
+    } catch (err: any) {
+      setPanelError(err.message || 'Error occurred while downloading document.');
+    } finally {
+      setDownloadingDocId(null);
+    }
   };
 
   // Handle Verify
@@ -393,8 +411,10 @@ export const DocumentVerificationPanel: React.FC<DocumentVerificationPanelProps>
                   key={doc.id}
                   document={doc}
                   isProcessing={processingDocId === doc.id}
+                  isDownloading={downloadingDocId === doc.id}
                   canVerify={canVerify}
                   onView={handleOpenViewer}
+                  onDownload={handleDownloadDocument}
                   onVerify={handleVerify}
                   onReject={handleOpenReject}
                 />
@@ -548,8 +568,10 @@ export const DocumentVerificationPanel: React.FC<DocumentVerificationPanelProps>
                 key={doc.id}
                 document={doc}
                 isProcessing={processingDocId === doc.id}
+                isDownloading={downloadingDocId === doc.id}
                 canVerify={canVerify}
                 onView={handleOpenViewer}
+                onDownload={handleDownloadDocument}
                 onVerify={handleVerify}
                 onReject={handleOpenReject}
               />

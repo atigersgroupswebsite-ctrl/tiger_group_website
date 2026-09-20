@@ -8,6 +8,7 @@ import React from 'react';
 import {
   FileText,
   Eye,
+  Download,
   CheckCircle,
   XCircle,
   Clock,
@@ -21,8 +22,10 @@ import type { DocumentRow } from '../../types/database';
 interface DocumentCardProps {
   document: DocumentRow;
   isProcessing: boolean;
+  isDownloading?: boolean;
   canVerify: boolean;
   onView: (doc: DocumentRow) => void;
+  onDownload?: (doc: DocumentRow) => void;
   onVerify: (doc: DocumentRow) => void;
   onReject: (doc: DocumentRow) => void;
 }
@@ -30,8 +33,10 @@ interface DocumentCardProps {
 export const DocumentCard: React.FC<DocumentCardProps> = ({
   document,
   isProcessing,
+  isDownloading = false,
   canVerify,
   onView,
+  onDownload,
   onVerify,
   onReject
 }) => {
@@ -252,27 +257,58 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           flexWrap: 'wrap'
         }}
       >
-        {/* View Button */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onView(document);
-          }}
-          disabled={isProcessing}
-          className="btn-admin-secondary"
-          style={{
-            padding: '0.45rem 0.85rem',
-            fontSize: '0.8rem',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.35rem'
-          }}
-        >
-          <Eye size={14} />
-          <span>View Document</span>
-        </button>
+        {/* Document Inspection Actions: View & Download */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onView(document);
+            }}
+            disabled={isProcessing}
+            className="btn-admin-secondary"
+            style={{
+              padding: '0.45rem 0.85rem',
+              fontSize: '0.8rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}
+          >
+            <Eye size={14} />
+            <span>View Document</span>
+          </button>
+
+          {onDownload && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDownload(document);
+              }}
+              disabled={isProcessing || isDownloading}
+              className="btn-admin-secondary"
+              title="Download original uploaded file"
+              aria-label="Download original file"
+              style={{
+                padding: '0.45rem 0.85rem',
+                fontSize: '0.8rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              {isDownloading ? (
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Download size={14} />
+              )}
+              <span>{isDownloading ? 'Downloading...' : 'Download'}</span>
+            </button>
+          )}
+        </div>
 
         {/* Verification Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
