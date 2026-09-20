@@ -706,14 +706,69 @@ function sanitizeForPdf(str?: string | null): string {
 }
 
 /**
+ * Requests a short-lived signed URL for a candidate document from the secure server-side gateway.
+ * The server verifies authentication and ownership against the database before signing.
+ */
+async function requestServerDocumentSignedUrl(docId: string): Promise<string | null> {
+  if (!docId || docId.startsWith('form-doc-') || docId.startsWith('draft-')) {
+    return null;
+  }
+
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return null;
+
+    const res = await fetch('/api/candidate/document-signed-url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ documentId: docId })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.success && data?.signedUrl) {
+        return data.signedUrl;
+      }
+    }
+
+    // Fallback: direct gateway payload routing if URL rewrite is bypassed
+    const fallbackRes = await fetch('/api/candidate/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ action: 'document_signed_url', documentId: docId })
+    });
+
+    if (fallbackRes.ok) {
+      const fbData = await fallbackRes.json();
+      if (fbData?.success && fbData?.signedUrl) {
+        return fbData.signedUrl;
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('[requestServerDocumentSignedUrl] Failed to fetch server signed URL:', err);
+    return null;
+  }
+}
+
+/**
  * Securely retrieves the binary content of a candidate-uploaded document.
- * Checks dataUrl, authenticated Supabase Storage download, or temporary signed URL.
+ * Checks in-memory data:, in-memory blob:, server-authorized signed URL, and admin direct storage.
  */
 async function fetchDocumentBytes(doc: {
+  id?: string;
   storage_path?: string | null;
   dataUrl?: string | null;
 }): Promise<Uint8Array | null> {
-  // 1. In-memory dataUrl (draft uploads or preview)
+  // 1. In-memory dataUrl (base64)
   if (doc.dataUrl && doc.dataUrl.startsWith('data:')) {
     try {
       const base64 = doc.dataUrl.split(',')[1];
@@ -730,8 +785,41 @@ async function fetchDocumentBytes(doc: {
     }
   }
 
-  // 2. Storage path in private Supabase candidate-documents bucket
-  if (doc.storage_path) {
+  // 2. In-memory blob: URL (fetch directly from client memory)
+  if (doc.dataUrl && (doc.dataUrl.startsWith('blob:') || doc.dataUrl.startsWith('http://localhost') || doc.dataUrl.startsWith('/'))) {
+    try {
+      const blobResp = await fetch(doc.dataUrl);
+      if (blobResp.ok) {
+        const buf = await blobResp.arrayBuffer();
+        if (buf && buf.byteLength > 0) {
+          return new Uint8Array(buf);
+        }
+      }
+    } catch (blobErr) {
+      console.warn('[fetchDocumentBytes] Blob URL fetch notice:', blobErr);
+    }
+  }
+
+  // 3. Secure server-side signed URL provisioning (for candidate & authenticated sessions)
+  if (doc.id) {
+    try {
+      const serverSignedUrl = await requestServerDocumentSignedUrl(doc.id);
+      if (serverSignedUrl) {
+        const resp = await fetch(serverSignedUrl);
+        if (resp.ok) {
+          const buf = await resp.arrayBuffer();
+          if (buf && buf.byteLength > 0) {
+            return new Uint8Array(buf);
+          }
+        }
+      }
+    } catch (serverErr) {
+      console.warn('[fetchDocumentBytes] Server signed URL fetch error:', serverErr);
+    }
+  }
+
+  // 4. Storage path direct retrieval fallback (works for active Admin sessions)
+  if (doc.storage_path && isSupabaseConfigured) {
     let bucket = 'candidate-documents';
     let path = doc.storage_path;
     if (path.startsWith('candidate-documents/')) {
@@ -741,29 +829,31 @@ async function fetchDocumentBytes(doc: {
       path = path.replace(/^generated-documents\//, '');
     }
 
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase.storage.from(bucket).download(path);
-        if (!error && data) {
-          const buf = await data.arrayBuffer();
+    try {
+      const { data, error } = await supabase.storage.from(bucket).download(path);
+      if (!error && data) {
+        const buf = await data.arrayBuffer();
+        if (buf && buf.byteLength > 0) {
           return new Uint8Array(buf);
         }
-      } catch (dlErr) {
-        console.warn('[fetchDocumentBytes] Direct download failed, attempting signed URL fallback:', dlErr);
       }
+    } catch (dlErr) {
+      console.warn('[fetchDocumentBytes] Direct download fallback failed:', dlErr);
+    }
 
-      try {
-        const { data: signData, error: signErr } = await supabase.storage.from(bucket).createSignedUrl(path, 300);
-        if (!signErr && signData?.signedUrl) {
-          const resp = await fetch(signData.signedUrl);
-          if (resp.ok) {
-            const buf = await resp.arrayBuffer();
+    try {
+      const { data: signData, error: signErr } = await supabase.storage.from(bucket).createSignedUrl(path, 300);
+      if (!signErr && signData?.signedUrl) {
+        const resp = await fetch(signData.signedUrl);
+        if (resp.ok) {
+          const buf = await resp.arrayBuffer();
+          if (buf && buf.byteLength > 0) {
             return new Uint8Array(buf);
           }
         }
-      } catch (signFetchErr) {
-        console.warn('[fetchDocumentBytes] Signed URL fetch error:', signFetchErr);
       }
+    } catch (signFetchErr) {
+      console.warn('[fetchDocumentBytes] Direct signed URL fetch error:', signFetchErr);
     }
   }
 

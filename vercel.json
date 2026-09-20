@@ -35,6 +35,10 @@
       "destination": "/api/enquiries?_action=$1"
     },
     {
+      "source": "/api/candidate/(.*)",
+      "destination": "/api/candidate/register?_action=$1"
+    },
+    {
       "source": "/api/verify",
       "destination": "/api/payment?_action=public-verify"
     },

@@ -121,12 +121,30 @@ export function paymentApiPlugin(): Plugin {
           }
         }
 
-        // Handle Candidate Account Creation via Supabase Auth Admin
-        if (url === '/api/candidate/register' && req.method?.toUpperCase() === 'POST') {
+        // Handle Candidate Operations: Registration, Email Confirmation, and Document Signed URL
+        if (
+          (url.startsWith('/api/candidate/register') || url.startsWith('/api/candidate/document-signed-url')) &&
+          req.method?.toUpperCase() === 'POST'
+        ) {
           try {
             const rawBody = await parseRequestBody(req);
             const body = JSON.parse(rawBody || '{}');
-            const { registerCandidateServerHandler, confirmCandidateEmailServerHandler } = await import('./candidateAccountService');
+            const authHeader = req.headers['authorization'];
+            const {
+              registerCandidateServerHandler,
+              confirmCandidateEmailServerHandler,
+              documentSignedUrlServerHandler
+            } = await import('./candidateAccountService');
+
+            if (
+              url.startsWith('/api/candidate/document-signed-url') ||
+              body?.action === 'document_signed_url' ||
+              body?.action === 'document-signed-url'
+            ) {
+              const result = await documentSignedUrlServerHandler(body, authHeader);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
+
             if (body?.action === 'confirm_email' && body?.email) {
               const result = await confirmCandidateEmailServerHandler(body.email);
               return sendJsonResponse(res, result.status || 200, result.data);
@@ -134,8 +152,8 @@ export function paymentApiPlugin(): Plugin {
             const result = await registerCandidateServerHandler(body);
             return sendJsonResponse(res, result.status || 200, result.data);
           } catch (candRegErr: any) {
-            console.error('[API_CANDIDATE_REGISTER_ERROR]', candRegErr);
-            return sendJsonResponse(res, 500, { success: false, error: candRegErr.message || 'Failed to create candidate account' });
+            console.error('[API_CANDIDATE_GATEWAY_ERROR]', candRegErr);
+            return sendJsonResponse(res, 500, { success: false, error: candRegErr.message || 'Failed to process candidate request' });
           }
         }
 

@@ -144,33 +144,74 @@ export function calculateDocumentVerificationStats(
 
 /**
  * Generates a temporary, secure signed URL to view a private candidate document.
+ * Checks direct Supabase Storage signing first (for admins), then falls back to
+ * secure server-side signed URL gateway (for candidate sessions).
  * Never generates or exposes permanent public URLs.
  */
 export async function getDocumentSignedUrl(
   storagePath: string | null | undefined,
-  expiresInSeconds = 3600
+  expiresInSeconds = 3600,
+  documentId?: string | null
 ): Promise<{ success: boolean; signedUrl?: string; error?: string }> {
-  if (!storagePath) {
-    return { success: false, error: 'Document has no storage path recorded.' };
+  if (!storagePath && !documentId) {
+    return { success: false, error: 'Document has no storage path or ID recorded.' };
   }
 
   if (!isSupabaseConfigured) {
     return { success: true, signedUrl: '#' };
   }
 
-  try {
-    const { data, error } = await supabase.storage
-      .from('candidate-documents')
-      .createSignedUrl(storagePath, expiresInSeconds);
+  // 1. Direct Supabase Storage signed URL (succeeds for active admin sessions)
+  if (storagePath) {
+    try {
+      let bucket = 'candidate-documents';
+      let cleanPath = storagePath;
+      if (cleanPath.startsWith('candidate-documents/')) {
+        cleanPath = cleanPath.replace(/^candidate-documents\//, '');
+      } else if (cleanPath.startsWith('generated-documents/')) {
+        bucket = 'generated-documents';
+        cleanPath = cleanPath.replace(/^generated-documents\//, '');
+      }
 
-    if (error || !data?.signedUrl) {
-      return { success: false, error: error?.message || 'Could not generate secure view URL.' };
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(cleanPath, expiresInSeconds);
+
+      if (!error && data?.signedUrl) {
+        return { success: true, signedUrl: data.signedUrl };
+      }
+    } catch {
+      // Fall through to server-side gateway fallback
     }
-
-    return { success: true, signedUrl: data.signedUrl };
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Storage signed URL generation failed.' };
   }
+
+  // 2. Server gateway fallback (for candidate authenticated sessions)
+  if (documentId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (token) {
+        const res = await fetch('/api/candidate/document-signed-url', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ documentId })
+        });
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData?.success && resData?.signedUrl) {
+            return { success: true, signedUrl: resData.signedUrl };
+          }
+        }
+      }
+    } catch (serverErr: any) {
+      console.warn('[getDocumentSignedUrl] Server gateway fallback notice:', serverErr);
+    }
+  }
+
+  return { success: false, error: 'Could not generate secure view URL.' };
 }
 
 /**

@@ -7,6 +7,7 @@
 // ==============================================================================
 
 import { createClient } from '@supabase/supabase-js';
+import { authenticateRequest } from './supabaseServer.js';
 
 export interface CandidateRegisterPayload {
   email: string;
@@ -224,3 +225,207 @@ export async function registerCandidateServerHandler(
     };
   }
 }
+
+export interface DocumentSignedUrlPayload {
+  documentId?: string;
+  docId?: string;
+}
+
+export interface DocumentSignedUrlResult {
+  success: boolean;
+  signedUrl?: string;
+  documentId?: string;
+  documentType?: string | null;
+  documentSide?: string | null;
+  originalFileName?: string | null;
+  mimeType?: string | null;
+  error?: string;
+}
+
+/**
+ * Server-side handler: Provision secure, temporary signed URLs for candidate documents.
+ * Security:
+ *   - Caller MUST be authenticated with a valid Supabase JWT Bearer token.
+ *   - Verifies active admin role OR candidate ownership (via joining_forms / applications).
+ *   - Rejects cross-candidate access with 403 Forbidden.
+ *   - Retrieves storage path from database row (never trusts client-supplied storage path).
+ *   - Generates short-lived signed URL (300 seconds) via server-side service-role client.
+ *   - Keeps candidate-documents bucket completely private.
+ */
+export async function documentSignedUrlServerHandler(
+  payload: DocumentSignedUrlPayload,
+  authHeader: string | undefined | null
+): Promise<{ status: number; data: DocumentSignedUrlResult }> {
+  // 1. Authenticate caller
+  const auth = await authenticateRequest(authHeader);
+  if (!auth.authenticated || !auth.user) {
+    return {
+      status: 401,
+      data: {
+        success: false,
+        error: auth.error || 'Authentication required to access documents.'
+      }
+    };
+  }
+
+  const user = auth.user;
+  const docId = (payload?.documentId || payload?.docId || '').trim();
+
+  if (!docId) {
+    return {
+      status: 400,
+      data: {
+        success: false,
+        error: 'Document ID is required.'
+      }
+    };
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+
+  try {
+    // 2. Fetch document record exclusively from database
+    const { data: doc, error: docErr } = await supabaseAdmin
+      .from('documents')
+      .select(`
+        id,
+        joining_form_id,
+        application_id,
+        document_type,
+        document_side,
+        storage_path,
+        original_file_name,
+        mime_type,
+        is_current,
+        verification_status
+      `)
+      .eq('id', docId)
+      .maybeSingle();
+
+    if (docErr || !doc) {
+      return {
+        status: 404,
+        data: {
+          success: false,
+          error: 'Document record not found.'
+        }
+      };
+    }
+
+    if (!doc.storage_path) {
+      return {
+        status: 400,
+        data: {
+          success: false,
+          error: 'Document has no storage path recorded.'
+        }
+      };
+    }
+
+    // 3. Determine if caller is an active admin
+    const { data: adminProfile } = await supabaseAdmin
+      .from('admin_profiles')
+      .select('id, role, active')
+      .eq('id', user.id)
+      .eq('active', true)
+      .maybeSingle();
+
+    const isAdmin = Boolean(adminProfile);
+
+    // 4. If not an admin, strictly verify candidate dossier ownership
+    if (!isAdmin) {
+      let isAuthorized = false;
+
+      if (doc.joining_form_id) {
+        const { data: jf } = await supabaseAdmin
+          .from('joining_forms')
+          .select('id, user_id, candidate_auth_user_id, email')
+          .eq('id', doc.joining_form_id)
+          .maybeSingle();
+
+        if (
+          jf &&
+          (jf.candidate_auth_user_id === user.id ||
+            jf.user_id === user.id ||
+            (user.email && jf.email && jf.email.toLowerCase() === user.email.toLowerCase()))
+        ) {
+          isAuthorized = true;
+        }
+      }
+
+      if (!isAuthorized && doc.application_id) {
+        const { data: app } = await supabaseAdmin
+          .from('applications')
+          .select('id, user_id, email')
+          .eq('id', doc.application_id)
+          .maybeSingle();
+
+        if (
+          app &&
+          (app.user_id === user.id ||
+            (user.email && app.email && app.email.toLowerCase() === user.email.toLowerCase()))
+        ) {
+          isAuthorized = true;
+        }
+      }
+
+      if (!isAuthorized) {
+        return {
+          status: 403,
+          data: {
+            success: false,
+            error: 'Forbidden: You do not have permission to access this candidate document.'
+          }
+        };
+      }
+    }
+
+    // 5. Parse bucket & path from authoritative database storage_path
+    let bucket = 'candidate-documents';
+    let path = doc.storage_path;
+    if (path.startsWith('candidate-documents/')) {
+      path = path.replace(/^candidate-documents\//, '');
+    } else if (path.startsWith('generated-documents/')) {
+      bucket = 'generated-documents';
+      path = path.replace(/^generated-documents\//, '');
+    }
+
+    // 6. Generate secure short-lived signed URL (300 seconds / 5 minutes)
+    const { data: signData, error: signErr } = await supabaseAdmin.storage
+      .from(bucket)
+      .createSignedUrl(path, 300);
+
+    if (signErr || !signData?.signedUrl) {
+      return {
+        status: 500,
+        data: {
+          success: false,
+          error: signErr?.message || 'Failed to generate secure document signed URL.'
+        }
+      };
+    }
+
+    return {
+      status: 200,
+      data: {
+        success: true,
+        signedUrl: signData.signedUrl,
+        documentId: doc.id,
+        documentType: doc.document_type,
+        documentSide: doc.document_side,
+        originalFileName: doc.original_file_name,
+        mimeType: doc.mime_type
+      }
+    };
+  } catch (err: any) {
+    console.error('[API_DOCUMENT_SIGNED_URL_ERROR]', err);
+    return {
+      status: 500,
+      data: {
+        success: false,
+        error: err?.message || 'Server error provisioning document signed URL.'
+      }
+    };
+  }
+}
+

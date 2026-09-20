@@ -393,8 +393,14 @@ export function buildJoiningFormDataFromDb(params: BuildJoiningFormDataParams): 
   };
 
   for (const doc of docRows) {
-    const cat = doc.document_type as DocumentCategory;
-    if (normalizedDocs[cat]) {
+    let cat: DocumentCategory | null = null;
+    if (doc.document_type === 'AADHAAR') {
+      cat = doc.document_side === 'BACK' ? 'AADHAAR_BACK' : 'AADHAAR_FRONT';
+    } else if (doc.document_type && doc.document_type in normalizedDocs) {
+      cat = doc.document_type as DocumentCategory;
+    }
+
+    if (cat && normalizedDocs[cat]) {
       normalizedDocs[cat] = {
         ...normalizedDocs[cat],
         verificationStatus: doc.verification_status as any,
@@ -403,7 +409,8 @@ export function buildJoiningFormDataFromDb(params: BuildJoiningFormDataParams): 
           name: doc.original_file_name || (doc as any).file_name || 'Document',
           size: doc.file_size || 0,
           type: doc.mime_type || 'application/octet-stream',
-          dataUrl: undefined
+          dataUrl: undefined,
+          storagePath: doc.storage_path || undefined
         }
       };
     }
