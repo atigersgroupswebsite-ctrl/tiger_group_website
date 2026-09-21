@@ -215,7 +215,7 @@ export async function generateEmployeeIdCardPdf(
   doc.setTextColor(197, 168, 128);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6.5);
-  doc.text('A TIGER GLOBAL', cardWidth / 2, 4.2, { align: 'center' });
+  doc.text("A TIGER GROUP'S", cardWidth / 2, 4.2, { align: 'center' });
 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
@@ -564,7 +564,7 @@ export async function generateEmployeeIdCardPdf(
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(4);
-  doc.text('A TIGER GROUPS — WORKFORCE ONBOARDING & COMPLIANCE DIVISION', cardWidth / 2, 51.2, { align: 'center' });
+  doc.text("A TIGER GROUP'S — WORKFORCE ONBOARDING & COMPLIANCE DIVISION", cardWidth / 2, 51.2, { align: 'center' });
 
   // 3. Produce output
   const pdfBytes = doc.output('arraybuffer');
