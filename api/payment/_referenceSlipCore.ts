@@ -70,6 +70,39 @@ function formatDisplayDate(dateStr?: string | null): string {
   }
 }
 
+function formatDisplayDateTime(isoStr?: string | null): { dateStr: string; timeStr: string } {
+  if (!isoStr) return { dateStr: '—', timeStr: '—' };
+  try {
+    const isDateOnly = !isoStr.includes('T') && !isoStr.includes(':');
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return { dateStr: isoStr, timeStr: '—' };
+
+    const dateFormatter = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    const dateStr = dateFormatter.format(d).replace(/\//g, ' / ');
+
+    if (isDateOnly) {
+      return { dateStr, timeStr: '—' };
+    }
+
+    const timeFormatter = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+    const timeStr = timeFormatter.format(d).toUpperCase();
+
+    return { dateStr, timeStr };
+  } catch {
+    return { dateStr: isoStr, timeStr: '—' };
+  }
+}
+
 function wrapText(
   text: string,
   maxWidth: number,
@@ -135,6 +168,8 @@ async function resolveCandidateInfo(
         .filter(Boolean)
         .join(', ') || 'Nagpur, Maharashtra';
 
+      const rawDesig = jf.designation || jf.position_applied || null;
+
       return {
         sourceType: 'JOINING_FORM',
         sourceId: jf.id,
@@ -148,9 +183,12 @@ async function resolveCandidateInfo(
         gender: jf.gender,
         aadhaarNumber: jf.aadhaar_number,
         panNumber: jf.pan_number,
-        positionApplied: jf.position_applied || 'Consultant / Executive',
-        expectedJoiningDate: jf.expected_joining_date,
-        photoPath: jf.candidate_photo_path
+        positionApplied: rawDesig,
+        expectedJoiningDate: jf.expected_joining_date || jf.date_of_joining,
+        photoPath: jf.candidate_photo_path || jf.photo_path,
+        submittedAt: jf.submitted_at || jf.created_at || null,
+        department: jf.department || null,
+        companyId: jf.company_id || null
       };
     }
   }
@@ -163,6 +201,8 @@ async function resolveCandidateInfo(
       .maybeSingle();
 
     if (app) {
+      const rawDesig = app.position_applied || app.designation || null;
+
       return {
         sourceType: 'APPLICATION',
         sourceId: app.id,
@@ -176,9 +216,12 @@ async function resolveCandidateInfo(
         gender: app.gender,
         aadhaarNumber: app.aadhaar_number,
         panNumber: app.pan_number,
-        positionApplied: app.position_applied || 'Consultant / Executive',
+        positionApplied: rawDesig,
         expectedJoiningDate: app.expected_joining_date,
-        photoPath: app.photo_url
+        photoPath: app.photo_url,
+        submittedAt: app.created_at || null,
+        department: null,
+        companyId: null
       };
     }
   }
@@ -308,11 +351,11 @@ export async function build2PageReferenceSlipPdf(params: {
     color: textMuted,
   });
 
-  // Right Reference Number & Date Box
+  // Right Reference Number & Date / Time Box
   const refBoxX = 390;
-  const refBoxY = 740;
+  const refBoxY = 730;
   const refBoxW = 168;
-  const refBoxH = 55;
+  const refBoxH = 62;
   page1.drawRectangle({
     x: refBoxX,
     y: refBoxY,
@@ -324,22 +367,33 @@ export async function build2PageReferenceSlipPdf(params: {
   });
   page1.drawText('REFERENCE NO.', {
     x: refBoxX + 8,
-    y: refBoxY + 38,
+    y: refBoxY + 48,
     size: 7.5,
     font: helveticaBold,
     color: textMuted,
   });
   page1.drawText(slip.reference_number || 'ATG/REF/2026/000000', {
     x: refBoxX + 8,
-    y: refBoxY + 25,
+    y: refBoxY + 36,
     size: 8.5,
     font: helveticaBold,
     color: navy,
   });
-  page1.drawText(`DATE: ${formatDisplayDate(slip.date || slip.created_at)}`, {
+
+  const issueTimestamp = candidate.submittedAt || slip.created_at || slip.date;
+  const { dateStr: issuedDate, timeStr: issuedTime } = formatDisplayDateTime(issueTimestamp);
+
+  page1.drawText(`DATE: ${issuedDate}`, {
+    x: refBoxX + 8,
+    y: refBoxY + 22,
+    size: 7.5,
+    font: helvetica,
+    color: darkSlate,
+  });
+  page1.drawText(`TIME: ${issuedTime}`, {
     x: refBoxX + 8,
     y: refBoxY + 10,
-    size: 8,
+    size: 7.5,
     font: helvetica,
     color: darkSlate,
   });
@@ -412,7 +466,7 @@ export async function build2PageReferenceSlipPdf(params: {
     { label: '6. Address', val: candidate.address || '—', maxLen: 50 },
     { label: '7. Aadhaar No.', val: candidate.aadhaarNumber || '—' },
     { label: '8. PAN', val: candidate.panNumber || '—' },
-    { label: '9. Position Applied', val: candidate.positionApplied || slip.designation || 'Consultant / Executive', bold: true },
+    { label: '9. Position Applied', val: candidate.positionApplied || slip.designation || '—', bold: true },
     { label: '10. Expected Date of Joining', val: formatDisplayDate(candidate.expectedJoiningDate || slip.joining_date) || 'Immediate' },
   ];
 
@@ -513,8 +567,8 @@ export async function build2PageReferenceSlipPdf(params: {
   });
 
   const compFields = [
-    { l: '1. Date of Interview', v: formatDisplayDate(slip.interview_date), l2: '4. Department', v2: slip.department || '—' },
-    { l: '2. Reporting Date', v: formatDisplayDate(slip.reporting_date), l2: '5. Designation', v2: slip.designation || '—' },
+    { l: '1. Date of Interview', v: formatDisplayDate(slip.interview_date), l2: '4. Department', v2: slip.department || candidate.department || '—' },
+    { l: '2. Reporting Date', v: formatDisplayDate(slip.reporting_date), l2: '5. Designation', v2: slip.designation || candidate.positionApplied || '—' },
     { l: '3. Reporting Time', v: slip.reporting_time || '—', l2: '6. Salary (CTC)', v2: slip.salary_ctc ? `INR ${Number(slip.salary_ctc).toLocaleString('en-IN')} / Month` : '—' },
   ];
 
@@ -1007,9 +1061,10 @@ export async function ensureReferenceSlipForPayment(
         application_id: application_id || null,
         joining_form_id: joining_form_id || null,
         reference_number: refNumber,
-        date: new Date().toISOString().split('T')[0],
+        date: candidate.submittedAt ? candidate.submittedAt.split('T')[0] : new Date().toISOString().split('T')[0],
         interview_result: 'SELECTED',
-        designation: candidate.positionApplied || 'Consultant / Executive',
+        department: candidate.department || null,
+        designation: candidate.positionApplied || null,
         remarks: 'Official reference slip authorized upon verified payment completion.',
       };
 
@@ -1273,8 +1328,8 @@ export async function verifyDocumentTokenHandler(token: string): Promise<{ statu
           candidateName,
           issuanceDate: slip.date || (slip.created_at ? slip.created_at.split('T')[0] : '—'),
           issuingAuthority: 'A TIGER GLOBAL Career Solution & Consultancy',
-          designation: slip.selected_designation || slip.designation || 'Consultant / Executive',
-          department: slip.department || 'Operations / Placement',
+          designation: slip.selected_designation || slip.designation || '—',
+          department: slip.department || '—',
           companyName: slip.company_name || 'A TIGER GLOBAL Authorized Client Organization',
           interviewResult: slip.interview_result || 'SELECTED',
           paymentVerified: Boolean(payment?.status === 'SUCCESS'),

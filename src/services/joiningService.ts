@@ -458,8 +458,8 @@ export function buildJoiningFormDataFromDb(params: BuildJoiningFormDataParams): 
       unit: formRecord?.unit || 'Assigned Operations Unit',
       address: formRecord?.company_address || 'Nagpur Industrial Cluster, MH',
       employeeCode: formRecord?.employee_code || formRecord?.joining_reference || (applicationRecord ? applicationRecord.application_number : 'Assigned on Deployment'),
-      designation: formRecord?.designation || applicationRecord?.designation || 'Staff / Trainee Associate',
-      department: formRecord?.department || 'Operations',
+      designation: formRecord?.designation || applicationRecord?.designation || '',
+      department: formRecord?.department || '',
       subDepartment: formRecord?.sub_department || 'General Operations',
       location: formRecord?.location || 'Nagpur, Maharashtra',
       dateOfJoining: formRecord?.date_of_joining || '',
@@ -764,10 +764,26 @@ export async function saveJoiningDraft(
       return { success: true };
     }
 
+    const targetDraftId = data.formId || identifier;
+    if (targetDraftId && (data.employment?.designation !== undefined || data.employment?.department !== undefined)) {
+      try {
+        await supabase
+          .from('joining_forms')
+          .update({
+            designation: data.employment?.designation?.trim() || null,
+            department: data.employment?.department?.trim() || null
+          })
+          .or(`id.eq.${targetDraftId},joining_reference.eq.${targetDraftId}`);
+      } catch (draftUpdErr) {
+        // Non-blocking in draft save
+      }
+    }
+
     const payload = {
       form_id: data.formId || identifier,
       application_id: data.applicationId || null,
       personal: canonicalizePersonalPhones(data.personal || {}),
+      employment: data.employment || {},
       permanent_address: data.permanentAddress || {},
       current_address: data.currentAddress || {},
       same_as_permanent: data.sameAsPermanentAddress ?? false,
@@ -831,11 +847,29 @@ export async function submitJoiningForm(
   }
 
   try {
+    const preSubmitId = data.formId || identifier;
+    if (preSubmitId) {
+      try {
+        await supabase
+          .from('joining_forms')
+          .update({
+            designation: data.employment?.designation?.trim() || null,
+            department: data.employment?.department?.trim() || null
+          })
+          .or(`id.eq.${preSubmitId},joining_reference.eq.${preSubmitId}`);
+      } catch {
+        // Non-blocking pre-submit sync
+      }
+    }
+
     const payload = {
       form_id: data.formId || identifier,
       application_id: data.applicationId || null,
       candidate_name: (data.personal?.employeeName || '').trim(),
       email: candidateEmail,
+      designation: data.employment?.designation?.trim() || null,
+      department: data.employment?.department?.trim() || null,
+      employment: data.employment || {},
       personal: canonicalizePersonalPhones(data.personal || {}),
       permanent_address: data.permanentAddress || {},
       current_address: data.currentAddress || {},
@@ -871,7 +905,21 @@ export async function submitJoiningForm(
 
     const submittedAt = res.submitted_at || new Date().toISOString();
     const joiningReference = res.joining_reference || 'JOIN-REFERENCE';
-    const formId = res.form_id;
+    const formId = res.form_id || preSubmitId;
+
+    if (formId) {
+      try {
+        await supabase
+          .from('joining_forms')
+          .update({
+            designation: data.employment?.designation?.trim() || null,
+            department: data.employment?.department?.trim() || null
+          })
+          .eq('id', formId);
+      } catch {
+        // Handled via server dispatch
+      }
+    }
 
     // Asynchronously dispatch confirmation receipt email via server endpoint
     try {
@@ -879,11 +927,13 @@ export async function submitJoiningForm(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          formId,
           candidateName: data.personal?.employeeName || 'Candidate',
           candidateEmail,
           joiningReference,
           companyName: data.employment?.companyName,
-          designation: data.employment?.designation,
+          designation: data.employment?.designation?.trim(),
+          department: data.employment?.department?.trim(),
           submittedAt
         })
       }).catch((emailErr) => console.warn('[JoiningReceiptEmail] Non-blocking dispatch notice:', emailErr));

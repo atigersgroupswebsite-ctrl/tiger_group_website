@@ -215,11 +215,11 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
                 <td className="pdf-label">Date of Joining:</td>
                 <td className="pdf-val">{emp.dateOfJoining || decl.declarationDate || '—'}</td>
                 <td className="pdf-label">Department:</td>
-                <td className="pdf-val">{emp.department || 'Operations'}</td>
+                <td className="pdf-val">{emp.department || '—'}</td>
               </tr>
               <tr>
                 <td className="pdf-label">Designation:</td>
-                <td className="pdf-val">{emp.designation || 'Associate'}</td>
+                <td className="pdf-val">{emp.designation || '—'}</td>
                 <td className="pdf-label">Location / Unit:</td>
                 <td className="pdf-val">{emp.location || 'Nagpur'} / {emp.unit || 'A TIGER GLOBAL'}</td>
               </tr>
@@ -648,9 +648,9 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
                 </tr>
                 <tr>
                   <td className="pdf-label">5. Department:</td>
-                  <td className="pdf-val">{emp.department || 'Operations'}</td>
+                  <td className="pdf-val">{emp.department || '—'}</td>
                   <td className="pdf-label">6. Designation:</td>
-                  <td className="pdf-val">{emp.designation || 'Associate'}</td>
+                  <td className="pdf-val">{emp.designation || '—'}</td>
                 </tr>
                 <tr>
                   <td className="pdf-label">7. PAN Number:</td>
@@ -736,9 +736,9 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
               <p>
                 I, <strong>{p.employeeName}</strong>, residing at{' '}
                 <strong>{perm.villageOrCity || perm.city || 'Nagpur'}, {perm.district}</strong>, working as{' '}
-                <strong>{emp.designation || 'Associate'}</strong> in M/s{' '}
+                <strong>{emp.designation || '—'}</strong> in M/s{' '}
                 <strong>A TIGER GLOBAL Career Solution & Consultancy</strong>, state that I am working as{' '}
-                <strong>{emp.designation || 'Associate'}</strong>.
+                <strong>{emp.designation || '—'}</strong>.
               </p>
               <p>
                 I am aware that:
@@ -843,7 +843,7 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
               For the above purpose, the term 'relatives' includes the following relationships, whether established by blood, marriage, or other legal action: mother, father, husband, wife, son, daughter, sister, brother, mother-in-law, father-in-law, sister-in-law, brother-in-law, son-in-law, daughter-in-law, stepchild, aunt, uncle, nephew, niece or cousin.
             </p>
             <p>
-              I, <strong>{p.employeeName}</strong>, joined on <strong>{decl.declarationDate}</strong> as <strong>{emp.designation || 'Associate'}</strong>, do hereby declare that:
+              I, <strong>{p.employeeName}</strong>, joined on <strong>{decl.declarationDate}</strong> as <strong>{emp.designation || '—'}</strong>, do hereby declare that:
             </p>
             <div style={{ backgroundColor: '#F8FAFC', padding: '12px', border: '1px solid #E2E8F0', borderRadius: '4px', margin: '12px 0' }}>
               {decl.hasRelativeInOrganization ? (

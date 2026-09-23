@@ -264,8 +264,8 @@ function buildProgrammaticJoiningPdf(formData: JoiningFormData): jsPDF {
   addSectionTitle('EMPLOYEE APPOINTMENT DETAILS', 39);
   y = 45;
   drawRow('Employee Name:', p.employeeName, 'Employee Code:', emp.employeeCode || 'ASSIGNED ON JOINING');
-  drawRow('Date of Joining:', emp.dateOfJoining || decl.declarationDate, 'Department:', emp.department || 'Operations');
-  drawRow('Designation:', emp.designation || 'Associate', 'Location / Unit:', `${emp.location || 'Nagpur'} / ${emp.unit || 'A TIGER GLOBAL'}`);
+  drawRow('Date of Joining:', emp.dateOfJoining || decl.declarationDate, 'Department:', emp.department || '—');
+  drawRow('Designation:', emp.designation || '—', 'Location / Unit:', `${emp.location || 'Nagpur'} / ${emp.unit || 'A TIGER GLOBAL'}`);
 
   y += 4;
   addSectionTitle('DOCUMENT CHECKLIST (STATUTORY SUBMISSIONS)', y);
@@ -429,7 +429,7 @@ function buildProgrammaticJoiningPdf(formData: JoiningFormData): jsPDF {
   y = 46;
   drawRow('1. Location:', emp.location || 'Nagpur, MH', '2. Name:', p.employeeName);
   drawRow("3. Father's Name:", p.fatherName, '4. Date of Birth:', p.dateOfBirth);
-  drawRow('5. Department:', emp.department || 'Operations', '6. Designation:', emp.designation || 'Associate');
+  drawRow('5. Department:', emp.department || '—', '6. Designation:', emp.designation || '—');
   drawRow('7. PAN Number:', p.panNumber, '8. Aadhaar Card No.:', p.aadhaarNumber);
   drawRow('9. Blood Group:', p.bloodGroup || '—', '10. Mobile Number:', p.employeeContactNumber);
   drawRow('11. Name of Bank:', bank.bankName, '12. Branch:', bank.branchName);
@@ -460,7 +460,7 @@ function buildProgrammaticJoiningPdf(formData: JoiningFormData): jsPDF {
     doc.setTextColor(...navy);
     y = 45;
     doc.text(
-      `I, ${p.employeeName || 'Candidate'}, residing at ${perm.villageOrCity || perm.city || 'Nagpur'}, working as ${emp.designation || 'Associate'} in M/s A TIGER GLOBAL Career Solution & Consultancy, state that I am working as ${emp.designation || 'Associate'}.`,
+      `I, ${p.employeeName || 'Candidate'}, residing at ${perm.villageOrCity || perm.city || 'Nagpur'}, working as ${emp.designation || '—'} in M/s A TIGER GLOBAL Career Solution & Consultancy, state that I am working as ${emp.designation || '—'}.`,
       15,
       y,
       { maxWidth: 180 }

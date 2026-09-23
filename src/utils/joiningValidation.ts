@@ -124,10 +124,23 @@ export const validateCustomFields = (
 export const validatePersonal = (
   data: JoiningFormData['personal'],
   configMap?: Record<string, JoiningFieldConfig>,
-  customFields?: Record<string, any>
+  customFields?: Record<string, any>,
+  employment?: JoiningFormData['employment']
 ): StepValidationResult => {
   const errors: Record<string, string> = {};
   const missingFields: string[] = [];
+
+  // Position / Designation (Mandatory for Joining Form)
+  if (!employment?.designation?.trim()) {
+    errors.designation = 'Position / Designation is required';
+    missingFields.push('Position / Designation');
+  }
+
+  // Department (Mandatory for Joining Form)
+  if (!employment?.department?.trim()) {
+    errors.department = 'Department is required';
+    missingFields.push('Department');
+  }
 
   // 1. Employee Name
   if (isFieldEnabled('personal.employeeName', configMap)) {
@@ -928,7 +941,7 @@ export const validateAllSteps = (
   const custom = formData.customFields;
 
   return {
-    1: validatePersonal(formData.personal, configMap, custom),
+    1: validatePersonal(formData.personal, configMap, custom, formData.employment),
     2: validateAddress(
       formData.permanentAddress,
       formData.currentAddress,

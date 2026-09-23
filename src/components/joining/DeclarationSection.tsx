@@ -157,7 +157,7 @@ export const DeclarationSection: React.FC<DeclarationSectionProps> = ({
           >
             I, <strong>{candidateName || 'Candidate'}</strong>, residing at{' '}
             <strong>{candidateAddress || '[Address on Record]'}</strong>, working as{' '}
-            <strong>{candidateDesignation || 'Associate'}</strong> in M/s A TIGER GLOBAL Career Solution & Consultancy,
+            <strong>{candidateDesignation || '[Designation]'}</strong> in M/s A TIGER GLOBAL Career Solution & Consultancy,
             hereby state that I am aware that:
             <ul style={{ margin: '0.5rem 0', paddingLeft: '1.25rem' }}>
               <li>The employer will provide separate, safe, and secure transport facility from the doorstep of my residence to the place of work and vice-versa;</li>

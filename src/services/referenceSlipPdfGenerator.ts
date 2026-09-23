@@ -147,6 +147,42 @@ function formatDisplayDate(dateStr?: string | null): string {
 }
 
 /**
+ * Formats ISO timestamp to Indian Standard Time (Asia/Kolkata) Date & Time
+ */
+function formatDisplayDateTime(isoStr?: string | null): { dateStr: string; timeStr: string } {
+  if (!isoStr) return { dateStr: '—', timeStr: '—' };
+  try {
+    const isDateOnly = !isoStr.includes('T') && !isoStr.includes(':');
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return { dateStr: isoStr, timeStr: '—' };
+
+    const dateFormatter = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    const dateStr = dateFormatter.format(d).replace(/\//g, ' / ');
+
+    if (isDateOnly) {
+      return { dateStr, timeStr: '—' };
+    }
+
+    const timeFormatter = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+    const timeStr = timeFormatter.format(d).toUpperCase();
+
+    return { dateStr, timeStr };
+  } catch {
+    return { dateStr: isoStr, timeStr: '—' };
+  }
+}
+
+/**
  * Splits text into lines fitting within maxWidth based on pdf-lib font metrics
  */
 function wrapText(
@@ -307,11 +343,11 @@ export async function buildDynamicReferenceSlipPdf(
     color: textMuted
   });
 
-  // Right Reference Number & Date Box
+  // Right Reference Number & Date / Time Box
   const refBoxX = 390;
-  const refBoxY = 740;
+  const refBoxY = 730;
   const refBoxW = 168;
-  const refBoxH = 55;
+  const refBoxH = 62;
   page1.drawRectangle({
     x: refBoxX,
     y: refBoxY,
@@ -323,22 +359,33 @@ export async function buildDynamicReferenceSlipPdf(
   });
   page1.drawText('REFERENCE NO.', {
     x: refBoxX + 8,
-    y: refBoxY + 38,
+    y: refBoxY + 48,
     size: 7.5,
     font: helveticaBold,
     color: textMuted
   });
   page1.drawText(slip.reference_number || 'ATG/REF/2026/000000', {
     x: refBoxX + 8,
-    y: refBoxY + 25,
+    y: refBoxY + 36,
     size: 8.5,
     font: helveticaBold,
     color: navy
   });
-  page1.drawText(`DATE: ${formatDisplayDate(slip.date || slip.created_at)}`, {
+
+  const issueTimestamp = candidate.submittedAt || slip.created_at || slip.date;
+  const { dateStr: issuedDate, timeStr: issuedTime } = formatDisplayDateTime(issueTimestamp);
+
+  page1.drawText(`DATE: ${issuedDate}`, {
+    x: refBoxX + 8,
+    y: refBoxY + 22,
+    size: 7.5,
+    font: helvetica,
+    color: darkSlate
+  });
+  page1.drawText(`TIME: ${issuedTime}`, {
     x: refBoxX + 8,
     y: refBoxY + 10,
-    size: 8,
+    size: 7.5,
     font: helvetica,
     color: darkSlate
   });
@@ -411,7 +458,7 @@ export async function buildDynamicReferenceSlipPdf(
     { label: '6. Address', val: candidate.address || '—', maxLen: 50 },
     { label: '7. Aadhaar No.', val: candidate.aadhaarNumber || '—' },
     { label: '8. PAN', val: candidate.panNumber || '—' },
-    { label: '9. Position Applied', val: candidate.positionApplied || slip.designation || 'Consultant / Executive', bold: true },
+    { label: '9. Position Applied', val: candidate.positionApplied || slip.designation || '—', bold: true },
     { label: '10. Expected Date of Joining', val: formatDisplayDate(candidate.expectedJoiningDate || slip.joining_date) || 'Immediate' }
   ];
 
@@ -512,8 +559,8 @@ export async function buildDynamicReferenceSlipPdf(
   });
 
   const compFields = [
-    { l: '1. Date of Interview', v: formatDisplayDate(slip.interview_date), l2: '4. Department', v2: slip.department || '—' },
-    { l: '2. Reporting Date', v: formatDisplayDate(slip.reporting_date), l2: '5. Designation', v2: slip.designation || '—' },
+    { l: '1. Date of Interview', v: formatDisplayDate(slip.interview_date), l2: '4. Department', v2: slip.department || candidate.department || '—' },
+    { l: '2. Reporting Date', v: formatDisplayDate(slip.reporting_date), l2: '5. Designation', v2: slip.designation || candidate.positionApplied || '—' },
     { l: '3. Reporting Time', v: slip.reporting_time || '—', l2: '6. Salary (CTC)', v2: slip.salary_ctc ? `INR ${slip.salary_ctc.toLocaleString('en-IN')} / Month` : '—' }
   ];
 

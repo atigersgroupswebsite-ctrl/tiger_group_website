@@ -40,6 +40,10 @@ export interface CandidateSourceInfo {
   expectedJoiningDate?: string | null;
   photoUrl?: string | null;
   signatureUrl?: string | null;
+  submittedAt?: string | null;
+  department?: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
 }
 
 export interface ReferenceSlipListItem {
@@ -157,6 +161,18 @@ export async function resolveCandidateSource(
         .maybeSingle();
 
       if (jf && !jfErr) {
+        // Resolve company name if company_id is present
+        let companyName: string | null = null;
+        if (jf.company_id) {
+          const { data: comp } = await supabase
+            .from('companies')
+            .select('name')
+            .eq('id', jf.company_id)
+            .maybeSingle();
+          if (comp?.name) companyName = comp.name;
+        }
+
+        // Preserve candidate's exact selected designation and department
         return {
           sourceType: 'JOINING_FORM',
           sourceId: jf.id,
@@ -172,10 +188,14 @@ export async function resolveCandidateSource(
           gender: jf.gender,
           aadhaarNumber: jf.aadhaar_number,
           panNumber: jf.pan_number,
-          positionApplied: jf.designation,
+          positionApplied: jf.designation || null,
           expectedJoiningDate: jf.date_of_joining,
           photoUrl: jf.photo_path,
-          signatureUrl: jf.candidate_signature_path
+          signatureUrl: jf.candidate_signature_path,
+          submittedAt: jf.submitted_at || jf.created_at || null,
+          department: jf.department || null,
+          companyId: jf.company_id || null,
+          companyName: companyName
         };
       }
     }
@@ -211,6 +231,8 @@ export async function resolveCandidateSource(
           .eq('document_type', 'SIGNATURE')
           .maybeSingle();
 
+        const rawDesig = app.designation || linkedJf?.designation || null;
+
         return {
           sourceType: 'APPLICATION',
           sourceId: app.id,
@@ -224,10 +246,14 @@ export async function resolveCandidateSource(
           gender: linkedJf?.gender || null,
           aadhaarNumber: linkedJf?.aadhaar_number || null,
           panNumber: linkedJf?.pan_number || null,
-          positionApplied: app.designation || linkedJf?.designation || null,
+          positionApplied: rawDesig,
           expectedJoiningDate: linkedJf?.date_of_joining || null,
           photoUrl: linkedJf?.photo_path || photoDoc?.storage_path || null,
-          signatureUrl: linkedJf?.candidate_signature_path || sigDoc?.storage_path || null
+          signatureUrl: linkedJf?.candidate_signature_path || sigDoc?.storage_path || null,
+          submittedAt: linkedJf?.submitted_at || linkedJf?.created_at || app.created_at || null,
+          department: linkedJf?.department || null,
+          companyId: linkedJf?.company_id || null,
+          companyName: null
         };
       }
     }
@@ -919,7 +945,11 @@ export async function getOrCreateReferenceSlipForEntity(params: {
       joiningFormId: params.joiningFormId,
       formData: {
         interviewResult: 'SELECTED',
-        designation: candidate.positionApplied || 'Consultant / Executive',
+        designation: candidate.positionApplied || null,
+        department: candidate.department || null,
+        companyId: candidate.companyId || undefined,
+        companyName: candidate.companyName || undefined,
+        interviewDate: candidate.submittedAt ? candidate.submittedAt.split('T')[0] : undefined,
         remarks: 'Auto-generated official reference slip upon verified payment completion.'
       },
       adminUser: { id: params.adminUserId || 'system', name: 'Automated Payment Verification' }

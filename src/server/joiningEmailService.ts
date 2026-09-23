@@ -7,13 +7,16 @@
 
 import { sendApplicationEmail } from './resendClient.js';
 import { renderJoiningReceiptTemplate } from './emailTemplates.js';
+import { getSupabaseServer } from './supabaseServer.js';
 
 export interface JoiningReceiptRequest {
+  formId?: string;
   candidateName: string;
   candidateEmail: string;
   joiningReference: string;
   companyName?: string;
   designation?: string;
+  department?: string;
   submittedAt: string;
 }
 
@@ -40,6 +43,22 @@ export async function sendJoiningReceiptServerHandler(
       status: 400,
       data: { success: false, error: 'A valid candidate email address is required.' }
     };
+  }
+
+  // Ensure authoritative designation and department are saved on the submitted record
+  if (payload.formId && (payload.designation !== undefined || payload.department !== undefined)) {
+    try {
+      const serverSupabase = getSupabaseServer();
+      await serverSupabase
+        .from('joining_forms')
+        .update({
+          designation: payload.designation ? payload.designation.trim() : null,
+          department: payload.department ? payload.department.trim() : null
+        })
+        .eq('id', payload.formId);
+    } catch (syncErr) {
+      console.warn('[JoiningReceipt] Server sync note:', syncErr);
+    }
   }
 
   const formattedDate = new Date(payload.submittedAt || new Date()).toLocaleString('en-IN', {

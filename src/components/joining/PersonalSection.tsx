@@ -6,7 +6,12 @@ import { CustomFieldsRenderer } from './CustomFieldsRenderer';
 
 interface PersonalSectionProps {
   data: PersonalInfo;
+  employment?: {
+    designation: string;
+    department: string;
+  };
   onChange: (field: keyof PersonalInfo, value: string) => void;
+  onEmploymentChange?: (field: 'designation' | 'department', value: string) => void;
   errors: Record<string, string>;
   readOnly?: boolean;
   configMap?: Record<string, JoiningFieldConfig>;
@@ -16,7 +21,9 @@ interface PersonalSectionProps {
 
 export const PersonalSection: React.FC<PersonalSectionProps> = ({
   data,
+  employment,
   onChange,
+  onEmploymentChange,
   errors,
   readOnly = false,
   configMap,
@@ -80,11 +87,76 @@ export const PersonalSection: React.FC<PersonalSectionProps> = ({
   return (
     <div>
       <div className="joining-step-header">
-        <span className="joining-step-tag">STEP 02</span>
-        <h2 className="joining-step-title">PERSONAL INFORMATION</h2>
+        <span className="joining-step-tag">STEP 01</span>
+        <h2 className="joining-step-title">PERSONAL & POSITION INFORMATION</h2>
         <p className="joining-step-desc">
-          Official identity and demographic records required for statutory KYC registration.
+          Official position, department, and identity records required for statutory KYC registration.
         </p>
+      </div>
+
+      {/* Position / Designation and Department */}
+      <div className="joining-grid-2" style={{ marginBottom: '1.25rem' }}>
+        <div className="field-wrapper">
+          <label className="field-label" htmlFor="designation">
+            <span>POSITION / DESIGNATION</span>
+            <span className="field-required-star">*</span>
+          </label>
+          <input
+            id="designation"
+            type="text"
+            list="joining-designation-options"
+            className={`field-input ${errors.designation ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
+            placeholder="e.g. Helper, Operator, Accountant, etc."
+            value={employment?.designation || ''}
+            onChange={(e) => onEmploymentChange?.('designation', e.target.value)}
+            readOnly={readOnly}
+            disabled={readOnly}
+          />
+          <datalist id="joining-designation-options">
+            <option value="Helper" />
+            <option value="Operator" />
+            <option value="Accountant" />
+            <option value="Sales Executive" />
+            <option value="Office Assistant" />
+            <option value="Technician" />
+            <option value="Store Keeper" />
+            <option value="Security Guard" />
+            <option value="Data Entry Operator" />
+            <option value="Delivery Associate" />
+          </datalist>
+          {errors.designation && <span className="field-error-msg">{errors.designation}</span>}
+        </div>
+
+        <div className="field-wrapper">
+          <label className="field-label" htmlFor="department">
+            <span>DEPARTMENT</span>
+            <span className="field-required-star">*</span>
+          </label>
+          <input
+            id="department"
+            type="text"
+            list="joining-department-options"
+            className={`field-input ${errors.department ? 'has-error' : ''} ${readOnly ? 'read-only-field' : ''}`}
+            placeholder="e.g. Production, Operations, Accounts, etc."
+            value={employment?.department || ''}
+            onChange={(e) => onEmploymentChange?.('department', e.target.value)}
+            readOnly={readOnly}
+            disabled={readOnly}
+          />
+          <datalist id="joining-department-options">
+            <option value="Production" />
+            <option value="Operations" />
+            <option value="Accounts & Finance" />
+            <option value="Sales & Marketing" />
+            <option value="Administration" />
+            <option value="Warehouse & Logistics" />
+            <option value="Quality Control" />
+            <option value="Maintenance" />
+            <option value="Security" />
+            <option value="Human Resources" />
+          </datalist>
+          {errors.department && <span className="field-error-msg">{errors.department}</span>}
+        </div>
       </div>
 
       <div className="joining-grid-2">

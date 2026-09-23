@@ -412,7 +412,7 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
 
     switch (step) {
       case 1:
-        result = validatePersonal(formData.personal, configMap, formData.customFields);
+        result = validatePersonal(formData.personal, configMap, formData.customFields, formData.employment);
         break;
       case 2:
         result = validateAddress(
@@ -508,6 +508,21 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
   };
 
   // Field update handlers (guarded against updates if submitted/read-only)
+  const handleEmploymentChange = (field: 'designation' | 'department', value: string) => {
+    if (isReadOnly) return;
+    setFormData((prev) => ({
+      ...prev,
+      employment: { ...prev.employment, [field]: value }
+    }));
+    if (stepErrors[field]) {
+      setStepErrors((prev) => {
+        const copy = { ...prev };
+        delete copy[field];
+        return copy;
+      });
+    }
+  };
+
   const handlePersonalChange = (field: keyof PersonalInfo, value: string) => {
     if (isReadOnly) return;
     setFormData((prev) => ({
@@ -952,11 +967,16 @@ export const JoiningForm: React.FC<JoiningFormProps> = ({ applicationId, applica
             />
           )}
 
-          {/* STEP 01 — PERSONAL */}
+          {/* STEP 01 — PERSONAL & POSITION */}
           {currentStep === 1 && (
             <PersonalSection
               data={formData.personal}
+              employment={{
+                designation: formData.employment.designation,
+                department: formData.employment.department
+              }}
               onChange={handlePersonalChange}
+              onEmploymentChange={handleEmploymentChange}
               errors={stepErrors}
               readOnly={isReadOnly}
               configMap={configMap}
