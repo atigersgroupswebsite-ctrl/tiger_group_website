@@ -9,6 +9,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import type { JoiningFormData } from '../../types/joining';
 import type { DocumentRow } from '../../types/database';
 import { getDocumentSignedUrl } from '../../services/adminDocumentService';
+import { getActiveCompanySignatureDataUrl } from '../../services/companySignatureService';
 import { FileText, Paperclip } from 'lucide-react';
 
 interface JoiningFormPrintPreviewProps {
@@ -16,13 +17,18 @@ interface JoiningFormPrintPreviewProps {
   documents?: DocumentRow[];
   onEditStep?: (stepNumber: number) => void;
   isSubmitted?: boolean;
+  companySignatureUrl?: string | null;
 }
+
+// Module-level in-memory cache to ensure instant availability on render & PDF export
+let cachedCompanySignatureDataUrl: string | null = null;
 
 export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = ({
   formData,
   documents,
   onEditStep,
-  isSubmitted = false
+  isSubmitted = false,
+  companySignatureUrl: propsCompanySignatureUrl
 }) => {
   const p = formData.personal;
   const emp = formData.employment;
@@ -33,6 +39,37 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
 
   const photoUrl = formData.documents?.PHOTO?.file?.dataUrl;
   const signatureUrl = formData.documents?.SIGNATURE?.file?.dataUrl;
+
+  const [companySignatureUrl, setCompanySignatureUrl] = useState<string | null>(
+    propsCompanySignatureUrl || cachedCompanySignatureDataUrl
+  );
+
+  useEffect(() => {
+    if (propsCompanySignatureUrl) {
+      setCompanySignatureUrl(propsCompanySignatureUrl);
+      return;
+    }
+
+    let isMounted = true;
+    if (!companySignatureUrl) {
+      getActiveCompanySignatureDataUrl()
+        .then((url) => {
+          if (url) {
+            cachedCompanySignatureDataUrl = url;
+            if (isMounted) {
+              setCompanySignatureUrl(url);
+            }
+          }
+        })
+        .catch((err) => {
+          console.warn('[JoiningFormPrintPreview] Error loading company signature:', err);
+        });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [propsCompanySignatureUrl, companySignatureUrl]);
 
   const isFemale = p.gender?.toLowerCase() === 'female';
   const showWomenConsent = isFemale && Boolean(decl.womenNightShiftConsent);
@@ -664,7 +701,16 @@ export const JoiningFormPrintPreview: React.FC<JoiningFormPrintPreviewProps> = (
               <div className="pdf-hr-sign-box">
                 <span className="pdf-sign-label">HR Department Approval:</span>
                 <div className="pdf-sig-preview-frame">
-                  <span className="pdf-sign-placeholder">Authorized Personnel Stamp</span>
+                  {companySignatureUrl ? (
+                    <img
+                      src={companySignatureUrl}
+                      alt="HR Department Approval Signature"
+                      className="pdf-rendered-signature"
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <span className="pdf-sign-placeholder">Authorized Personnel Stamp</span>
+                  )}
                 </div>
                 <span className="pdf-sign-name">A TIGER GLOBAL Career Solution & Consultancy</span>
               </div>
