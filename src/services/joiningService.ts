@@ -848,76 +848,153 @@ export async function submitJoiningForm(
 
   try {
     const preSubmitId = data.formId || identifier;
+    let existingDraft: { id: string; joining_reference: string; submission_status: string } | null = null;
+
     if (preSubmitId) {
-      try {
-        await supabase
-          .from('joining_forms')
-          .update({
-            designation: data.employment?.designation?.trim() || null,
-            department: data.employment?.department?.trim() || null
-          })
-          .or(`id.eq.${preSubmitId},joining_reference.eq.${preSubmitId}`);
-      } catch {
-        // Non-blocking pre-submit sync
+      const { data: foundDraft } = await (supabase
+        .from('joining_forms')
+        .select('id, joining_reference, submission_status')
+        .or(`id.eq.${preSubmitId},joining_reference.eq.${preSubmitId}`)
+        .maybeSingle() as any);
+
+      if (foundDraft && foundDraft.submission_status !== 'SUBMITTED') {
+        existingDraft = foundDraft;
       }
     }
 
-    const payload = {
-      form_id: data.formId || identifier,
-      application_id: data.applicationId || null,
-      candidate_name: (data.personal?.employeeName || '').trim(),
-      email: candidateEmail,
-      designation: data.employment?.designation?.trim() || null,
-      department: data.employment?.department?.trim() || null,
-      employment: data.employment || {},
-      personal: canonicalizePersonalPhones(data.personal || {}),
-      permanent_address: data.permanentAddress || {},
-      current_address: data.currentAddress || {},
-      same_as_permanent: data.sameAsPermanentAddress ?? false,
-      bank: data.bank || {},
-      emergency_contacts: canonicalizeEmergencyPhones(data.emergencyContacts || []),
-      education: sanitizeEducationRecords(data.education || []),
-      family: data.family || [],
-      declarations: data.declarations || {},
-      documents: data.documents || {},
-      custom_fields: data.customFields || {}
-    };
-
-    const { data: rpcRes, error: rpcErr } = await supabase.rpc('submit_joining_form_bundle', {
-      payload: payload as any
-    });
-
-    if (rpcErr) {
-      return { success: false, error: rpcErr.message };
-    }
-
-    const res = rpcRes as {
-      success?: boolean;
-      error?: string;
-      submitted_at?: string;
-      joining_reference?: string;
-      form_id?: string;
-    };
-
-    if (!res?.success) {
-      return { success: false, error: res?.error || 'Submission failed.' };
-    }
-
-    const submittedAt = res.submitted_at || new Date().toISOString();
-    const joiningReference = res.joining_reference || 'JOIN-REFERENCE';
-    const formId = res.form_id || preSubmitId;
-
-    if (formId) {
-      try {
-        await supabase
+    if (!existingDraft) {
+      const sessionRes = await getCandidateSession();
+      if (sessionRes.authenticated && sessionRes.user) {
+        const { data: userDraft } = await (supabase
           .from('joining_forms')
-          .update({
-            designation: data.employment?.designation?.trim() || null,
-            department: data.employment?.department?.trim() || null
-          })
-          .eq('id', formId);
-      } catch {
-        // Handled via server dispatch
+          .select('id, joining_reference, submission_status')
+          .or(`candidate_auth_user_id.eq.${sessionRes.user.id},user_id.eq.${sessionRes.user.id}`)
+          .eq('submission_status', 'DRAFT')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle() as any);
+
+        if (userDraft) {
+          existingDraft = userDraft;
+        }
+      }
+    }
+
+    let submittedAt = new Date().toISOString();
+    let joiningReference = data.joiningReference || 'JOIN-REFERENCE';
+    let formId = preSubmitId;
+
+    if (existingDraft) {
+      // 1. Persist all updated draft form fields into the existing record
+      const draftSaveRes = await saveJoiningDraft(existingDraft.id, data);
+      if (!draftSaveRes.success) {
+        return { success: false, error: draftSaveRes.error || 'Failed to save draft progress before submission.' };
+      }
+
+      // 2. Authoritatively transition the existing draft record to SUBMITTED
+      const { data: updatedForm, error: updateErr } = await (supabase
+        .from('joining_forms')
+        .update({
+          submission_status: 'SUBMITTED',
+          submitted_at: submittedAt,
+          updated_at: submittedAt,
+          designation: data.employment?.designation?.trim() || null,
+          department: data.employment?.department?.trim() || null
+        })
+        .eq('id', existingDraft.id)
+        .select('id, joining_reference, submitted_at')
+        .single() as any);
+
+      if (updateErr || !updatedForm) {
+        return { success: false, error: updateErr?.message || 'Failed to finalize submission.' };
+      }
+
+      formId = updatedForm.id;
+      joiningReference = updatedForm.joining_reference || existingDraft.joining_reference;
+      submittedAt = updatedForm.submitted_at || submittedAt;
+
+      // Sync declarations accepted_at timestamp
+      if (formId) {
+        try {
+          await supabase
+            .from('declarations')
+            .update({ accepted_at: submittedAt })
+            .eq('joining_form_id', formId);
+        } catch {
+          // Non-blocking
+        }
+      }
+
+      // If associated with an application, update application status
+      if (data.applicationId) {
+        try {
+          await supabase
+            .from('applications')
+            .update({ status: 'JOINING_SUBMITTED' })
+            .eq('id', data.applicationId);
+        } catch {
+          // Non-blocking
+        }
+      }
+    } else {
+      // Edge Case: If genuinely no existing draft record exists, preserve original submission bundle RPC behavior
+      const payload = {
+        form_id: data.formId || identifier,
+        application_id: data.applicationId || null,
+        candidate_name: (data.personal?.employeeName || '').trim(),
+        email: candidateEmail,
+        designation: data.employment?.designation?.trim() || null,
+        department: data.employment?.department?.trim() || null,
+        employment: data.employment || {},
+        personal: canonicalizePersonalPhones(data.personal || {}),
+        permanent_address: data.permanentAddress || {},
+        current_address: data.currentAddress || {},
+        same_as_permanent: data.sameAsPermanentAddress ?? false,
+        bank: data.bank || {},
+        emergency_contacts: canonicalizeEmergencyPhones(data.emergencyContacts || []),
+        education: sanitizeEducationRecords(data.education || []),
+        family: data.family || [],
+        declarations: data.declarations || {},
+        documents: data.documents || {},
+        custom_fields: data.customFields || {}
+      };
+
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('submit_joining_form_bundle', {
+        payload: payload as any
+      });
+
+      if (rpcErr) {
+        return { success: false, error: rpcErr.message };
+      }
+
+      const res = rpcRes as {
+        success?: boolean;
+        error?: string;
+        submitted_at?: string;
+        joining_reference?: string;
+        form_id?: string;
+      };
+
+      if (!res?.success) {
+        return { success: false, error: res?.error || 'Submission failed.' };
+      }
+
+      submittedAt = res.submitted_at || submittedAt;
+      joiningReference = res.joining_reference || joiningReference;
+      formId = res.form_id || formId;
+
+      if (formId) {
+        try {
+          await supabase
+            .from('joining_forms')
+            .update({
+              designation: data.employment?.designation?.trim() || null,
+              department: data.employment?.department?.trim() || null
+            })
+            .eq('id', formId);
+        } catch {
+          // Handled via server dispatch
+        }
       }
     }
 
