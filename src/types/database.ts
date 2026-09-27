@@ -1217,6 +1217,12 @@ export interface Database {
         };
         Returns: Json;
       };
+      delete_joining_form_permanently: {
+        Args: {
+          target_form_id: string;
+        };
+        Returns: Json;
+      };
       check_joining_access_status: {
         Args: {
           candidate_email: string;

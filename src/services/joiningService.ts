@@ -1364,3 +1364,84 @@ export async function getCandidateDossierDetails(
   }
 }
 
+/**
+ * Permanently deletes a candidate joining form submission dossier.
+ * - Restricted to authenticated active administrators (enforced at both DB RPC & RLS levels).
+ * - Atomically unlinks employee records to protect business directories.
+ * - Safely deletes exclusive child dependent records (contacts, education, family, declarations).
+ * - Decouples application records to avoid orphan cascading on parent applications.
+ * - Cleans up exclusive candidate files from Supabase Storage ('candidate-documents').
+ */
+export async function deleteJoiningForm(
+  formId: string
+): Promise<JoiningServiceResult<{ id: string; joiningReference: string; candidateName: string }>> {
+  if (!isSupabaseConfigured) {
+    return {
+      success: true,
+      data: {
+        id: formId,
+        joiningReference: 'JOIN-MOCK-001',
+        candidateName: 'Mock Candidate'
+      }
+    };
+  }
+
+  if (!formId || typeof formId !== 'string') {
+    return { success: false, error: 'A valid joining form ID is required for deletion.' };
+  }
+
+  try {
+    // 1. Invoke atomic database RPC function
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('delete_joining_form_permanently', {
+      target_form_id: formId
+    });
+
+    if (rpcErr) {
+      console.error('[deleteJoiningForm] RPC execution error:', rpcErr);
+      return {
+        success: false,
+        error: rpcErr.message || 'Failed to permanently delete joining form from database.'
+      };
+    }
+
+    const result = rpcRes as {
+      success: boolean;
+      joining_form_id: string;
+      joining_reference: string;
+      candidate_name: string;
+      storage_paths?: string[];
+    };
+
+    // 2. Storage cleanup: remove exclusive candidate documents from 'candidate-documents' bucket
+    const storagePaths = Array.isArray(result?.storage_paths) ? result.storage_paths.filter(Boolean) : [];
+    if (storagePaths.length > 0) {
+      try {
+        const { error: storageErr } = await supabase.storage
+          .from('candidate-documents')
+          .remove(storagePaths);
+
+        if (storageErr) {
+          console.warn('[deleteJoiningForm] Notice: Some storage files could not be removed:', storageErr);
+        }
+      } catch (sEx) {
+        console.warn('[deleteJoiningForm] Storage cleanup exception:', sEx);
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        id: result?.joining_form_id || formId,
+        joiningReference: result?.joining_reference || 'PENDING',
+        candidateName: result?.candidate_name || 'Candidate'
+      }
+    };
+  } catch (err: any) {
+    console.error('[deleteJoiningForm] Unexpected error:', err);
+    return {
+      success: false,
+      error: err?.message || 'An unexpected error occurred while deleting the joining form.'
+    };
+  }
+}
+

@@ -20,10 +20,14 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  Download
+  Download,
+  Trash2,
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { formatIndianPhoneNumber } from '../../utils/phoneUtils';
 import { exportJoiningFormsXlsx } from '../../services/adminJoiningExportService';
+import { deleteJoiningForm } from '../../services/joiningService';
 
 interface JoiningListItem {
   id: string;
@@ -43,6 +47,13 @@ export const AdminJoiningListPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<boolean>(false);
   const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null);
+  const [deleteSuccessNotice, setDeleteSuccessNotice] = useState<string | null>(null);
+
+  // Deletion modal state
+  const [pendingDeleteItem, setPendingDeleteItem] = useState<JoiningListItem | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -130,6 +141,38 @@ export const AdminJoiningListPage: React.FC = () => {
       setError(err?.message || 'Failed to export joining submissions to Excel.');
     } finally {
       setExporting(false);
+    }
+  };
+
+  // Handler: Confirm and execute permanent deletion of joining form
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteItem) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const res = await deleteJoiningForm(pendingDeleteItem.id);
+
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to delete joining form.');
+      }
+
+      const deletedRef = pendingDeleteItem.joiningReference;
+      setShowDeleteModal(false);
+      setPendingDeleteItem(null);
+
+      // Immediately filter out the deleted item from state
+      setItems((prev) => prev.filter((item) => item.id !== pendingDeleteItem.id));
+
+      // Show success notification
+      setDeleteSuccessNotice(`Joining form ${deletedRef} deleted successfully.`);
+      setTimeout(() => setDeleteSuccessNotice(null), 6000);
+    } catch (err: any) {
+      console.error('[AdminJoiningList] Deletion error:', err);
+      setDeleteError(err?.message || 'Failed to delete joining form.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -226,6 +269,26 @@ export const AdminJoiningListPage: React.FC = () => {
         >
           <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
           <span>{exportSuccessNotice}</span>
+        </div>
+      )}
+
+      {/* Delete success alert */}
+      {deleteSuccessNotice && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            backgroundColor: '#E8F5E9',
+            border: '1px solid #A5D6A7',
+            color: '#2E7D32',
+            padding: '1rem',
+            borderRadius: '8px',
+            fontSize: '0.875rem'
+          }}
+        >
+          <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
+          <span>{deleteSuccessNotice}</span>
         </div>
       )}
 
@@ -457,29 +520,66 @@ export const AdminJoiningListPage: React.FC = () => {
 
                       {/* Action */}
                       <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/admin/joining/${item.id}`);
-                          }}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            padding: '0.4rem 0.8rem',
-                            borderRadius: '6px',
-                            border: '1px solid #CBD5E1',
-                            backgroundColor: '#FFFFFF',
-                            color: '#0F1B38',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <Eye size={13} />
-                          <span>REVIEW</span>
-                        </button>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/admin/joining/${item.id}`);
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.4rem 0.8rem',
+                              borderRadius: '6px',
+                              border: '1px solid #CBD5E1',
+                              backgroundColor: '#FFFFFF',
+                              color: '#0F1B38',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Eye size={13} />
+                            <span>REVIEW</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPendingDeleteItem(item);
+                              setShowDeleteModal(true);
+                              setDeleteError(null);
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.4rem 0.8rem',
+                              borderRadius: '6px',
+                              border: '1px solid #FCA5A5',
+                              backgroundColor: '#FEF2F2',
+                              color: '#DC2626',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#FEE2E2';
+                              e.currentTarget.style.borderColor = '#EF4444';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#FEF2F2';
+                              e.currentTarget.style.borderColor = '#FCA5A5';
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            <span>DELETE</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -489,6 +589,201 @@ export const AdminJoiningListPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && pendingDeleteItem && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}
+          onClick={() => {
+            if (!isDeleting) {
+              setShowDeleteModal(false);
+              setPendingDeleteItem(null);
+              setDeleteError(null);
+            }
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '12px',
+              maxWidth: '480px',
+              width: '100%',
+              padding: '1.75rem',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+              border: '1px solid #E2E8F0'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '10px',
+                  backgroundColor: '#FEE2E2',
+                  border: '1px solid #FCA5A5',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  color: '#DC2626'
+                }}
+              >
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 style={{ margin: '0 0 0.25rem 0', fontSize: '1.15rem', fontWeight: 800, color: '#0F1B38' }}>
+                  Delete Joining Form?
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.875rem', color: '#64748B', lineHeight: 1.5 }}>
+                  Are you sure you want to permanently delete this joining form?
+                </p>
+              </div>
+            </div>
+
+            {/* Candidate & Reference Card */}
+            <div
+              style={{
+                backgroundColor: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: '8px',
+                padding: '0.85rem 1rem',
+                marginBottom: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+                fontSize: '0.875rem'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#64748B', fontWeight: 500 }}>Candidate:</span>
+                <span style={{ color: '#0F172A', fontWeight: 700 }}>{pendingDeleteItem.candidateName}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#64748B', fontWeight: 500 }}>Reference:</span>
+                <span
+                  style={{
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    color: '#0F1B38',
+                    backgroundColor: '#E2E8F0',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontSize: '0.82rem'
+                  }}
+                >
+                  {pendingDeleteItem.joiningReference}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#64748B', fontWeight: 500 }}>Status:</span>
+                <span
+                  style={{
+                    fontWeight: 700,
+                    fontSize: '0.75rem',
+                    color: pendingDeleteItem.submissionStatus === 'SUBMITTED' ? '#15803D' : '#92400E'
+                  }}
+                >
+                  {pendingDeleteItem.submissionStatus}
+                </span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.825rem', color: '#DC2626', fontWeight: 600, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <AlertCircle size={14} />
+              <span>This action cannot be undone.</span>
+            </p>
+
+            {deleteError && (
+              <div
+                style={{
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: '6px',
+                  padding: '0.65rem 0.85rem',
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.825rem',
+                  color: '#DC2626',
+                  fontWeight: 600
+                }}
+              >
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setPendingDeleteItem(null);
+                  setDeleteError(null);
+                }}
+                disabled={isDeleting}
+                style={{
+                  padding: '0.55rem 1.1rem',
+                  borderRadius: '6px',
+                  border: '1px solid #CBD5E1',
+                  backgroundColor: '#FFFFFF',
+                  color: '#475569',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: isDeleting ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.55rem 1.25rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: isDeleting ? '#EF4444' : '#DC2626',
+                  color: '#FFFFFF',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isDeleting ? 0.75 : 1,
+                  boxShadow: '0 1px 2px rgba(220, 38, 38, 0.2)'
+                }}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                    <span>Deleting Permanently...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={15} />
+                    <span>Delete Permanently</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
