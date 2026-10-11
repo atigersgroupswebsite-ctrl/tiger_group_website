@@ -28,12 +28,18 @@ interface RegularReferenceSlipModalProps {
   isOpen: boolean;
   onClose: () => void;
   formData: RegularJoiningFormData | null;
+  companySignatureUrl?: string | null;
+  companyStampUrl?: string | null;
+  verifierName?: string;
 }
 
 export const RegularReferenceSlipModal: React.FC<RegularReferenceSlipModalProps> = ({
   isOpen,
   onClose,
-  formData
+  formData,
+  companySignatureUrl,
+  companyStampUrl,
+  verifierName = 'Authorized Officer'
 }) => {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -56,7 +62,11 @@ export const RegularReferenceSlipModal: React.FC<RegularReferenceSlipModalProps>
       setLoading(true);
       setError(null);
       try {
-        const bytes = await buildRegularReferenceSlipPdf(formData);
+        const bytes = await buildRegularReferenceSlipPdf(formData, {
+          companySignatureUrlOrData: companySignatureUrl,
+          companyStampUrlOrData: companyStampUrl,
+          verifierName
+        });
         if (!active) return;
         const blob = new Blob([bytes as any], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
@@ -82,7 +92,7 @@ export const RegularReferenceSlipModal: React.FC<RegularReferenceSlipModalProps>
         urlRef.current = null;
       }
     };
-  }, [isOpen, formData]);
+  }, [isOpen, formData, companySignatureUrl, companyStampUrl, verifierName]);
 
   if (!isOpen || !formData) return null;
 
@@ -97,7 +107,11 @@ export const RegularReferenceSlipModal: React.FC<RegularReferenceSlipModalProps>
 
   const handleDownload = async () => {
     if (!formData) return;
-    await downloadRegularReferenceSlipPdf(formData);
+    await downloadRegularReferenceSlipPdf(formData, {
+      companySignatureUrlOrData: companySignatureUrl,
+      companyStampUrlOrData: companyStampUrl,
+      verifierName
+    });
   };
 
   return (

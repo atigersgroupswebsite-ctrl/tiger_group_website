@@ -16,7 +16,7 @@
 //   - Clear badges when unuploaded/pending (no misleading download buttons)
 // ==============================================================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileCheck2,
   ShieldCheck,
@@ -43,12 +43,17 @@ import { CompleteJoiningDocumentModal } from './CompleteJoiningDocumentModal';
 import { RegularReferenceSlipModal } from './RegularReferenceSlipModal';
 import { generateAndPersistEmployeeIdCard } from '../../services/employeeIdCardGenerator';
 import type { EmployeeRow } from '../../types/database';
+import {
+  getActiveCompanySignatureSignedUrl,
+  getActiveCompanyStampSignedUrl
+} from '../../services/companySignatureService';
 
 interface EmployeeDocumentsPanelProps {
   employeeCode: string;
   formData: RegularJoiningFormData;
   employee?: EmployeeRow | null;
   companySignatureUrl?: string | null;
+  companyStampUrl?: string | null;
   verifierName?: string;
   onRefresh?: () => Promise<void> | void;
 }
@@ -58,13 +63,40 @@ export const EmployeeDocumentsPanel: React.FC<EmployeeDocumentsPanelProps> = ({
   formData,
   employee,
   companySignatureUrl,
+  companyStampUrl,
   verifierName = 'Authorized Administrator',
   onRefresh
 }) => {
   // Modal states
   const [isCompleteDocModalOpen, setIsCompleteDocModalOpen] = useState<boolean>(false);
+  const [completeDocModalMode, setCompleteDocModalMode] = useState<'all' | 'official_5'>('all');
   const [isReferenceSlipModalOpen, setIsReferenceSlipModalOpen] = useState<boolean>(false);
   const [inspectDoc, setInspectDoc] = useState<{ title: string; url: string; badge?: string } | null>(null);
+
+  // Active Company Stamp & Signature URLs
+  const [activeCompanySig, setActiveCompanySig] = useState<string | null>(companySignatureUrl || null);
+  const [activeCompanyStamp, setActiveCompanyStamp] = useState<string | null>(companyStampUrl || null);
+
+  useEffect(() => {
+    if (companySignatureUrl) setActiveCompanySig(companySignatureUrl);
+    if (companyStampUrl) setActiveCompanyStamp(companyStampUrl);
+
+    if (!companySignatureUrl || !companyStampUrl) {
+      let isMounted = true;
+      Promise.all([
+        !companySignatureUrl ? getActiveCompanySignatureSignedUrl().catch(() => null) : Promise.resolve(companySignatureUrl),
+        !companyStampUrl ? getActiveCompanyStampSignedUrl().catch(() => null) : Promise.resolve(companyStampUrl)
+      ]).then(([sig, stamp]) => {
+        if (isMounted) {
+          if (sig) setActiveCompanySig(sig);
+          if (stamp) setActiveCompanyStamp(stamp);
+        }
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [companySignatureUrl, companyStampUrl]);
 
   // Download processing states
   const [downloadingItem, setDownloadingItem] = useState<string | null>(null);
@@ -93,7 +125,11 @@ export const EmployeeDocumentsPanel: React.FC<EmployeeDocumentsPanelProps> = ({
     try {
       setDownloadingItem('ref-slip');
       setActionError(null);
-      const res = await downloadRegularReferenceSlipPdf(formData);
+      const res = await downloadRegularReferenceSlipPdf(formData, {
+        companySignatureUrlOrData: activeCompanySig,
+        companyStampUrlOrData: activeCompanyStamp,
+        verifierName
+      });
       if (res.success) {
         setActionSuccess(`Downloaded Employee Reference Slip (${res.fileName})`);
         setTimeout(() => setActionSuccess(null), 4000);
@@ -113,7 +149,8 @@ export const EmployeeDocumentsPanel: React.FC<EmployeeDocumentsPanelProps> = ({
       setDownloadingItem('complete-doc');
       setActionError(null);
       const res = await downloadCompleteJoiningDocumentPdf(formData, {
-        companySignatureUrl,
+        companySignatureUrl: activeCompanySig,
+        companyStampUrl: activeCompanyStamp,
         verifierName
       });
       if (res.success) {
@@ -135,7 +172,8 @@ export const EmployeeDocumentsPanel: React.FC<EmployeeDocumentsPanelProps> = ({
       setDownloadingItem('declaration');
       setActionError(null);
       const res = await downloadEmployeeDeclarationPdf(formData, {
-        companySignatureUrl,
+        companySignatureUrl: activeCompanySig,
+        companyStampUrl: activeCompanyStamp,
         verifierName
       });
       if (res.success) {
@@ -499,7 +537,10 @@ export const EmployeeDocumentsPanel: React.FC<EmployeeDocumentsPanelProps> = ({
           <div style={{ display: 'flex', gap: '0.4rem', borderTop: '1px solid rgba(197, 160, 89, 0.3)', paddingTop: '0.75rem' }}>
             <button
               type="button"
-              onClick={() => setIsCompleteDocModalOpen(true)}
+              onClick={() => {
+                setCompleteDocModalMode('all');
+                setIsCompleteDocModalOpen(true);
+              }}
               style={{
                 flex: 1,
                 display: 'inline-flex',
@@ -546,7 +587,7 @@ export const EmployeeDocumentsPanel: React.FC<EmployeeDocumentsPanelProps> = ({
         </div>
 
         {/* ================================================================== */}
-        {/* ITEM 3: EMPLOYEE DECLARATION                                       */}
+        {/* ITEM 3: 5 OFFICIAL JOINING DECLARATIONS                            */}
         {/* ================================================================== */}
         <div
           style={{
@@ -564,7 +605,7 @@ export const EmployeeDocumentsPanel: React.FC<EmployeeDocumentsPanelProps> = ({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0F1B38' }}>
                 <ShieldCheck size={18} style={{ color: '#C5A059' }} />
-                <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>3. Employee Declaration</span>
+                <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>3. Official Joining Declarations</span>
               </div>
               <span
                 style={{
@@ -576,25 +617,50 @@ export const EmployeeDocumentsPanel: React.FC<EmployeeDocumentsPanelProps> = ({
                   borderRadius: '4px'
                 }}
               >
-                CLAUSES 1–6
+                5 A4 PAGES
               </span>
             </div>
             <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
-              Statutory undertakings, dual employment & relative employment declarations.
+              Reproduces the 5 official joining documents: Self Declaration, Relatives Declaration, Terms & Conditions, Contract Appointment Letter, Resignation Declaration.
             </p>
           </div>
 
           <div style={{ display: 'flex', gap: '0.4rem', borderTop: '1px solid #F1F5F9', paddingTop: '0.75rem' }}>
             <button
               type="button"
-              onClick={handleDownloadDeclaration}
-              disabled={downloadingItem === 'declaration'}
+              onClick={() => {
+                setCompleteDocModalMode('official_5');
+                setIsCompleteDocModalOpen(true);
+              }}
               style={{
-                width: '100%',
+                flex: 1,
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.35rem',
+                gap: '0.3rem',
+                padding: '0.4rem 0.6rem',
+                backgroundColor: '#F8FAFC',
+                border: '1px solid #CBD5E1',
+                borderRadius: '4px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: '#334155',
+                cursor: 'pointer'
+              }}
+            >
+              <Eye size={13} />
+              <span>View</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadDeclaration}
+              disabled={downloadingItem === 'declaration'}
+              style={{
+                flex: 1.2,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.3rem',
                 padding: '0.4rem 0.6rem',
                 backgroundColor: '#0F1B38',
                 border: 'none',
@@ -606,7 +672,7 @@ export const EmployeeDocumentsPanel: React.FC<EmployeeDocumentsPanelProps> = ({
               }}
             >
               {downloadingItem === 'declaration' ? <Loader2 size={13} className="admin-spinner" /> : <Download size={13} />}
-              <span>Download Declaration PDF</span>
+              <span>Download</span>
             </button>
           </div>
         </div>
@@ -1157,20 +1223,25 @@ export const EmployeeDocumentsPanel: React.FC<EmployeeDocumentsPanelProps> = ({
       </div>
 
       {/* Modals */}
-      {/* 1. Complete Joining Document Modal */}
-      <CompleteJoiningDocumentModal
-        isOpen={isCompleteDocModalOpen}
-        onClose={() => setIsCompleteDocModalOpen(false)}
-        formData={formData}
-        companySignatureUrl={companySignatureUrl}
-        verifierName={verifierName}
-      />
-
-      {/* 2. Regular Reference Slip Modal */}
+      {/* 1. Reference Slip Modal */}
       <RegularReferenceSlipModal
         isOpen={isReferenceSlipModalOpen}
         onClose={() => setIsReferenceSlipModalOpen(false)}
         formData={formData}
+        companySignatureUrl={activeCompanySig}
+        companyStampUrl={activeCompanyStamp}
+        verifierName={verifierName}
+      />
+
+      {/* 2. Complete Joining Document & Official Declarations Modal */}
+      <CompleteJoiningDocumentModal
+        isOpen={isCompleteDocModalOpen}
+        onClose={() => setIsCompleteDocModalOpen(false)}
+        formData={formData}
+        companySignatureUrl={activeCompanySig}
+        companyStampUrl={activeCompanyStamp}
+        verifierName={verifierName}
+        initialMode={completeDocModalMode}
       />
 
       {/* 3. Lightbox Inspection Modal */}

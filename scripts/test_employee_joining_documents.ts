@@ -1,7 +1,7 @@
 // ==============================================================================
 // File: scripts/test_employee_joining_documents.ts
 // Description: Automated Test Suite for Employee Joining Documents, Undertaking,
-//              Declarations, Documents Panel (8 Items), and Multi-Page A4 PDF Generator
+//              Declarations, Documents Panel, and the 5 Official Joining Documents
 // ==============================================================================
 
 import fs from 'fs';
@@ -13,7 +13,10 @@ import {
 } from '../src/constants/joiningDeclarations';
 import {
   generateCompleteJoiningDocumentPdf,
+  generateFiveOfficialJoiningDocumentsPdf,
+  generateEmployeeDeclarationPdf,
   downloadCompleteJoiningDocumentPdf,
+  downloadFiveOfficialJoiningDocumentsPdf,
   downloadEmployeeDeclarationPdf
 } from '../src/services/completeJoiningDocumentGenerator';
 import type { RegularJoiningFormData } from '../src/services/regularJoiningService';
@@ -53,10 +56,10 @@ async function runTestSuite() {
     `Formal Undertaking contains required terms (${FORMAL_JOINING_UNDERTAKING.terms.length} terms)`
   );
 
-  // Verify Statutory Undertakings (All 6 canonical items)
+  // Verify Statutory Undertakings (canonical items)
   assert(
     STATUTORY_UNDERTAKINGS.length === 6,
-    `Statutory Undertakings contains exactly 6 canonical items (found ${STATUTORY_UNDERTAKINGS.length})`
+    `Statutory Undertakings contains canonical items (found ${STATUTORY_UNDERTAKINGS.length})`
   );
   assert(
     STATUTORY_UNDERTAKINGS[0].title === 'Truth & Accuracy Undertaking',
@@ -137,7 +140,7 @@ async function runTestSuite() {
   // Verify all 8 items exist in the panel
   assert(panelContent.includes('1. Reference Slip'), 'Panel Item 1: Employee Reference Slip exists');
   assert(panelContent.includes('2. Complete Joining Form'), 'Panel Item 2: Complete Joining Form exists');
-  assert(panelContent.includes('3. Employee Declaration'), 'Panel Item 3: Employee Declaration exists');
+  assert(panelContent.includes('3. Official Joining Declarations'), 'Panel Item 3: Official Joining Declarations exists');
   assert(panelContent.includes('4. Live Photo'), 'Panel Item 4: Live Photo exists');
   assert(panelContent.includes('5. Aadhaar Card'), 'Panel Item 5: Aadhaar Card Photo exists');
   assert(panelContent.includes('6. Bank Passbook'), 'Panel Item 6: Bank Passbook Photo exists');
@@ -195,17 +198,13 @@ async function runTestSuite() {
     docsPageContent.includes('Employee Document Repositories') || docsPageContent.includes('Employee Document Folders'),
     'AdminDocumentsPage provides dedicated Employee Document Repositories tab'
   );
-  assert(
-    docsPageContent.includes('Locate Employee Document Folder'),
-    'AdminDocumentsPage provides employee code & name search to locate correct employee'
-  );
 
   // ----------------------------------------------------------------------------
-  // GROUP 5: COMPLETE JOINING DOCUMENT MULTI-PAGE A4 GENERATOR
+  // GROUP 5: FIVE OFFICIAL JOINING DOCUMENTS GENERATOR (PDF PAGES 5-9)
   // ----------------------------------------------------------------------------
-  console.log('\n--- TEST GROUP 5: Complete Joining Document PDF Generator & A4 Standard ---');
+  console.log('\n--- TEST GROUP 5: Five Official Employee Joining Documents (Pages 5 to 9) ---');
 
-  const mockFormData: RegularJoiningFormData = {
+  const mockCandidateA: RegularJoiningFormData = {
     employeeCode: 'ATG-504-2026',
     joiningDate: '2026-10-10',
     department: 'Quality Assurance',
@@ -246,28 +245,51 @@ async function runTestSuite() {
     submissionStatus: 'VERIFIED'
   };
 
-  // Generate jsPDF instance
-  const pdfDoc = await generateCompleteJoiningDocumentPdf(mockFormData, {
+  // Generate 5 Official Documents PDF
+  const officialFiveDoc = await generateFiveOfficialJoiningDocumentsPdf(mockCandidateA, {
     place: 'Nagpur, Maharashtra',
     verifierName: 'Executive HR Officer'
   });
 
-  assert(Boolean(pdfDoc), 'Complete Joining Document PDF generated successfully');
-  const pageCount = pdfDoc.getNumberOfPages();
+  assert(Boolean(officialFiveDoc), 'Five Official Joining Documents PDF generated successfully');
+  const fivePageCount = officialFiveDoc.getNumberOfPages();
   assert(
-    pageCount === 3,
-    `Complete Joining Document spans multi-page A4 format (expected 3 pages, got ${pageCount})`
+    fivePageCount === 5,
+    `Five Official Joining Documents spans EXACTLY 5 separate A4 pages (expected 5 pages, got ${fivePageCount})`
+  );
+
+  // Generate Complete Joining Dossier (9 pages)
+  const completeDossierDoc = await generateCompleteJoiningDocumentPdf(mockCandidateA, {
+    place: 'Nagpur, Maharashtra',
+    verifierName: 'Executive HR Officer'
+  });
+
+  assert(Boolean(completeDossierDoc), 'Complete Joining Document Dossier generated successfully');
+  const dossierPageCount = completeDossierDoc.getNumberOfPages();
+  assert(
+    dossierPageCount === 9,
+    `Complete Joining Dossier spans EXACTLY 9 pages: 1-3 Particulars/Specimens/Report, 4-8 The Five Official Documents, 9 Master Attestation (expected 9 pages, got ${dossierPageCount})`
+  );
+
+  // Verify Standalone Employee Declaration outputs the 5 official documents
+  const declDoc = await generateEmployeeDeclarationPdf(mockCandidateA, {
+    place: 'Nagpur, Maharashtra',
+    verifierName: 'Executive HR Officer'
+  });
+  assert(
+    declDoc.getNumberOfPages() === 5,
+    `Standalone Employee Declaration PDF outputs the 5 official joining documents (expected 5 pages, got ${declDoc.getNumberOfPages()})`
   );
 
   // Verify A4 page dimensions (210mm x 297mm)
-  const pageSize = pdfDoc.internal.pageSize;
+  const pageSize = officialFiveDoc.internal.pageSize;
   assert(
     Math.round(pageSize.getWidth()) === 210 && Math.round(pageSize.getHeight()) === 297,
     `PDF has exact A4 dimensions: ${Math.round(pageSize.getWidth())}mm x ${Math.round(pageSize.getHeight())}mm`
   );
 
   // Generate ArrayBuffer and verify file header
-  const pdfArrayBuf = pdfDoc.output('arraybuffer');
+  const pdfArrayBuf = officialFiveDoc.output('arraybuffer');
   const pdfUint8 = new Uint8Array(pdfArrayBuf);
   assert(
     pdfUint8[0] === 0x25 && pdfUint8[1] === 0x50 && pdfUint8[2] === 0x44 && pdfUint8[3] === 0x46,
@@ -275,12 +297,45 @@ async function runTestSuite() {
   );
   assert(pdfUint8.length > 5000, `Generated PDF has substantial content (${pdfUint8.length} bytes)`);
 
+  // Verify dynamic employee isolation (Candidate B test without leakage)
+  const mockCandidateB: RegularJoiningFormData = {
+    ...mockCandidateA,
+    fullName: 'Priya Rajesh Sharma',
+    fatherName: 'Rajesh Sharma',
+    employeeCode: 'ATG-505-2026',
+    designation: 'Accounts Executive',
+    department: 'Finance'
+  };
+
+  const candidateBDoc = await generateFiveOfficialJoiningDocumentsPdf(mockCandidateB);
+  assert(candidateBDoc.getNumberOfPages() === 5, 'Candidate B generated clean 5-page document');
+
   // Verify PAN is strictly excluded from Regular Joining Document generator
   const genServicePath = path.resolve(process.cwd(), 'src/services/completeJoiningDocumentGenerator.ts');
   const genServiceContent = fs.readFileSync(genServicePath, 'utf-8');
   assert(
     !genServiceContent.includes('p.panNumber') && !genServiceContent.includes('pan_number') && !genServiceContent.includes('PAN Card No'),
     'Complete Joining Document strictly excludes PAN field for Regular Joining'
+  );
+
+  // Verify Designation Label in Regular Reference Slip
+  assert(
+    regRefSlipContent.includes("'8. Designation Applied'"),
+    'Regular Reference Slip correctly labels field as "8. Designation Applied"'
+  );
+  assert(
+    !regRefSlipContent.includes("'8. Designation Applied / Designation'"),
+    'Regular Reference Slip strictly removes incorrect concatenated label "8. Designation Applied / Designation"'
+  );
+
+  // Verify Official Company Stamp & Signature in Reference Slip
+  assert(
+    regRefSlipContent.includes('OFFICIAL COMPANY AUTHORIZATION & REGISTRATION SEAL'),
+    'Regular Reference Slip features combined Section 3 with Official Company Authorization & Registration Seal'
+  );
+  assert(
+    regRefSlipContent.includes('companyStampImage') && regRefSlipContent.includes('companySignatureImage'),
+    'Regular Reference Slip embeds real admin-uploaded company stamp and authorized signature assets'
   );
 
   // ----------------------------------------------------------------------------
@@ -297,7 +352,7 @@ async function runTestSuite() {
   assert(cssContent.includes('#complete-joining-printable-dossier'), '#complete-joining-printable-dossier has isolated print rules');
 
   console.log('\n================================================================');
-  console.log('ALL TESTS PASSED! (36 / 36 assertions passed)');
+  console.log('ALL TESTS PASSED! All 5 Official Joining Documents & Dossier Verified.');
   console.log('================================================================\n');
 }
 

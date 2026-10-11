@@ -16,6 +16,16 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import type { RegularJoiningFormData } from './regularJoiningService';
 import { persistGeneratedDocument } from './filePersistenceService';
+import {
+  getActiveCompanySignatureDataUrl,
+  getActiveCompanyStampDataUrl
+} from './companySignatureService';
+
+export interface BuildRegularReferenceSlipOptions {
+  companySignatureUrlOrData?: string | null;
+  companyStampUrlOrData?: string | null;
+  verifierName?: string | null;
+}
 
 export interface GenerateRegularReferenceSlipResult {
   success: boolean;
@@ -128,7 +138,8 @@ function formatDisplayDate(dateStr?: string | null): string {
  * Builds the official 1-page vector PDF for the Regular Joining Form Reference Slip.
  */
 export async function buildRegularReferenceSlipPdf(
-  formData: RegularJoiningFormData
+  formData: RegularJoiningFormData,
+  options?: BuildRegularReferenceSlipOptions
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
 
@@ -154,7 +165,7 @@ export async function buildRegularReferenceSlipPdf(
   const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_X * 2; // 523.28
   const BORDER_INSET = 26;
 
-  // Resolve candidate photo
+  // 1. Resolve candidate photo
   let candidatePhoto: any = null;
   const photoSource = formData.photo?.dataUrl || formData.photo?.storagePath;
   if (photoSource) {
@@ -167,6 +178,48 @@ export async function buildRegularReferenceSlipPdf(
       }
     } catch (photoErr) {
       console.warn('[buildRegularReferenceSlipPdf] Could not embed candidate photo:', photoErr);
+    }
+  }
+
+  // 2. Resolve authentic official company stamp
+  let companyStampImage: any = null;
+  let stampSource = options?.companyStampUrlOrData || (formData as any)?.custom_fields?.companyStampUrl;
+  if (!stampSource) {
+    try {
+      stampSource = await getActiveCompanyStampDataUrl();
+    } catch (_) {}
+  }
+  if (stampSource) {
+    try {
+      const resolvedStamp = await resolveImageBytes(stampSource);
+      if (resolvedStamp) {
+        companyStampImage = resolvedStamp.isPng
+          ? await pdfDoc.embedPng(resolvedStamp.bytes)
+          : await pdfDoc.embedJpg(resolvedStamp.bytes);
+      }
+    } catch (stampErr) {
+      console.warn('[buildRegularReferenceSlipPdf] Could not embed company stamp:', stampErr);
+    }
+  }
+
+  // 3. Resolve authentic authorized signatory signature
+  let companySignatureImage: any = null;
+  let sigSource = options?.companySignatureUrlOrData || (formData as any)?.custom_fields?.companySignatureUrl;
+  if (!sigSource) {
+    try {
+      sigSource = await getActiveCompanySignatureDataUrl();
+    } catch (_) {}
+  }
+  if (sigSource) {
+    try {
+      const resolvedSig = await resolveImageBytes(sigSource);
+      if (resolvedSig) {
+        companySignatureImage = resolvedSig.isPng
+          ? await pdfDoc.embedPng(resolvedSig.bytes)
+          : await pdfDoc.embedJpg(resolvedSig.bytes);
+      }
+    } catch (sigErr) {
+      console.warn('[buildRegularReferenceSlipPdf] Could not embed company signature:', sigErr);
     }
   }
 
@@ -341,7 +394,7 @@ export async function buildRegularReferenceSlipPdf(
     { label: '5. Email Address', val: formData.email || '—' },
     { label: '6. Address', val: displayAddress, maxLen: 46 },
     { label: '7. Aadhaar No.', val: formData.aadhaarNumber ? `XXXX-XXXX-${formData.aadhaarNumber.slice(-4)}` : '—' },
-    { label: '8. Designation Applied / Designation', val: formData.designation || '—', bold: true },
+    { label: '8. Designation Applied', val: formData.designation || '—', bold: true },
     { label: '9. Expected Date of Joining', val: formatDisplayDate(formData.joiningDate) || 'Immediate' },
     { label: '10. Department', val: formData.department || '—' }
   ];
@@ -391,11 +444,22 @@ export async function buildRegularReferenceSlipPdf(
   });
 
   if (candidatePhoto) {
+    const maxPW = photoW - 4;
+    const maxPH = photoH - 4;
+    const pRatio = candidatePhoto.width / candidatePhoto.height;
+    let drawPW = maxPW;
+    let drawPH = drawPW / pRatio;
+    if (drawPH > maxPH) {
+      drawPH = maxPH;
+      drawPW = drawPH * pRatio;
+    }
+    const drawPX = photoX + (photoW - drawPW) / 2;
+    const drawPY = photoY + (photoH - drawPH) / 2;
     page.drawImage(candidatePhoto, {
-      x: photoX + 1,
-      y: photoY + 1,
-      width: photoW - 2,
-      height: photoH - 2
+      x: drawPX,
+      y: drawPY,
+      width: drawPW,
+      height: drawPH
     });
   } else {
     page.drawText('CANDIDATE', {
@@ -532,11 +596,11 @@ export async function buildRegularReferenceSlipPdf(
 
   // ===========================================================================
   // BOTTOM SECTION:
-  // Authorized Company Signature and Consultancy Seal
-  // NO QR Code (Section 3 is completely removed!)
+  // Combined Official Company Stamp & Authorized Signatory Area
+  // Real Administrator-Uploaded Assets with Proportional Aspect Ratios
   // ===========================================================================
-  const bottomY = 70;
-  const bottomH = 155;
+  const bottomY = 66;
+  const bottomH = 158;
 
   page.drawRectangle({
     x: MARGIN_X,
@@ -548,11 +612,40 @@ export async function buildRegularReferenceSlipPdf(
     color: bgLight
   });
 
-  // Left Seal Box
-  const sealBoxX = MARGIN_X + 30;
-  const sealBoxY = bottomY + 20;
-  const sealBoxW = 200;
-  const sealBoxH = 115;
+  // Authorization Header Strip
+  page.drawRectangle({
+    x: MARGIN_X,
+    y: bottomY + bottomH - 18,
+    width: CONTENT_WIDTH,
+    height: 18,
+    color: rgb(0.92, 0.94, 0.97)
+  });
+  page.drawText('3. OFFICIAL COMPANY AUTHORIZATION & REGISTRATION SEAL', {
+    x: MARGIN_X + 10,
+    y: bottomY + bottomH - 13,
+    size: 8,
+    font: helveticaBold,
+    color: navy
+  });
+
+  // Verification Status Badge Pill
+  const isVerified = formData.submissionStatus === 'VERIFIED';
+  const badgeText = isVerified
+    ? 'STATUS: VERIFIED & CONFIRMED ON RECORD'
+    : 'STATUS: PROVISIONAL / PENDING ADMINISTRATIVE VERIFICATION';
+  page.drawText(badgeText, {
+    x: MARGIN_X + CONTENT_WIDTH - (isVerified ? 205 : 255),
+    y: bottomY + bottomH - 13,
+    size: 7,
+    font: helveticaBold,
+    color: isVerified ? rgb(0.02, 0.47, 0.34) : rgb(0.71, 0.33, 0.04)
+  });
+
+  // Left Seal / Stamp Box
+  const sealBoxX = MARGIN_X + 14;
+  const sealBoxY = bottomY + 10;
+  const sealBoxW = 240;
+  const sealBoxH = 120;
 
   page.drawRectangle({
     x: sealBoxX,
@@ -564,40 +657,79 @@ export async function buildRegularReferenceSlipPdf(
     color: white
   });
 
-  page.drawText('A TIGER GLOBAL', {
-    x: sealBoxX + 54,
-    y: sealBoxY + 84,
-    size: 10,
-    font: helveticaBold,
-    color: gold
-  });
-  page.drawText('CONSULTANCY SEAL', {
-    x: sealBoxX + 46,
-    y: sealBoxY + 68,
-    size: 9,
+  page.drawText('OFFICIAL COMPANY SEAL / STAMP', {
+    x: sealBoxX + 10,
+    y: sealBoxY + sealBoxH - 14,
+    size: 7.5,
     font: helveticaBold,
     color: navy
   });
-  page.drawText('[ OFFICIAL VERIFIED STAMP ]', {
-    x: sealBoxX + 36,
-    y: sealBoxY + 44,
-    size: 8,
-    font: helvetica,
-    color: textMuted
-  });
-  page.drawText('NAGPUR, MAHARASHTRA', {
-    x: sealBoxX + 44,
-    y: sealBoxY + 28,
-    size: 7.5,
+
+  if (companyStampImage) {
+    const maxImgW = sealBoxW - 24;
+    const maxImgH = sealBoxH - 36;
+    const ratio = companyStampImage.width / companyStampImage.height;
+    let drawW = maxImgW;
+    let drawH = drawW / ratio;
+    if (drawH > maxImgH) {
+      drawH = maxImgH;
+      drawW = drawH * ratio;
+    }
+    const drawX = sealBoxX + (sealBoxW - drawW) / 2;
+    const drawY = sealBoxY + 16 + (maxImgH - drawH) / 2;
+    page.drawImage(companyStampImage, {
+      x: drawX,
+      y: drawY,
+      width: drawW,
+      height: drawH
+    });
+  } else {
+    // Professional placeholder warning when not uploaded
+    page.drawRectangle({
+      x: sealBoxX + 12,
+      y: sealBoxY + 22,
+      width: sealBoxW - 24,
+      height: sealBoxH - 44,
+      borderColor: rgb(0.9, 0.8, 0.7),
+      borderWidth: 0.75,
+      color: rgb(0.99, 0.98, 0.97)
+    });
+    page.drawText('[ OFFICIAL COMPANY STAMP ]', {
+      x: sealBoxX + 46,
+      y: sealBoxY + 68,
+      size: 8,
+      font: helveticaBold,
+      color: rgb(0.65, 0.45, 0.15)
+    });
+    page.drawText('Status: Pending Administrative Upload', {
+      x: sealBoxX + 38,
+      y: sealBoxY + 52,
+      size: 7,
+      font: helveticaOblique,
+      color: textMuted
+    });
+    page.drawText('(Upload official company stamp in Admin Settings)', {
+      x: sealBoxX + 22,
+      y: sealBoxY + 38,
+      size: 6.5,
+      font: helvetica,
+      color: textMuted
+    });
+  }
+
+  page.drawText('A TIGER GLOBAL Career Solution & Consultancy', {
+    x: sealBoxX + 10,
+    y: sealBoxY + 6,
+    size: 6.5,
     font: helvetica,
     color: textMuted
   });
 
   // Right Signatory Box
-  const sigBoxX = MARGIN_X + CONTENT_WIDTH - 230;
-  const sigBoxY = bottomY + 20;
-  const sigBoxW = 200;
-  const sigBoxH = 115;
+  const sigBoxX = MARGIN_X + CONTENT_WIDTH - 254;
+  const sigBoxY = bottomY + 10;
+  const sigBoxW = 240;
+  const sigBoxH = 120;
 
   page.drawRectangle({
     x: sigBoxX,
@@ -610,30 +742,76 @@ export async function buildRegularReferenceSlipPdf(
   });
 
   page.drawText('AUTHORIZED SIGNATORY', {
-    x: sigBoxX + 38,
-    y: sigBoxY + 84,
-    size: 9.5,
+    x: sigBoxX + 10,
+    y: sigBoxY + sigBoxH - 14,
+    size: 7.5,
     font: helveticaBold,
     color: navy
   });
-  page.drawText('A TIGER GLOBAL CAREER SOLUTION', {
-    x: sigBoxX + 16,
-    y: sigBoxY + 54,
-    size: 8,
-    font: helvetica,
-    color: textBody
+
+  if (companySignatureImage) {
+    const maxImgW = sigBoxW - 24;
+    const maxImgH = 48;
+    const ratio = companySignatureImage.width / companySignatureImage.height;
+    let drawW = maxImgW;
+    let drawH = drawW / ratio;
+    if (drawH > maxImgH) {
+      drawH = maxImgH;
+      drawW = drawH * ratio;
+    }
+    const drawX = sigBoxX + (sigBoxW - drawW) / 2;
+    const drawY = sigBoxY + 34 + (maxImgH - drawH) / 2;
+    page.drawImage(companySignatureImage, {
+      x: drawX,
+      y: drawY,
+      width: drawW,
+      height: drawH
+    });
+  } else {
+    page.drawRectangle({
+      x: sigBoxX + 12,
+      y: sigBoxY + 34,
+      width: sigBoxW - 24,
+      height: 48,
+      borderColor: rgb(0.85, 0.88, 0.92),
+      borderWidth: 0.75,
+      color: rgb(0.98, 0.98, 0.99)
+    });
+    page.drawText('[ AUTHORIZED SIGNATURE ]', {
+      x: sigBoxX + 48,
+      y: sigBoxY + 64,
+      size: 8,
+      font: helveticaBold,
+      color: navy
+    });
+    page.drawText('Status: Pending Administrative Upload', {
+      x: sigBoxX + 38,
+      y: sigBoxY + 48,
+      size: 7,
+      font: helveticaOblique,
+      color: textMuted
+    });
+  }
+
+  // Divider line under signature
+  page.drawLine({
+    start: { x: sigBoxX + 10, y: sigBoxY + 30 },
+    end: { x: sigBoxX + sigBoxW - 10, y: sigBoxY + 30 },
+    thickness: 0.75,
+    color: borderLight
   });
-  page.drawText('& CONSULTANCY', {
-    x: sigBoxX + 60,
-    y: sigBoxY + 40,
-    size: 8,
-    font: helvetica,
-    color: textBody
+
+  page.drawText('A TIGER GLOBAL CAREER SOLUTION & CONSULTANCY', {
+    x: sigBoxX + 10,
+    y: sigBoxY + 18,
+    size: 7,
+    font: helveticaBold,
+    color: darkSlate
   });
   page.drawText('(Corporate Onboarding Authority)', {
-    x: sigBoxX + 32,
-    y: sigBoxY + 22,
-    size: 7.5,
+    x: sigBoxX + 10,
+    y: sigBoxY + 7,
+    size: 6.5,
     font: helveticaOblique,
     color: textMuted
   });
@@ -645,9 +823,10 @@ export async function buildRegularReferenceSlipPdf(
  * Generates the official 1-page Regular Employee Reference Slip as a PDF Blob.
  */
 export async function generateRegularReferenceSlipPdfBlob(
-  formData: RegularJoiningFormData
+  formData: RegularJoiningFormData,
+  options?: BuildRegularReferenceSlipOptions
 ): Promise<Blob> {
-  const pdfBytes = await buildRegularReferenceSlipPdf(formData);
+  const pdfBytes = await buildRegularReferenceSlipPdf(formData, options);
   return new Blob([pdfBytes as any], { type: 'application/pdf' });
 }
 
@@ -655,10 +834,11 @@ export async function generateRegularReferenceSlipPdfBlob(
  * Triggers browser download of the official 1-page Regular Employee Reference Slip.
  */
 export async function downloadRegularReferenceSlipPdf(
-  formData: RegularJoiningFormData
+  formData: RegularJoiningFormData,
+  options?: BuildRegularReferenceSlipOptions
 ): Promise<GenerateRegularReferenceSlipResult> {
   try {
-    const pdfBytes = await buildRegularReferenceSlipPdf(formData);
+    const pdfBytes = await buildRegularReferenceSlipPdf(formData, options);
     const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
     const cleanRef = (formData.employeeCode || 'REGULAR-REFERENCE-SLIP').replace(/[^a-zA-Z0-9_-]/g, '_');
     const fileName = `${cleanRef}-REFERENCE-SLIP.pdf`;
@@ -694,10 +874,11 @@ export async function downloadRegularReferenceSlipPdf(
 export async function generateAndPersistRegularReferenceSlip(
   formData: RegularJoiningFormData,
   joiningFormId?: string | null,
-  currentAdminId?: string | null
+  currentAdminId?: string | null,
+  options?: BuildRegularReferenceSlipOptions
 ): Promise<GenerateRegularReferenceSlipResult> {
   try {
-    const pdfBytes = await buildRegularReferenceSlipPdf(formData);
+    const pdfBytes = await buildRegularReferenceSlipPdf(formData, options);
     const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
     const cleanRef = (formData.employeeCode || 'REGULAR-REFERENCE-SLIP').replace(/[^a-zA-Z0-9_-]/g, '_');
     const fileName = `${cleanRef}-REFERENCE-SLIP.pdf`;

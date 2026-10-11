@@ -1,6 +1,6 @@
 // ==============================================================================
 // File: src/components/admin/CompanySignatureSettingsSection.tsx
-// Description: Founder / CEO Signature Management Section (Admin Settings)
+// Description: Founder / CEO Signature and Official Company Stamp Management Section
 // Brand: A TIGER GROUPS — A TIGER GLOBAL Career Solution & Consultancy
 // Security: Strictly SUPER_ADMIN governed for modifications; all admins can inspect status
 // ==============================================================================
@@ -10,15 +10,10 @@ import {
   ShieldCheck,
   UploadCloud,
   RefreshCw,
-  Trash2,
   CheckCircle2,
   AlertCircle,
-  Lock,
   FileCheck,
-  Power,
-  Info,
-  X,
-  Image as ImageIcon
+  Stamp
 } from 'lucide-react';
 import {
   getCompanySignatureSettings,
@@ -27,7 +22,14 @@ import {
   removeCompanySignature,
   toggleCompanySignatureEnabled,
   SIGNATURE_CONSTRAINTS,
-  type CompanySignatureMetadata
+  type CompanySignatureMetadata,
+  getCompanyStampSettings,
+  getActiveCompanyStampSignedUrl,
+  uploadCompanyStamp,
+  removeCompanyStamp,
+  toggleCompanyStampEnabled,
+  STAMP_CONSTRAINTS,
+  type CompanyStampMetadata
 } from '../../services/companySignatureService';
 
 interface CompanySignatureSettingsSectionProps {
@@ -37,101 +39,106 @@ interface CompanySignatureSettingsSectionProps {
 export const CompanySignatureSettingsSection: React.FC<CompanySignatureSettingsSectionProps> = ({
   isSuperAdmin
 }) => {
-  const [metadata, setMetadata] = useState<CompanySignatureMetadata | null>(null);
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'SIGNATURE' | 'STAMP'>('SIGNATURE');
+
+  // --- SIGNATURE STATE ---
+  const [signatureMeta, setSignatureMeta] = useState<CompanySignatureMetadata | null>(null);
+  const [signatureSignedUrl, setSignatureSignedUrl] = useState<string | null>(null);
+  const [selectedSigFile, setSelectedSigFile] = useState<File | null>(null);
+  const [selectedSigPreview, setSelectedSigPreview] = useState<string | null>(null);
+  const sigFileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- STAMP STATE ---
+  const [stampMeta, setStampMeta] = useState<CompanyStampMetadata | null>(null);
+  const [stampSignedUrl, setStampSignedUrl] = useState<string | null>(null);
+  const [selectedStampFile, setSelectedStampFile] = useState<File | null>(null);
+  const [selectedStampPreview, setSelectedStampPreview] = useState<string | null>(null);
+  const stampFileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- COMMON STATE ---
   const [loading, setLoading] = useState<boolean>(true);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedFilePreview, setSelectedFilePreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const loadSignatureState = useCallback(async () => {
+  const loadAllState = useCallback(async () => {
     setLoading(true);
     try {
-      const meta = await getCompanySignatureSettings();
-      setMetadata(meta);
+      const [sigMeta, stMeta] = await Promise.all([
+        getCompanySignatureSettings(),
+        getCompanyStampSettings()
+      ]);
+      setSignatureMeta(sigMeta);
+      setStampMeta(stMeta);
 
-      if (meta.storage_path) {
-        const url = await getActiveCompanySignatureSignedUrl(3600);
-        setSignedUrl(url);
-      } else {
-        setSignedUrl(null);
-      }
+      const [sigUrl, stUrl] = await Promise.all([
+        sigMeta.storage_path ? getActiveCompanySignatureSignedUrl(3600) : Promise.resolve(null),
+        stMeta.storage_path ? getActiveCompanyStampSignedUrl(3600) : Promise.resolve(null)
+      ]);
+      setSignatureSignedUrl(sigUrl);
+      setStampSignedUrl(stUrl);
     } catch (err) {
-      console.error('[CompanySignatureSettingsSection] Error loading signature:', err);
+      console.error('[CompanySignatureSettingsSection] Error loading settings:', err);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadSignatureState();
-  }, [loadSignatureState]);
+    loadAllState();
+  }, [loadAllState]);
 
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // --- SIGNATURE HANDLERS ---
+  const handleSigFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setStatusMessage(null);
 
-    // Validate MIME type
     const mimeType = file.type.toLowerCase();
     if (!SIGNATURE_CONSTRAINTS.allowedMimeTypes.includes(mimeType)) {
       setStatusMessage({
         type: 'error',
         text: 'Invalid file format. Please choose a PNG, JPG, or WebP image.'
       });
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      setSelectedFile(null);
-      setSelectedFilePreview(null);
+      if (sigFileInputRef.current) sigFileInputRef.current.value = '';
+      setSelectedSigFile(null);
+      setSelectedSigPreview(null);
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > SIGNATURE_CONSTRAINTS.maxSizeBytes) {
       setStatusMessage({
         type: 'error',
         text: `File size exceeds 5MB limit (${(file.size / (1024 * 1024)).toFixed(2)} MB).`
       });
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      setSelectedFile(null);
-      setSelectedFilePreview(null);
+      if (sigFileInputRef.current) sigFileInputRef.current.value = '';
+      setSelectedSigFile(null);
+      setSelectedSigPreview(null);
       return;
     }
 
-    setSelectedFile(file);
-
-    // Generate local preview for immediate user feedback
+    setSelectedSigFile(file);
     const reader = new FileReader();
     reader.onload = (event) => {
-      setSelectedFilePreview(event.target?.result as string);
+      setSelectedSigPreview(event.target?.result as string);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleClearSelectedFile = () => {
-    setSelectedFile(null);
-    setSelectedFilePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  const handleClearSelectedSigFile = () => {
+    setSelectedSigFile(null);
+    setSelectedSigPreview(null);
+    if (sigFileInputRef.current) sigFileInputRef.current.value = '';
   };
 
   const handleUploadSignature = async () => {
-    if (!selectedFile) {
-      setStatusMessage({
-        type: 'error',
-        text: 'Please choose a signature image file first.'
-      });
+    if (!selectedSigFile) {
+      setStatusMessage({ type: 'error', text: 'Please choose a signature image file first.' });
       return;
     }
 
     if (!isSuperAdmin) {
-      setStatusMessage({
-        type: 'error',
-        text: 'Unauthorized: Only SUPER_ADMIN accounts have permission to upload or replace the company signature.'
-      });
+      setStatusMessage({ type: 'error', text: 'Unauthorized: Only SUPER_ADMIN accounts can upload the signature.' });
       return;
     }
 
@@ -139,52 +146,38 @@ export const CompanySignatureSettingsSection: React.FC<CompanySignatureSettingsS
     setStatusMessage(null);
 
     try {
-      const res = await uploadCompanySignature(selectedFile);
-      if (!res.success) {
-        throw new Error(res.error || 'Failed to upload signature asset.');
-      }
+      const res = await uploadCompanySignature(selectedSigFile);
+      if (!res.success) throw new Error(res.error || 'Failed to upload signature asset.');
 
       setStatusMessage({
         type: 'success',
-        text: `Founder/CEO signature successfully ${metadata?.storage_path ? 'replaced' : 'uploaded'} (Version ${res.setting?.version || 1}). Active on Employee ID Cards.`
+        text: `Authorized Signatory Signature successfully ${signatureMeta?.storage_path ? 'replaced' : 'uploaded'}. Active on Reference Slips & Joining Documents.`
       });
 
-      handleClearSelectedFile();
-      await loadSignatureState();
+      handleClearSelectedSigFile();
+      await loadAllState();
     } catch (err: any) {
-      setStatusMessage({
-        type: 'error',
-        text: err.message || 'Signature upload encountered an error.'
-      });
+      setStatusMessage({ type: 'error', text: err.message || 'Signature upload encountered an error.' });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleToggleEnabled = async () => {
-    if (!metadata?.storage_path || !isSuperAdmin) return;
-
+  const handleToggleSigEnabled = async () => {
+    if (!isSuperAdmin) return;
     setIsProcessing(true);
     setStatusMessage(null);
-
     try {
-      const targetState = !metadata.enabled;
-      const res = await toggleCompanySignatureEnabled(targetState);
-      if (!res.success) {
-        throw new Error(res.error || 'Failed to update signature state.');
-      }
-
+      const nextEnabled = !signatureMeta?.enabled;
+      const res = await toggleCompanySignatureEnabled(nextEnabled);
+      if (!res.success) throw new Error(res.error || 'Failed to toggle status.');
       setStatusMessage({
         type: 'success',
-        text: `Founder/CEO signature ${targetState ? 'enabled' : 'disabled'} for ID Card generation.`
+        text: `Authorized Signatory Signature ${nextEnabled ? 'enabled' : 'disabled'}.`
       });
-
-      await loadSignatureState();
+      await loadAllState();
     } catch (err: any) {
-      setStatusMessage({
-        type: 'error',
-        text: err.message || 'Action failed.'
-      });
+      setStatusMessage({ type: 'error', text: err.message || 'Error toggling signature.' });
     } finally {
       setIsProcessing(false);
     }
@@ -192,39 +185,145 @@ export const CompanySignatureSettingsSection: React.FC<CompanySignatureSettingsS
 
   const handleRemoveSignature = async () => {
     if (!isSuperAdmin) return;
-
-    const confirmed = window.confirm(
-      'Are you sure you want to remove the current Founder/CEO signature? Future ID Cards will generate with a blank company signature line until a new signature is uploaded.'
-    );
-    if (!confirmed) return;
-
+    if (!window.confirm('Are you sure you want to remove the Authorized Signatory Signature?')) return;
     setIsProcessing(true);
     setStatusMessage(null);
-
     try {
       const res = await removeCompanySignature();
-      if (!res.success) {
-        throw new Error(res.error || 'Failed to remove signature asset.');
-      }
-
+      if (!res.success) throw new Error(res.error || 'Failed to remove signature.');
       setStatusMessage({
         type: 'success',
-        text: 'Founder/CEO signature asset removed from active company identity configuration.'
+        text: 'Authorized Signatory Signature asset removed from active company identity.'
       });
-
-      await loadSignatureState();
+      await loadAllState();
     } catch (err: any) {
-      setStatusMessage({
-        type: 'error',
-        text: err.message || 'Failed to remove signature.'
-      });
+      setStatusMessage({ type: 'error', text: err.message || 'Failed to remove signature.' });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const isConfigured = Boolean(metadata?.storage_path);
-  const isActive = isConfigured && metadata?.enabled;
+  // --- STAMP HANDLERS ---
+  const handleStampFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setStatusMessage(null);
+
+    const mimeType = file.type.toLowerCase();
+    if (!STAMP_CONSTRAINTS.allowedMimeTypes.includes(mimeType)) {
+      setStatusMessage({
+        type: 'error',
+        text: 'Invalid file format. Please choose a PNG, JPG, or WebP image.'
+      });
+      if (stampFileInputRef.current) stampFileInputRef.current.value = '';
+      setSelectedStampFile(null);
+      setSelectedStampPreview(null);
+      return;
+    }
+
+    if (file.size > STAMP_CONSTRAINTS.maxSizeBytes) {
+      setStatusMessage({
+        type: 'error',
+        text: `File size exceeds 5MB limit (${(file.size / (1024 * 1024)).toFixed(2)} MB).`
+      });
+      if (stampFileInputRef.current) stampFileInputRef.current.value = '';
+      setSelectedStampFile(null);
+      setSelectedStampPreview(null);
+      return;
+    }
+
+    setSelectedStampFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setSelectedStampPreview(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearSelectedStampFile = () => {
+    setSelectedStampFile(null);
+    setSelectedStampPreview(null);
+    if (stampFileInputRef.current) stampFileInputRef.current.value = '';
+  };
+
+  const handleUploadStamp = async () => {
+    if (!selectedStampFile) {
+      setStatusMessage({ type: 'error', text: 'Please choose an official company stamp image first.' });
+      return;
+    }
+
+    if (!isSuperAdmin) {
+      setStatusMessage({ type: 'error', text: 'Unauthorized: Only SUPER_ADMIN accounts can upload the company stamp.' });
+      return;
+    }
+
+    setIsProcessing(true);
+    setStatusMessage(null);
+
+    try {
+      const res = await uploadCompanyStamp(selectedStampFile);
+      if (!res.success) throw new Error(res.error || 'Failed to upload stamp asset.');
+
+      setStatusMessage({
+        type: 'success',
+        text: `Official Company Stamp successfully ${stampMeta?.storage_path ? 'replaced' : 'uploaded'}. Active on Reference Slips & Joining Documents.`
+      });
+
+      handleClearSelectedStampFile();
+      await loadAllState();
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: err.message || 'Stamp upload encountered an error.' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleToggleStampEnabled = async () => {
+    if (!isSuperAdmin) return;
+    setIsProcessing(true);
+    setStatusMessage(null);
+    try {
+      const nextEnabled = !stampMeta?.enabled;
+      const res = await toggleCompanyStampEnabled(nextEnabled);
+      if (!res.success) throw new Error(res.error || 'Failed to toggle status.');
+      setStatusMessage({
+        type: 'success',
+        text: `Official Company Stamp ${nextEnabled ? 'enabled' : 'disabled'}.`
+      });
+      await loadAllState();
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: err.message || 'Error toggling stamp.' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRemoveStamp = async () => {
+    if (!isSuperAdmin) return;
+    if (!window.confirm('Are you sure you want to remove the Official Company Stamp?')) return;
+    setIsProcessing(true);
+    setStatusMessage(null);
+    try {
+      const res = await removeCompanyStamp();
+      if (!res.success) throw new Error(res.error || 'Failed to remove company stamp.');
+      setStatusMessage({
+        type: 'success',
+        text: 'Official Company Stamp asset removed from active company identity.'
+      });
+      await loadAllState();
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: err.message || 'Failed to remove stamp.' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const isSigConfigured = Boolean(signatureMeta?.storage_path);
+  const isSigActive = isSigConfigured && signatureMeta?.enabled;
+
+  const isStampConfigured = Boolean(stampMeta?.storage_path);
+  const isStampActive = isStampConfigured && stampMeta?.enabled;
 
   return (
     <div
@@ -238,6 +337,22 @@ export const CompanySignatureSettingsSection: React.FC<CompanySignatureSettingsS
         overflow: 'hidden'
       }}
     >
+      {/* Hidden File Inputs */}
+      <input
+        ref={sigFileInputRef}
+        type="file"
+        accept={SIGNATURE_CONSTRAINTS.allowedMimeTypes.join(',')}
+        style={{ display: 'none' }}
+        onChange={handleSigFileSelected}
+      />
+      <input
+        ref={stampFileInputRef}
+        type="file"
+        accept={STAMP_CONSTRAINTS.allowedMimeTypes.join(',')}
+        style={{ display: 'none' }}
+        onChange={handleStampFileSelected}
+      />
+
       {/* Header Banner */}
       <div
         style={{
@@ -265,435 +380,450 @@ export const CompanySignatureSettingsSection: React.FC<CompanySignatureSettingsS
               boxShadow: '0 2px 4px rgba(15, 27, 56, 0.15)'
             }}
           >
-            <FileCheck size={22} />
+            <ShieldCheck size={22} />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0F1B38' }}>
-                FOUNDER / CEO SIGNATURE
+                OFFICIAL COMPANY ASSETS & AUTHORIZATION SEALS
               </h3>
-              {/* Status Pill Badge */}
-              {loading ? (
-                <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Loading status...</span>
-              ) : isActive ? (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    background: '#ECFDF5',
-                    color: '#047857',
-                    border: '1px solid #A7F3D0',
-                    borderRadius: '20px',
-                    padding: '0.2rem 0.65rem',
-                    fontSize: '0.725rem',
-                    fontWeight: 700
-                  }}
-                >
-                  <CheckCircle2 size={12} />
-                  Active (Version {metadata?.version || 1})
-                </span>
-              ) : isConfigured ? (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    background: '#FFFBEB',
-                    color: '#B45309',
-                    border: '1px solid #FDE68A',
-                    borderRadius: '20px',
-                    padding: '0.2rem 0.65rem',
-                    fontSize: '0.725rem',
-                    fontWeight: 700
-                  }}
-                >
-                  <Power size={12} />
-                  Disabled
-                </span>
-              ) : (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    background: '#F1F5F9',
-                    color: '#64748B',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '20px',
-                    padding: '0.2rem 0.65rem',
-                    fontSize: '0.725rem',
-                    fontWeight: 600
-                  }}
-                >
-                  <AlertCircle size={12} />
-                  Not Configured
-                </span>
-              )}
             </div>
             <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: '#64748B' }}>
-              Official authority signature asset rendered on Employee Identity Cards above{' '}
-              <strong>Managing Director &amp; CEO</strong>.
+              Manage official company stamp and authorized signatory signature for Reference Slips, Complete Joining Documents & ID Cards
             </p>
           </div>
         </div>
 
-        {/* Permission Indicator */}
-        <div style={{ fontSize: '0.75rem', color: isSuperAdmin ? '#047857' : '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-          {isSuperAdmin ? (
-            <>
-              <ShieldCheck size={14} />
-              <span>SUPER_ADMIN Authorized</span>
-            </>
-          ) : (
-            <>
-              <Lock size={14} />
-              <span>SUPER_ADMIN Required to Modify</span>
-            </>
-          )}
+        {/* Tab Selector */}
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => { setActiveTab('SIGNATURE'); setStatusMessage(null); }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.5rem 1rem',
+              borderRadius: '6px',
+              border: activeTab === 'SIGNATURE' ? '1px solid #0F1B38' : '1px solid #CBD5E1',
+              backgroundColor: activeTab === 'SIGNATURE' ? '#0F1B38' : '#F8FAFC',
+              color: activeTab === 'SIGNATURE' ? '#FFFFFF' : '#475569',
+              fontSize: '0.825rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            <FileCheck size={14} />
+            <span>Authorized Signature</span>
+            {isSigActive && <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#10B981' }} />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setActiveTab('STAMP'); setStatusMessage(null); }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.5rem 1rem',
+              borderRadius: '6px',
+              border: activeTab === 'STAMP' ? '1px solid #0F1B38' : '1px solid #CBD5E1',
+              backgroundColor: activeTab === 'STAMP' ? '#0F1B38' : '#F8FAFC',
+              color: activeTab === 'STAMP' ? '#FFFFFF' : '#475569',
+              fontSize: '0.825rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            <Stamp size={14} />
+            <span>Official Company Stamp</span>
+            {isStampActive && <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#10B981' }} />}
+          </button>
+
+          <button
+            type="button"
+            onClick={loadAllState}
+            disabled={loading || isProcessing}
+            title="Refresh assets status"
+            style={{
+              background: 'none',
+              border: '1px solid #E2E8F0',
+              padding: '0.45rem',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              color: '#64748B'
+            }}
+          >
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          </button>
         </div>
       </div>
 
-      {/* Body Section */}
-      <div style={{ padding: '1.5rem' }}>
-        {statusMessage && (
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              marginBottom: '1.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.825rem',
-              background: statusMessage.type === 'success' ? '#ECFDF5' : '#FEF2F2',
-              color: statusMessage.type === 'success' ? '#047857' : '#B91C1C',
-              border: `1px solid ${statusMessage.type === 'success' ? '#A7F3D0' : '#FECACA'}`
-            }}
-          >
-            {statusMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-            <span>{statusMessage.text}</span>
-          </div>
-        )}
+      {/* Notifications */}
+      {statusMessage && (
+        <div
+          style={{
+            margin: '1rem 1.5rem 0',
+            padding: '0.75rem 1rem',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            backgroundColor: statusMessage.type === 'success' ? '#ECFDF5' : '#FEF2F2',
+            border: `1px solid ${statusMessage.type === 'success' ? '#A7F3D0' : '#FECACA'}`,
+            color: statusMessage.type === 'success' ? '#065F46' : '#991B1B',
+            fontSize: '0.85rem',
+            fontWeight: 600
+          }}
+        >
+          {statusMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+          <span>{statusMessage.text}</span>
+        </div>
+      )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-          {/* Left Column: Visual Signature Asset Display */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Current Signature Preview
-            </label>
+      {/* MAIN BODY: SIGNATURE PANEL */}
+      {activeTab === 'SIGNATURE' && (
+        <div style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            {/* Left: Specimen Display */}
+            <div style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1rem', background: '#F8FAFC' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0F1B38' }}>Active Signature Specimen</span>
+                {isSigActive ? (
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#047857', background: '#ECFDF5', padding: '2px 8px', borderRadius: '4px' }}>ACTIVE</span>
+                ) : (
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', background: '#F1F5F9', padding: '2px 8px', borderRadius: '4px' }}>NOT UPLOADED</span>
+                )}
+              </div>
 
-            <div
-              style={{
-                width: '100%',
-                height: '120px',
-                border: '1.5px dashed #CBD5E1',
-                borderRadius: '8px',
-                background: signedUrl
-                  ? 'repeating-conic-gradient(#F8FAFC 0% 25%, #FFFFFF 0% 50%) 50% / 16px 16px'
-                  : '#F8FAFC',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0.75rem',
-                position: 'relative'
-              }}
-            >
-              {loading ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748B', fontSize: '0.8rem' }}>
-                  <RefreshCw size={16} className="animate-spin" />
-                  <span>Loading signature asset...</span>
-                </div>
-              ) : signedUrl ? (
-                <img
-                  src={signedUrl}
-                  alt="Founder / CEO Signature"
-                  style={{
-                    maxHeight: '85px',
-                    maxWidth: '90%',
-                    objectFit: 'contain',
-                    filter: isActive ? 'none' : 'grayscale(100%) opacity(0.5)'
-                  }}
-                />
-              ) : (
-                <div style={{ textAlign: 'center', color: '#94A3B8' }}>
-                  <FileCheck size={28} style={{ margin: '0 auto 0.4rem auto', opacity: 0.5 }} />
-                  <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>No active signature uploaded</div>
-                  <div style={{ fontSize: '0.72rem' }}>ID Cards will generate with a blank company signature line</div>
+              <div
+                style={{
+                  height: '140px',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden'
+                }}
+              >
+                {selectedSigPreview ? (
+                  <img src={selectedSigPreview} alt="Selected Signature Preview" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+                ) : signatureSignedUrl ? (
+                  <img src={signatureSignedUrl} alt="Active Company Signature" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+                ) : (
+                  <div style={{ textAlign: 'center', color: '#94A3B8', fontSize: '0.8rem' }}>
+                    <FileCheck size={28} style={{ margin: '0 auto 0.25rem', opacity: 0.5 }} />
+                    <span>No signature uploaded</span>
+                  </div>
+                )}
+              </div>
+
+              {signatureMeta?.storage_path && (
+                <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#64748B', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Version: {signatureMeta.version || 1}</span>
+                  <span>Type: {signatureMeta.mime_type || 'image/png'}</span>
+                  <span>Updated: {signatureMeta.uploaded_at ? new Date(signatureMeta.uploaded_at).toLocaleDateString() : '—'}</span>
                 </div>
               )}
             </div>
 
-            {/* Asset Metadata */}
-            {metadata?.storage_path && (
-              <div style={{ marginTop: '0.75rem', fontSize: '0.725rem', color: '#64748B', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                <div>
-                  <strong>File:</strong> {metadata.file_name || 'founder_signature'}
-                  {metadata.file_size ? ` (${(metadata.file_size / 1024).toFixed(1)} KB)` : ''}
-                </div>
-                {metadata.uploaded_at && (
-                  <div>
-                    <strong>Updated:</strong>{' '}
-                    {new Date(metadata.uploaded_at).toLocaleString('en-GB', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+            {/* Right: Upload & Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem', fontWeight: 800, color: '#0F1B38' }}>
+                  Authorized Signatory Administration
+                </h4>
+                <p style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', color: '#64748B', lineHeight: 1.5 }}>
+                  This official signature is embedded directly onto generated <strong>Employee Reference Slips</strong>, <strong>Complete Joining Documents</strong>, and <strong>Employee ID Cards</strong>.
+                </p>
+
+                {selectedSigFile && (
+                  <div style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '6px', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#1E40AF' }}>
+                    <strong>Selected: </strong>{selectedSigFile.name} ({(selectedSigFile.size / 1024).toFixed(1)} KB)
                   </div>
                 )}
-                <div>
-                  <strong>Authority Title:</strong> Managing Director &amp; CEO
-                </div>
               </div>
-            )}
-          </div>
 
-          {/* Right Column: Actions & Configuration Directives */}
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Asset Governance &amp; Controls
-              </label>
-
-              {/* Upload Specifications Info Box */}
-              <div
-                style={{
-                  background: '#F8FAFC',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  padding: '0.85rem',
-                  fontSize: '0.75rem',
-                  color: '#475569',
-                  marginBottom: '1rem',
-                  lineHeight: '1.45'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, color: '#0F1B38', marginBottom: '0.3rem' }}>
-                  <Info size={14} style={{ color: '#C5A880' }} />
-                  <span>Upload Directives</span>
-                </div>
-                <div>• Supported formats: <strong>PNG</strong> (recommended for transparent background), <strong>JPG</strong>, <strong>WebP</strong>.</div>
-                <div>• Maximum file size: <strong>5 MB</strong>.</div>
-                <div>• Secure storage: Stored in private bucket <code>company-assets</code>.</div>
-                <div>• Historical safety: Uploading a new signature does not alter previously compiled PDF archives.</div>
-              </div>
-            </div>
-
-            {/* Action Controls */}
-            <div>
-              {/* Hidden or standard native input */}
-              <input
-                ref={fileInputRef}
-                id="founder-signature-file-input"
-                type="file"
-                accept={SIGNATURE_CONSTRAINTS.allowedExtensions.join(',')}
-                style={{ display: 'none' }}
-                onChange={handleFileSelected}
-                disabled={!isSuperAdmin || isProcessing}
-              />
-
-              {/* Selected File Stage Card (When file is chosen) */}
-              {selectedFile ? (
-                <div
-                  style={{
-                    background: '#F0FDF4',
-                    border: '1.5px solid #86EFAC',
-                    borderRadius: '8px',
-                    padding: '0.85rem 1rem',
-                    marginBottom: '1rem'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <ImageIcon size={18} style={{ color: '#16A34A' }} />
-                      <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#166534' }}>
-                        Selected File for Upload
-                      </span>
-                    </div>
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                {selectedSigFile ? (
+                  <>
                     <button
                       type="button"
-                      onClick={handleClearSelectedFile}
-                      disabled={isProcessing}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#64748B',
-                        padding: '2px',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                      title="Clear selection"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-
-                  <div style={{ fontSize: '0.775rem', color: '#334155', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                    <span><strong>Name:</strong> {selectedFile.name}</span>
-                    <span><strong>Size:</strong> {(selectedFile.size / 1024).toFixed(1)} KB</span>
-                    <span><strong>Format:</strong> {selectedFile.type.split('/')[1]?.toUpperCase() || 'IMAGE'}</span>
-                  </div>
-
-                  {selectedFilePreview && (
-                    <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div
-                        style={{
-                          height: '42px',
-                          maxWidth: '140px',
-                          padding: '2px 8px',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '4px',
-                          background: '#FFFFFF',
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <img
-                          src={selectedFilePreview}
-                          alt="Selection Preview"
-                          style={{ maxHeight: '36px', maxWidth: '100%', objectFit: 'contain' }}
-                        />
-                      </div>
-                      <span style={{ fontSize: '0.725rem', color: '#047857' }}>
-                        Ready to upload and activate as official company authority signature.
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Explicit Commit Upload Button */}
-                  <div style={{ marginTop: '0.85rem', display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      id="btn-upload-founder-signature"
-                      disabled={!isSuperAdmin || isProcessing}
                       onClick={handleUploadSignature}
-                      className="admin-btn admin-btn-primary"
+                      disabled={isProcessing}
                       style={{
-                        padding: '0.55rem 1.25rem',
+                        padding: '0.6rem 1.25rem',
+                        backgroundColor: '#C5A059',
+                        color: '#0F1B38',
+                        border: 'none',
+                        borderRadius: '6px',
                         fontSize: '0.825rem',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.45rem',
-                        cursor: isSuperAdmin && !isProcessing ? 'pointer' : 'not-allowed',
-                        background: '#047857',
-                        borderColor: '#047857',
-                        color: '#FFFFFF',
-                        fontWeight: 700
+                        fontWeight: 700,
+                        cursor: 'pointer'
                       }}
                     >
-                      {isProcessing ? (
-                        <>
-                          <RefreshCw size={14} className="animate-spin" />
-                          <span>Uploading Signature Asset...</span>
-                        </>
-                      ) : (
-                        <>
-                          <UploadCloud size={15} />
-                          <span>{isConfigured ? 'Confirm & Replace Signature' : 'Upload Signature'}</span>
-                        </>
-                      )}
+                      {isProcessing ? 'Saving...' : 'Confirm Upload'}
                     </button>
-
                     <button
                       type="button"
-                      onClick={handleClearSelectedFile}
-                      disabled={isProcessing}
-                      className="admin-btn"
+                      onClick={handleClearSelectedSigFile}
                       style={{
-                        padding: '0.55rem 0.85rem',
-                        fontSize: '0.8rem',
-                        background: '#F8FAFC',
+                        padding: '0.6rem 1rem',
+                        backgroundColor: '#F1F5F9',
+                        color: '#475569',
                         border: '1px solid #CBD5E1',
-                        color: '#64748B'
+                        borderRadius: '6px',
+                        fontSize: '0.825rem',
+                        fontWeight: 600,
+                        cursor: 'pointer'
                       }}
                     >
                       Cancel
                     </button>
-                  </div>
-                </div>
-              ) : (
-                /* Unselected State: Visible Chooser & Governance Controls */
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    id="btn-choose-signature-file"
-                    disabled={!isSuperAdmin || isProcessing}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="admin-btn admin-btn-primary"
-                    style={{
-                      padding: '0.6rem 1.25rem',
-                      fontSize: '0.825rem',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.45rem',
-                      cursor: isSuperAdmin ? 'pointer' : 'not-allowed',
-                      opacity: !isSuperAdmin ? 0.6 : 1,
-                      fontWeight: 700
-                    }}
-                  >
-                    <UploadCloud size={15} />
-                    <span>{isConfigured ? 'Replace Signature (Select File)' : 'Upload Signature (Select File)'}</span>
-                  </button>
-
-                  {/* Enable / Disable Button */}
-                  {isConfigured && (
+                  </>
+                ) : (
+                  <>
                     <button
                       type="button"
+                      onClick={() => sigFileInputRef.current?.click()}
                       disabled={!isSuperAdmin || isProcessing}
-                      onClick={handleToggleEnabled}
-                      className="admin-btn"
                       style={{
-                        padding: '0.55rem 1rem',
+                        padding: '0.6rem 1.25rem',
+                        backgroundColor: '#0F1B38',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '6px',
                         fontSize: '0.825rem',
+                        fontWeight: 700,
+                        cursor: isSuperAdmin ? 'pointer' : 'not-allowed',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '0.4rem',
-                        background: metadata?.enabled ? '#FFFBEB' : '#ECFDF5',
-                        color: metadata?.enabled ? '#B45309' : '#047857',
-                        border: `1px solid ${metadata?.enabled ? '#FDE68A' : '#A7F3D0'}`,
-                        cursor: isSuperAdmin ? 'pointer' : 'not-allowed',
-                        opacity: !isSuperAdmin ? 0.6 : 1
+                        gap: '0.4rem'
                       }}
                     >
-                      <Power size={13} />
-                      <span>{metadata?.enabled ? 'Disable Signature' : 'Enable Signature'}</span>
+                      <UploadCloud size={15} />
+                      <span>{isSigConfigured ? 'Replace Signature' : 'Upload Signature'}</span>
                     </button>
-                  )}
 
-                  {/* Remove Button */}
-                  {isConfigured && (
-                    <button
-                      type="button"
-                      disabled={!isSuperAdmin || isProcessing}
-                      onClick={handleRemoveSignature}
-                      className="admin-btn"
-                      style={{
-                        padding: '0.55rem 0.9rem',
-                        fontSize: '0.825rem',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        background: '#FEF2F2',
-                        color: '#B91C1C',
-                        border: '1px solid #FECACA',
-                        cursor: isSuperAdmin ? 'pointer' : 'not-allowed',
-                        opacity: !isSuperAdmin ? 0.6 : 1
-                      }}
-                    >
-                      <Trash2 size={13} />
-                      <span>Remove</span>
-                    </button>
-                  )}
-                </div>
-              )}
+                    {isSigConfigured && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleToggleSigEnabled}
+                          disabled={!isSuperAdmin || isProcessing}
+                          style={{
+                            padding: '0.6rem 1rem',
+                            backgroundColor: signatureMeta?.enabled ? '#FFFBEB' : '#ECFDF5',
+                            color: signatureMeta?.enabled ? '#B45309' : '#047857',
+                            border: `1px solid ${signatureMeta?.enabled ? '#FDE68A' : '#A7F3D0'}`,
+                            borderRadius: '6px',
+                            fontSize: '0.825rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {signatureMeta?.enabled ? 'Disable' : 'Enable'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleRemoveSignature}
+                          disabled={!isSuperAdmin || isProcessing}
+                          style={{
+                            padding: '0.6rem 1rem',
+                            backgroundColor: '#FEF2F2',
+                            color: '#991B1B',
+                            border: '1px solid #FECACA',
+                            borderRadius: '6px',
+                            fontSize: '0.825rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* MAIN BODY: STAMP PANEL */}
+      {activeTab === 'STAMP' && (
+        <div style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            {/* Left: Specimen Display */}
+            <div style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1rem', background: '#F8FAFC' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0F1B38' }}>Active Company Stamp Specimen</span>
+                {isStampActive ? (
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#047857', background: '#ECFDF5', padding: '2px 8px', borderRadius: '4px' }}>ACTIVE</span>
+                ) : (
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', background: '#F1F5F9', padding: '2px 8px', borderRadius: '4px' }}>NOT UPLOADED</span>
+                )}
+              </div>
+
+              <div
+                style={{
+                  height: '140px',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden'
+                }}
+              >
+                {selectedStampPreview ? (
+                  <img src={selectedStampPreview} alt="Selected Stamp Preview" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+                ) : stampSignedUrl ? (
+                  <img src={stampSignedUrl} alt="Active Company Stamp" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+                ) : (
+                  <div style={{ textAlign: 'center', color: '#94A3B8', fontSize: '0.8rem' }}>
+                    <Stamp size={28} style={{ margin: '0 auto 0.25rem', opacity: 0.5 }} />
+                    <span>No official company stamp uploaded</span>
+                  </div>
+                )}
+              </div>
+
+              {stampMeta?.storage_path && (
+                <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#64748B', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Version: {stampMeta.version || 1}</span>
+                  <span>Type: {stampMeta.mime_type || 'image/png'}</span>
+                  <span>Updated: {stampMeta.uploaded_at ? new Date(stampMeta.uploaded_at).toLocaleDateString() : '—'}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Upload & Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem', fontWeight: 800, color: '#0F1B38' }}>
+                  Official Company Stamp & Registration Seal
+                </h4>
+                <p style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', color: '#64748B', lineHeight: 1.5 }}>
+                  This official corporate registration seal is embedded alongside the authorized signatory in Section 3 of <strong>Employee Reference Slips</strong>, Section H of <strong>Complete Joining Documents</strong>, and <strong>Statutory Declarations</strong>.
+                </p>
+
+                {selectedStampFile && (
+                  <div style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '6px', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#1E40AF' }}>
+                    <strong>Selected: </strong>{selectedStampFile.name} ({(selectedStampFile.size / 1024).toFixed(1)} KB)
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                {selectedStampFile ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleUploadStamp}
+                      disabled={isProcessing}
+                      style={{
+                        padding: '0.6rem 1.25rem',
+                        backgroundColor: '#C5A059',
+                        color: '#0F1B38',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '0.825rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {isProcessing ? 'Saving...' : 'Confirm Upload'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearSelectedStampFile}
+                      style={{
+                        padding: '0.6rem 1rem',
+                        backgroundColor: '#F1F5F9',
+                        color: '#475569',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '6px',
+                        fontSize: '0.825rem',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => stampFileInputRef.current?.click()}
+                      disabled={!isSuperAdmin || isProcessing}
+                      style={{
+                        padding: '0.6rem 1.25rem',
+                        backgroundColor: '#0F1B38',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '0.825rem',
+                        fontWeight: 700,
+                        cursor: isSuperAdmin ? 'pointer' : 'not-allowed',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
+                      }}
+                    >
+                      <UploadCloud size={15} />
+                      <span>{isStampConfigured ? 'Replace Stamp' : 'Upload Stamp'}</span>
+                    </button>
+
+                    {isStampConfigured && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleToggleStampEnabled}
+                          disabled={!isSuperAdmin || isProcessing}
+                          style={{
+                            padding: '0.6rem 1rem',
+                            backgroundColor: stampMeta?.enabled ? '#FFFBEB' : '#ECFDF5',
+                            color: stampMeta?.enabled ? '#B45309' : '#047857',
+                            border: `1px solid ${stampMeta?.enabled ? '#FDE68A' : '#A7F3D0'}`,
+                            borderRadius: '6px',
+                            fontSize: '0.825rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {stampMeta?.enabled ? 'Disable' : 'Enable'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleRemoveStamp}
+                          disabled={!isSuperAdmin || isProcessing}
+                          style={{
+                            padding: '0.6rem 1rem',
+                            backgroundColor: '#FEF2F2',
+                            color: '#991B1B',
+                            border: '1px solid #FECACA',
+                            borderRadius: '6px',
+                            fontSize: '0.825rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

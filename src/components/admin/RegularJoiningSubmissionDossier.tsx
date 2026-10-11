@@ -41,8 +41,11 @@ import { RegularReferenceSlipModal } from './RegularReferenceSlipModal';
 import { CompleteJoiningDocumentModal } from './CompleteJoiningDocumentModal';
 import { EmployeeDocumentsPanel } from './EmployeeDocumentsPanel';
 import { EmployeeIdCardPanel } from './EmployeeIdCardPanel';
+import {
+  getActiveCompanySignatureSignedUrl,
+  getActiveCompanyStampSignedUrl
+} from '../../services/companySignatureService';
 import { downloadCompleteJoiningDocumentPdf } from '../../services/completeJoiningDocumentGenerator';
-import { getActiveCompanySignatureSignedUrl } from '../../services/companySignatureService';
 import type { EmployeeRow, DocumentRow } from '../../types/database';
 
 interface RegularJoiningSubmissionDossierProps {
@@ -79,15 +82,22 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
   const [isCompleteDocModalOpen, setIsCompleteDocModalOpen] = useState<boolean>(false);
   const [isDownloadingCompleteDoc, setIsDownloadingCompleteDoc] = useState<boolean>(false);
   const [companySignatureUrl, setCompanySignatureUrl] = useState<string | null>(null);
+  const [companyStampUrl, setCompanyStampUrl] = useState<string | null>(null);
   const [inspectDoc, setInspectDoc] = useState<{ title: string; url: string } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
-    getActiveCompanySignatureSignedUrl()
-      .then((url) => {
-        if (isMounted && url) setCompanySignatureUrl(url);
+    Promise.all([
+      getActiveCompanySignatureSignedUrl(),
+      getActiveCompanyStampSignedUrl()
+    ])
+      .then(([sig, stamp]) => {
+        if (isMounted) {
+          if (sig) setCompanySignatureUrl(sig);
+          if (stamp) setCompanyStampUrl(stamp);
+        }
       })
-      .catch((err) => console.warn('Company signature load warning:', err));
+      .catch((err) => console.warn('Company assets load warning:', err));
     return () => {
       isMounted = false;
     };
@@ -99,6 +109,7 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
       setActionError(null);
       const res = await downloadCompleteJoiningDocumentPdf(formData, {
         companySignatureUrl,
+        companyStampUrl,
         verifierName
       });
       if (res.success) {
