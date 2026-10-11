@@ -36,6 +36,7 @@ interface JoiningListItem {
   email: string;
   mobile: string;
   submissionStatus: string;
+  workflowType: 'REGULAR' | 'STANDARD';
   submittedAt: string | null;
   createdAt: string;
 }
@@ -58,6 +59,7 @@ export const AdminJoiningListPage: React.FC = () => {
   // Filters
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [workflowFilter, setWorkflowFilter] = useState<string>('ALL');
 
   const fetchJoiningList = useCallback(async () => {
     setLoading(true);
@@ -69,10 +71,12 @@ export const AdminJoiningListPage: React.FC = () => {
         .select(`
           id,
           joining_reference,
+          employee_code,
           candidate_name,
           email,
           employee_contact_number,
           submission_status,
+          custom_fields,
           submitted_at,
           created_at
         `)
@@ -88,16 +92,25 @@ export const AdminJoiningListPage: React.FC = () => {
         throw new Error(fetchErr.message);
       }
 
-      const mapped: JoiningListItem[] = (data || []).map((row: any) => ({
-        id: row.id,
-        joiningReference: row.joining_reference || 'PENDING',
-        candidateName: row.candidate_name || 'Candidate',
-        email: row.email || 'N/A',
-        mobile: row.employee_contact_number ? formatIndianPhoneNumber(row.employee_contact_number) : 'N/A',
-        submissionStatus: row.submission_status || 'DRAFT',
-        submittedAt: row.submitted_at,
-        createdAt: row.created_at
-      }));
+      const mapped: JoiningListItem[] = (data || []).map((row: any) => {
+        const isRegular =
+          row.workflow_type === 'REGULAR' ||
+          row.custom_fields?.workflowType === 'REGULAR' ||
+          (row.joining_reference && String(row.joining_reference).startsWith('ATG-')) ||
+          (row.employee_code && String(row.employee_code).startsWith('ATG-'));
+
+        return {
+          id: row.id,
+          joiningReference: row.employee_code || row.joining_reference || 'PENDING',
+          candidateName: row.candidate_name || 'Candidate',
+          email: row.email || 'N/A',
+          mobile: row.employee_contact_number ? formatIndianPhoneNumber(row.employee_contact_number) : 'N/A',
+          submissionStatus: row.submission_status || 'DRAFT',
+          workflowType: isRegular ? 'REGULAR' : 'STANDARD',
+          submittedAt: row.submitted_at,
+          createdAt: row.created_at
+        };
+      });
 
       setItems(mapped);
     } catch (err: any) {
@@ -112,8 +125,11 @@ export const AdminJoiningListPage: React.FC = () => {
     fetchJoiningList();
   }, [fetchJoiningList]);
 
-  // Client search filter across fields
+  // Client search and workflow filter across fields
   const filteredItems = items.filter((item) => {
+    if (workflowFilter !== 'ALL' && item.workflowType !== workflowFilter) {
+      return false;
+    }
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -206,6 +222,28 @@ export const AdminJoiningListPage: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => navigate('/admin/regular-joining')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.55rem 1rem',
+              border: '1px solid #C5A059',
+              borderRadius: '6px',
+              backgroundColor: '#C5A059',
+              color: '#0F1B38',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <FileCheck2 size={15} />
+            <span>Regular Joining Form</span>
+          </button>
+
           <button
             onClick={handleQuickExportXlsx}
             disabled={exporting || loading}
@@ -346,11 +384,32 @@ export const AdminJoiningListPage: React.FC = () => {
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <Filter size={15} style={{ color: '#64748B' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Filter size={15} style={{ color: '#64748B' }} />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{
+                padding: '0.5rem 0.75rem',
+                border: '1px solid #CBD5E1',
+                borderRadius: '6px',
+                fontSize: '0.85rem',
+                backgroundColor: '#FFFFFF',
+                color: '#334155'
+              }}
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="SUBMITTED">Pending Verification</option>
+              <option value="VERIFIED">Verified</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="DRAFT">Draft</option>
+            </select>
+          </div>
+
           <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            value={workflowFilter}
+            onChange={(e) => setWorkflowFilter(e.target.value)}
             style={{
               padding: '0.5rem 0.75rem',
               border: '1px solid #CBD5E1',
@@ -360,9 +419,9 @@ export const AdminJoiningListPage: React.FC = () => {
               color: '#334155'
             }}
           >
-            <option value="ALL">All Statuses</option>
-            <option value="SUBMITTED">Submitted</option>
-            <option value="DRAFT">Draft / In Progress</option>
+            <option value="ALL">All Workflows</option>
+            <option value="REGULAR">Regular Joining Form</option>
+            <option value="STANDARD">Standard Portal</option>
           </select>
         </div>
 
@@ -391,7 +450,7 @@ export const AdminJoiningListPage: React.FC = () => {
             <FileCheck2 size={38} style={{ color: '#CBD5E1', margin: '0 auto 0.75rem auto' }} />
             <h3 style={{ fontSize: '1rem', color: '#1E293B', marginBottom: '0.25rem' }}>No Submissions Found</h3>
             <p style={{ fontSize: '0.85rem', margin: 0 }}>
-              {searchQuery || statusFilter !== 'ALL'
+              {searchQuery || statusFilter !== 'ALL' || workflowFilter !== 'ALL'
                 ? 'Try adjusting your search criteria.'
                 : 'No candidate joining submissions have been created yet.'}
             </p>
@@ -403,6 +462,7 @@ export const AdminJoiningListPage: React.FC = () => {
                 <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   <th style={{ padding: '0.75rem 1rem' }}>Joining Reference</th>
                   <th style={{ padding: '0.75rem 1rem' }}>Candidate Name</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Workflow</th>
                   <th style={{ padding: '0.75rem 1rem' }}>Email</th>
                   <th style={{ padding: '0.75rem 1rem' }}>Mobile</th>
                   <th style={{ padding: '0.75rem 1rem' }}>Submission Status</th>
@@ -412,8 +472,6 @@ export const AdminJoiningListPage: React.FC = () => {
               </thead>
               <tbody>
                 {filteredItems.map((item) => {
-                  const isSubmitted = item.submissionStatus === 'SUBMITTED';
-
                   return (
                     <tr
                       key={item.id}
@@ -451,6 +509,44 @@ export const AdminJoiningListPage: React.FC = () => {
                         </div>
                       </td>
 
+                      {/* Workflow Badge */}
+                      <td style={{ padding: '0.85rem 1rem' }}>
+                        {item.workflowType === 'REGULAR' ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              backgroundColor: '#0F1B38',
+                              color: '#C5A059',
+                              border: '1px solid #C5A059',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              letterSpacing: '0.02em'
+                            }}
+                          >
+                            Regular Joining
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              backgroundColor: '#EFF6FF',
+                              color: '#1E40AF',
+                              border: '1px solid #BFDBFE',
+                              fontSize: '0.72rem',
+                              fontWeight: 600
+                            }}
+                          >
+                            Standard Portal
+                          </span>
+                        )}
+                      </td>
+
                       {/* Email */}
                       <td style={{ padding: '0.85rem 1rem', color: '#475569' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
@@ -469,7 +565,7 @@ export const AdminJoiningListPage: React.FC = () => {
 
                       {/* Submission Status */}
                       <td style={{ padding: '0.85rem 1rem' }}>
-                        {isSubmitted ? (
+                        {item.submissionStatus === 'VERIFIED' ? (
                           <span
                             style={{
                               display: 'inline-flex',
@@ -479,14 +575,33 @@ export const AdminJoiningListPage: React.FC = () => {
                               borderRadius: '20px',
                               backgroundColor: '#DCFCE7',
                               color: '#15803D',
+                              border: '1px solid #BBF7D0',
                               fontSize: '0.75rem',
                               fontWeight: 700
                             }}
                           >
                             <CheckCircle2 size={12} />
-                            <span>SUBMITTED</span>
+                            <span>VERIFIED</span>
                           </span>
-                        ) : (
+                        ) : item.submissionStatus === 'REJECTED' ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              padding: '0.2rem 0.6rem',
+                              borderRadius: '20px',
+                              backgroundColor: '#FEE2E2',
+                              color: '#991B1B',
+                              border: '1px solid #FECACA',
+                              fontSize: '0.75rem',
+                              fontWeight: 700
+                            }}
+                          >
+                            <AlertCircle size={12} />
+                            <span>REJECTED</span>
+                          </span>
+                        ) : item.submissionStatus === 'SUBMITTED' ? (
                           <span
                             style={{
                               display: 'inline-flex',
@@ -496,8 +611,27 @@ export const AdminJoiningListPage: React.FC = () => {
                               borderRadius: '20px',
                               backgroundColor: '#FEF3C7',
                               color: '#92400E',
+                              border: '1px solid #FDE68A',
                               fontSize: '0.75rem',
                               fontWeight: 700
+                            }}
+                          >
+                            <Clock size={12} />
+                            <span>PENDING VERIFICATION</span>
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              padding: '0.2rem 0.6rem',
+                              borderRadius: '20px',
+                              backgroundColor: '#F1F5F9',
+                              color: '#64748B',
+                              border: '1px solid #E2E8F0',
+                              fontSize: '0.75rem',
+                              fontWeight: 600
                             }}
                           >
                             <Clock size={12} />

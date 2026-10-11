@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
+import { AdminErrorBoundary } from './AdminErrorBoundary';
 import { AdminNotificationToast } from './AdminNotificationToast';
 import { AdminNotificationProvider } from '../../contexts/AdminNotificationContext';
 import type { BreadcrumbItem } from './AdminBreadcrumbs';
@@ -109,9 +110,11 @@ export const AdminLayout: React.FC = () => {
             onOpenMobile={() => setMobileMenuOpen(true)}
           />
 
-          {/* Page Body */}
+          {/* Page Body with Error Boundary Isolation */}
           <main className="admin-main-body">
-            <Outlet />
+            <AdminErrorBoundary>
+              <Outlet />
+            </AdminErrorBoundary>
           </main>
         </div>
 

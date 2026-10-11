@@ -29,6 +29,8 @@ import { AdminEmployerEnquiriesPage } from './pages/admin/AdminEmployerEnquiries
 import { AdminExportsPage } from './pages/admin/AdminExportsPage';
 import { AdminJoiningListPage } from './pages/admin/AdminJoiningListPage';
 import { AdminJoiningDetailPage } from './pages/admin/AdminJoiningDetailPage';
+import { AdminRegularJoiningPage } from './pages/admin/AdminRegularJoiningPage';
+import { AdminRegularJoiningListPage } from './pages/admin/AdminRegularJoiningListPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminCompaniesPage } from './pages/admin/AdminCompaniesPage';
 import { AdminCompanyDetailPage } from './pages/admin/AdminCompanyDetailPage';
@@ -97,6 +99,9 @@ export const App: React.FC = () => {
               <Route path="employer-enquiries/:id" element={<AdminEmployerEnquiriesPage />} />
               <Route path="joining" element={<AdminJoiningListPage />} />
               <Route path="joining/:id" element={<AdminJoiningDetailPage />} />
+              <Route path="regular-joining" element={<AdminRegularJoiningPage />} />
+              <Route path="regular-joining/:id" element={<AdminRegularJoiningPage />} />
+              <Route path="regular-joining-list" element={<AdminRegularJoiningListPage />} />
               <Route path="admin-users" element={<AdminUsersPage />} />
               <Route path="settings/admin-users" element={<AdminUsersPage />} />
               <Route path="exports" element={<AdminExportsPage />} />

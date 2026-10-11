@@ -26,6 +26,11 @@ import {
 import { getAllCompanies, type CompanyRow } from '../../services/companyService';
 import { getEntityActivityLogs } from '../../services/activityService';
 import { EmployeeIdCardPanel } from '../../components/admin/EmployeeIdCardPanel';
+import { EmployeeDocumentsPanel } from '../../components/admin/EmployeeDocumentsPanel';
+import {
+  getRegularJoiningForm,
+  type RegularJoiningFormData
+} from '../../services/regularJoiningService';
 import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 import type { ActivityLogRow, EmploymentStatus } from '../../types/database';
 import { ADMIN_ROUTES } from '../../constants/adminRoutes';
@@ -108,6 +113,7 @@ export const AdminEmployeeDetailPage: React.FC = () => {
   const [address, setAddress] = useState<string>('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [regularFormData, setRegularFormData] = useState<RegularJoiningFormData | null>(null);
 
   // Status Change Modal State
   const [isStatusModalOpen, setIsStatusModalOpen] = useState<boolean>(false);
@@ -237,6 +243,14 @@ export const AdminEmployeeDetailPage: React.FC = () => {
                 .createSignedUrl(sigDoc.storage_path, 3600);
               if (sRes?.signedUrl) setSignatureUrl(sRes.signedUrl);
             }
+          }
+        }
+
+        // Populate regularFormData for Documents Panel
+        if (empRes.employee.joining_form_id) {
+          const regRes = await getRegularJoiningForm(empRes.employee.joining_form_id);
+          if (regRes.success && regRes.data) {
+            setRegularFormData(regRes.data.formData);
           }
         }
       }
@@ -899,6 +913,18 @@ export const AdminEmployeeDetailPage: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Employee Documents Repository Section (8 Documents) */}
+      {regularFormData && (
+        <div style={{ marginTop: '1rem' }}>
+          <EmployeeDocumentsPanel
+            employeeCode={employee.employee_code}
+            formData={regularFormData}
+            employee={employee}
+            onRefresh={loadEmployeeDetails}
+          />
+        </div>
+      )}
 
       {/* Status Change Modal */}
       {isStatusModalOpen && (

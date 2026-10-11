@@ -1587,5 +1587,23 @@
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
+
+  /* Complete Joining Document print layout */
+  .complete-doc-modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    backdrop-filter: none !important;
+  }
+
+  #complete-joining-printable-dossier {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+  }
 }
 

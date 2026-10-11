@@ -24,6 +24,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { exportJoiningFormsXlsx } from '../../services/adminJoiningExportService';
+import { exportRegularJoiningRecordsXlsx } from '../../services/regularJoiningExportService';
 
 const JOB_SEEKER_CSV_HEADERS = [
   { key: 'srNo', label: 'Sr. No.' },
@@ -326,6 +327,24 @@ export const AdminExportsPage: React.FC = () => {
       );
     } catch (err: unknown) {
       setErrorNotice(err instanceof Error ? err.message : 'Joining dossiers Excel export failed.');
+    } finally {
+      setLoadingType(null);
+    }
+  };
+
+  // Regular Joining Forms Export Handler (3-Sheet Excel Workbook)
+  const handleExportRegularJoiningXlsx = async () => {
+    setLoadingType('reg-jf-xlsx');
+    setErrorNotice(null);
+    setSuccessNotice(null);
+
+    try {
+      const result = await exportRegularJoiningRecordsXlsx();
+      setSuccessNotice(
+        `Successfully exported ${result.recordCount} Regular Joining records to ${result.filename} (includes 3 sheets: Employee Joining Details, Document Checklist, Joining Summary).`
+      );
+    } catch (err: unknown) {
+      setErrorNotice(err instanceof Error ? err.message : 'Regular Joining Excel export failed.');
     } finally {
       setLoadingType(null);
     }
@@ -814,6 +833,22 @@ export const AdminExportsPage: React.FC = () => {
                 label="Export All Submissions (Excel)"
               />
             </>
+          }
+        />
+
+        {/* Regular Joining Records Export Card (3-Sheet Excel Workbook) */}
+        <ExportCard
+          title="Regular Joining Records (Admin Register)"
+          recordCountText="3-Sheet Excel (.xlsx)"
+          description="Download all admin-operated Regular Joining Form records (ATG-501-2026 onwards) into a standardized 3-sheet Excel workbook with sequential employee codes, document verification checklist, and executive KPIs."
+          icon={FileCheck2}
+          actionsSlot={
+            <ExportButton
+              format="xlsx"
+              onClick={handleExportRegularJoiningXlsx}
+              loading={loadingType === 'reg-jf-xlsx'}
+              label="Export Regular Joining Workbook (.xlsx)"
+            />
           }
         />
       </div>

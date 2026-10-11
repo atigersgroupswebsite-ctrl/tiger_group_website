@@ -274,7 +274,7 @@ export async function getEmployeeById(
       .from('employees')
       .select(`
         *,
-        company:companies(id, name, company_type, address, email, phone),
+        company:companies(id, name, company_type, address),
         application:applications(id, application_number, full_name, mobile, email, status, desired_company, designation, address),
         joining_form:joining_forms(id, joining_reference, candidate_name, employee_contact_number, email, submission_status)
       `)
@@ -718,7 +718,7 @@ export async function getLatestGeneratedIdCard(params: {
       .from('generated_files')
       .select('*')
       .eq('file_type', 'ID_CARD_PDF')
-      .order('created_at', { ascending: false })
+      .order('generated_at', { ascending: false })
       .limit(1);
 
     if (params.joiningFormId) {

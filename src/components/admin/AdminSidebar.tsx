@@ -44,6 +44,7 @@ const CORE_NAV_ITEMS: NavItemDef[] = [
   { name: 'Dashboard', path: ADMIN_ROUTES.dashboard, icon: LayoutDashboard },
   { name: 'Applications', path: ADMIN_ROUTES.applications, icon: Users },
   { name: 'Joining Submissions', path: ADMIN_ROUTES.joining, icon: FileCheck2 },
+  { name: 'Regular Joining Form', path: ADMIN_ROUTES.regularJoining, icon: FileCheck2 },
   { name: 'Employer Enquiries', path: ADMIN_ROUTES.employerEnquiries, icon: Building2 },
   { name: 'Admin Directory', path: ADMIN_ROUTES.adminUsers, icon: ShieldCheck },
   { name: 'Exports', path: ADMIN_ROUTES.exports, icon: Download }

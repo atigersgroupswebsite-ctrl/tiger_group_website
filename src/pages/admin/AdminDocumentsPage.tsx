@@ -35,8 +35,13 @@ import {
   XCircle,
   Clock,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  FolderCheck,
+  Users
 } from 'lucide-react';
+import { EmployeeDocumentsPanel } from '../../components/admin/EmployeeDocumentsPanel';
+import { getAllEmployees, type EmployeeWithRelations } from '../../services/employeeService';
+import { getRegularJoiningForm, type RegularJoiningFormData } from '../../services/regularJoiningService';
 
 const STATUS_BADGES: Record<
   DocumentVerificationStatus,
@@ -110,6 +115,88 @@ export const AdminDocumentsPage: React.FC = () => {
 
   // Inline action processing
   const [processingDocId, setProcessingDocId] = useState<string | null>(null);
+
+  // Employee Documents Tab State
+  const [activeTab, setActiveTab] = useState<'QUEUE' | 'EMPLOYEES'>('QUEUE');
+  const [employeeSearch, setEmployeeSearch] = useState<string>('');
+  const [employeeList, setEmployeeList] = useState<EmployeeWithRelations[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeWithRelations | null>(null);
+  const [selectedEmpFormData, setSelectedEmpFormData] = useState<RegularJoiningFormData | null>(null);
+  const [isEmpLoading, setIsEmpLoading] = useState<boolean>(false);
+
+  const searchEmployees = useCallback(async (query: string) => {
+    try {
+      setIsEmpLoading(true);
+      const res = await getAllEmployees({ search: query });
+      if (res.success && res.data) {
+        setEmployeeList(res.data);
+      }
+    } catch (err) {
+      console.warn('Failed to search employees:', err);
+    } finally {
+      setIsEmpLoading(false);
+    }
+  }, []);
+
+  const handleSelectEmployee = async (emp: EmployeeWithRelations) => {
+    setSelectedEmployee(emp);
+    setSelectedEmpFormData(null);
+    try {
+      setIsEmpLoading(true);
+      if (emp.joining_form_id) {
+        const regRes = await getRegularJoiningForm(emp.joining_form_id);
+        if (regRes.success && regRes.data) {
+          setSelectedEmpFormData(regRes.data.formData);
+          return;
+        }
+      }
+      // Fallback
+      setSelectedEmpFormData({
+        employeeCode: emp.employee_code,
+        fullName: emp.candidate_name || emp.employee_code || 'Employee',
+        fatherName: '—',
+        email: emp.email || '',
+        mobile: emp.mobile || '',
+        department: emp.department || 'Operations',
+        designation: emp.designation || 'Associate',
+        companyName: emp.company?.name || 'A TIGER GLOBAL',
+        unitName: emp.location || 'Nagpur Unit',
+        factorySupervisorName: 'Authorized Supervisor',
+        joiningDate: emp.joining_date || '',
+        dob: '',
+        gender: 'Male',
+        maritalStatus: 'Single',
+        aadhaarNumber: 'XXXX-XXXX-XXXX',
+        permanentAddress: 'Nagpur, Maharashtra',
+        currentAddress: 'Nagpur, Maharashtra',
+        sameAsPermanent: true,
+        uanNumber: '',
+        esicNumber: '',
+        ptNumber: '',
+        alternateMobile: '',
+        bankAccountNumber: '',
+        ifscCode: '',
+        bankName: '',
+        branchName: '',
+        upiNumber: '',
+        photo: null,
+        aadhaar: null,
+        bankPassbook: null,
+        signature: null,
+        submissionStatus: 'VERIFIED'
+      });
+    } catch (err) {
+      console.error('Error fetching employee joining form:', err);
+    } finally {
+      setIsEmpLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'EMPLOYEES') {
+      searchEmployees(employeeSearch);
+    }
+  }, [activeTab, searchEmployees, employeeSearch]);
 
   // Fetch queue
   const fetchQueue = useCallback(async () => {
@@ -363,15 +450,202 @@ export const AdminDocumentsPage: React.FC = () => {
         </div>
       )}
 
-      {/* KPI Cards Grid */}
+      {/* Mode Switcher: Document Queue vs Employee Documents */}
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '1rem',
+          display: 'flex',
+          gap: '0.75rem',
+          borderBottom: '2px solid #E2E8F0',
           marginBottom: '1.5rem'
         }}
       >
+        <button
+          type="button"
+          onClick={() => setActiveTab('QUEUE')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.65rem 1.25rem',
+            backgroundColor: 'transparent',
+            border: 'none',
+            borderBottom: activeTab === 'QUEUE' ? '2.5px solid #0F1B38' : '2.5px solid transparent',
+            color: activeTab === 'QUEUE' ? '#0F1B38' : '#64748B',
+            fontWeight: activeTab === 'QUEUE' ? 800 : 600,
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            marginBottom: '-2px'
+          }}
+        >
+          <ShieldCheck size={16} style={{ color: activeTab === 'QUEUE' ? '#C5A059' : '#94A3B8' }} />
+          <span>Document Verification Queue</span>
+          <span
+            style={{
+              backgroundColor: '#EFF6FF',
+              color: '#1E40AF',
+              padding: '2px 7px',
+              borderRadius: '10px',
+              fontSize: '0.72rem',
+              fontWeight: 800
+            }}
+          >
+            {stats.pending}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('EMPLOYEES');
+            searchEmployees(employeeSearch);
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.65rem 1.25rem',
+            backgroundColor: 'transparent',
+            border: 'none',
+            borderBottom: activeTab === 'EMPLOYEES' ? '2.5px solid #0F1B38' : '2.5px solid transparent',
+            color: activeTab === 'EMPLOYEES' ? '#0F1B38' : '#64748B',
+            fontWeight: activeTab === 'EMPLOYEES' ? 800 : 600,
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            marginBottom: '-2px'
+          }}
+        >
+          <FolderCheck size={16} style={{ color: activeTab === 'EMPLOYEES' ? '#C5A059' : '#94A3B8' }} />
+          <span>Employee Document Repositories</span>
+        </button>
+      </div>
+
+      {/* EMPLOYEE DOCUMENTS DIRECTORY VIEW */}
+      {activeTab === 'EMPLOYEES' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '2rem' }}>
+          {/* Employee Search Card */}
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: '10px',
+              padding: '1.25rem',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <Users size={18} style={{ color: '#0F1B38' }} />
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0F1B38' }}>
+                Locate Employee Document Folder
+              </h3>
+            </div>
+            <p style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', color: '#64748B' }}>
+              Search by unique employee code (e.g. <strong style={{ color: '#0F1B38' }}>ATG-504-2026</strong>) or employee name to inspect and download all 8 saved joining documents.
+            </p>
+
+            <div style={{ position: 'relative', maxWidth: '480px' }}>
+              <Search
+                size={16}
+                style={{
+                  position: 'absolute',
+                  left: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#94A3B8'
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Type employee code (ATG-...) or name..."
+                value={employeeSearch}
+                onChange={(e) => {
+                  setEmployeeSearch(e.target.value);
+                  searchEmployees(e.target.value);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.6rem 0.75rem 0.6rem 2.25rem',
+                  borderRadius: '6px',
+                  border: '1px solid #CBD5E1',
+                  fontSize: '0.85rem',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* Quick Employee Selection Chips */}
+            <div style={{ marginTop: '1rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {isEmpLoading && <div style={{ fontSize: '0.8rem', color: '#64748B' }}>Searching records...</div>}
+              {!isEmpLoading && employeeList.length === 0 && (
+                <div style={{ fontSize: '0.8rem', color: '#94A3B8', fontStyle: 'italic' }}>
+                  No matching employee records found.
+                </div>
+              )}
+              {employeeList.map((emp) => {
+                const isSelected = selectedEmployee?.id === emp.id;
+                return (
+                  <button
+                    key={emp.id}
+                    type="button"
+                    onClick={() => handleSelectEmployee(emp)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      padding: '0.45rem 0.85rem',
+                      borderRadius: '6px',
+                      border: isSelected ? '1.5px solid #0F1B38' : '1px solid #CBD5E1',
+                      backgroundColor: isSelected ? '#0F1B38' : '#F8FAFC',
+                      color: isSelected ? '#FFFFFF' : '#1E293B',
+                      fontSize: '0.8rem',
+                      fontWeight: isSelected ? 800 : 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: 'monospace',
+                        fontWeight: 800,
+                        backgroundColor: isSelected ? 'rgba(197, 160, 89, 0.3)' : '#E2E8F0',
+                        color: isSelected ? '#C5A059' : '#0F1B38',
+                        padding: '1px 5px',
+                        borderRadius: '3px',
+                        fontSize: '0.75rem'
+                      }}
+                    >
+                      {emp.employee_code}
+                    </span>
+                    <span>{emp.candidate_name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Render 8-Document Panel for Selected Employee */}
+          {selectedEmployee && selectedEmpFormData && (
+            <EmployeeDocumentsPanel
+              employeeCode={selectedEmployee.employee_code}
+              formData={selectedEmpFormData}
+              employee={selectedEmployee}
+              onRefresh={() => handleSelectEmployee(selectedEmployee)}
+            />
+          )}
+        </div>
+      )}
+
+      {/* QUEUE VIEW (ACTIVE TAB: QUEUE) */}
+      {activeTab === 'QUEUE' && (
+        <>
+          {/* KPI Cards Grid */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '1rem',
+              marginBottom: '1.5rem'
+            }}
+          >
         <div
           style={{
             backgroundColor: '#FFFFFF',
@@ -969,6 +1243,8 @@ export const AdminDocumentsPage: React.FC = () => {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* SECURE DOCUMENT VIEWER MODAL */}
       <SecureDocumentViewer

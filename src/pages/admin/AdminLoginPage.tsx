@@ -81,7 +81,7 @@ export const AdminLoginPage: React.FC = () => {
       } else {
         setLocalError(res.error || 'Authentication failed. Please verify your email and password.');
       }
-    } catch (err: unknown) {
+    } catch {
       setLocalError('Invalid administrator credentials or unauthorized account.');
     } finally {
       setIsSubmitting(false);

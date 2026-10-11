@@ -27,6 +27,7 @@ import { JoiningFormPrintPreview } from '../../components/joining/JoiningFormPri
 import { DocumentVerificationPanel } from '../../components/admin/DocumentVerificationPanel';
 import { EmployeeIdCardPanel } from '../../components/admin/EmployeeIdCardPanel';
 import { ReferenceSlipApplicationTab } from '../../components/admin/ReferenceSlipApplicationTab';
+import { RegularJoiningSubmissionDossier } from '../../components/admin/RegularJoiningSubmissionDossier';
 import { getAdminJoiningDossier, type AdminJoiningDossierResult } from '../../services/joiningService';
 import { downloadJoiningPacketPdf } from '../../services/joiningPdfGenerator';
 import { getEmployeeByJoiningFormId } from '../../services/employeeService';
@@ -34,6 +35,10 @@ import {
   getCandidateDocuments,
   calculateDocumentVerificationStats
 } from '../../services/adminDocumentService';
+import {
+  getRegularJoiningForm,
+  type RegularJoiningFormData
+} from '../../services/regularJoiningService';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import type { EmployeeRow, DocumentRow } from '../../types/database';
 import type { JoiningFormData } from '../../types/joining';
@@ -51,6 +56,8 @@ export const AdminJoiningDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<JoiningFormData | null>(null);
+  const [regularFormData, setRegularFormData] = useState<RegularJoiningFormData | null>(null);
+  const [isRegularJoining, setIsRegularJoining] = useState<boolean>(false);
   const [rawDossier, setRawDossier] = useState<AdminJoiningDossierResult['raw'] | null>(null);
   const [employee, setEmployee] = useState<EmployeeRow | null>(null);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
@@ -62,27 +69,48 @@ export const AdminJoiningDetailPage: React.FC = () => {
     setError(null);
 
     try {
-      // 1. Fetch normalized joining dossier using shared admin service
+      // 1. Check if this record is a Regular Joining Form
+      const regRes = await getRegularJoiningForm(id);
+      if (regRes.success && regRes.data) {
+        const rawForm = regRes.data.raw;
+        const isReg =
+          rawForm?.workflow_type === 'REGULAR' ||
+          rawForm?.custom_fields?.workflowType === 'REGULAR' ||
+          String(rawForm?.joining_reference || '').startsWith('ATG-') ||
+          String(rawForm?.employee_code || '').startsWith('ATG-');
+
+        if (isReg) {
+          setRegularFormData(regRes.data.formData);
+          setIsRegularJoining(true);
+          if (regRes.data.employeeRecord) {
+            setEmployee(regRes.data.employeeRecord);
+          }
+          if (regRes.data.documents) {
+            setDocuments(regRes.data.documents);
+          }
+        }
+      }
+
+      // 2. Fetch normalized joining dossier using shared admin service
       const res = await getAdminJoiningDossier(id);
+      if (res.success && res.data) {
+        setFormData(res.data.formData);
+        setRawDossier(res.data.raw);
 
-      if (!res.success || !res.data) {
-        throw new Error(res.error || 'Joining record not found.');
-      }
+        // Fetch linked Employee record if already promoted
+        const formId = res.data.raw.joiningForm?.id || id;
+        const empRecord = await getEmployeeByJoiningFormId(formId);
+        if (empRecord) {
+          setEmployee(empRecord);
+        }
 
-      setFormData(res.data.formData);
-      setRawDossier(res.data.raw);
-
-      // 2. Fetch linked Employee record if already promoted
-      const formId = res.data.raw.joiningForm?.id || id;
-      const empRecord = await getEmployeeByJoiningFormId(formId);
-      if (empRecord) {
-        setEmployee(empRecord);
-      }
-
-      // 3. Fetch candidate's documents exclusively for this joining dossier
-      const docsRes = await getCandidateDocuments({ joiningFormId: formId });
-      if (docsRes.success && docsRes.data) {
-        setDocuments(docsRes.data);
+        // Fetch candidate's documents exclusively for this joining dossier
+        const docsRes = await getCandidateDocuments({ joiningFormId: formId });
+        if (docsRes.success && docsRes.data) {
+          setDocuments(docsRes.data);
+        }
+      } else if (!regRes.success) {
+        throw new Error(res.error || regRes.error || 'Joining record not found.');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load joining record details.');
@@ -120,6 +148,21 @@ export const AdminJoiningDetailPage: React.FC = () => {
           Preparing canonical paperwork sheets and statutory credentials...
         </p>
       </div>
+    );
+  }
+
+  // Dedicated Regular Joining Submission Representation & Verification Workspace
+  if (isRegularJoining && regularFormData) {
+    return (
+      <RegularJoiningSubmissionDossier
+        formId={id!}
+        formData={regularFormData}
+        employee={employee}
+        documents={documents}
+        canVerify={canVerify}
+        verifierName={profile?.full_name || 'Administrator'}
+        onRefresh={loadJoiningDetails}
+      />
     );
   }
 
