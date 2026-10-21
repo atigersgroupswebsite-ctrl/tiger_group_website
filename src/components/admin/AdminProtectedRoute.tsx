@@ -268,9 +268,7 @@ export const AdminProtectedRoute: React.FC = () => {
         cleanPath === '/admin/regular-joining' ||
         cleanPath.startsWith('/admin/regular-joining/') ||
         cleanPath === '/admin/regular-joining-list' ||
-        (cleanPath.startsWith('/admin/joining/') && cleanPath !== '/admin/joining') ||
-        cleanPath === '/admin/employees' ||
-        cleanPath.startsWith('/admin/employees/');
+        (cleanPath.startsWith('/admin/joining/') && cleanPath !== '/admin/joining');
 
       if (!isAllowed) {
         return (

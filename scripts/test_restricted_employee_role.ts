@@ -88,21 +88,17 @@ async function runTestSuite() {
       cleanPath === '/admin/regular-joining' ||
       cleanPath.startsWith('/admin/regular-joining/') ||
       cleanPath === '/admin/regular-joining-list' ||
-      (cleanPath.startsWith('/admin/joining/') && cleanPath !== '/admin/joining') ||
-      cleanPath === '/admin/employees' ||
-      cleanPath.startsWith('/admin/employees/')
+      (cleanPath.startsWith('/admin/joining/') && cleanPath !== '/admin/joining')
     );
   }
 
-  // Operator Allowed Paths (Workflow: Joining Form, Submissions, Verification, ID Cards)
+  // Operator Allowed Paths (Strictly Joining Form, Submissions, and Dossier)
   assert(isOperatorAllowedPath('/admin/regular-joining'), 'Operator allowed to access Regular Joining Form');
   assert(isOperatorAllowedPath('/admin/regular-joining/form-uuid-123'), 'Operator allowed to access specific Regular Joining Form');
   assert(isOperatorAllowedPath('/admin/regular-joining-list'), 'Operator allowed to access Regular Joining Submissions List');
   assert(isOperatorAllowedPath('/admin/joining/some-uuid-456'), 'Operator allowed to access specific Joining Dossier');
-  assert(isOperatorAllowedPath('/admin/employees'), 'Operator allowed to access ID Cards section');
-  assert(isOperatorAllowedPath('/admin/employees/emp-uuid-789'), 'Operator allowed to access specific Employee ID Card');
 
-  // Operator Denied Paths (Direct URL Attack simulation)
+  // Operator Denied Paths (Direct URL Attack simulation - all other admin modules blocked)
   const forbiddenPaths = [
     '/admin', // General dashboard denied (redirected)
     '/admin/applications',
@@ -120,6 +116,8 @@ async function runTestSuite() {
     '/admin/payments',
     '/admin/payments/pay-1',
     '/admin/reference-slips',
+    '/admin/employees', // Separate ID Card / Employee Management module strictly denied
+    '/admin/employees/emp-1',
     '/admin/files',
     '/admin/activity',
     '/admin/settings',
@@ -162,10 +160,10 @@ async function runTestSuite() {
   );
   assert(
     !operatorBlock.includes("name: 'Dashboard'") &&
+    !operatorBlock.includes("name: 'ID Cards'") &&
     operatorBlock.includes("name: 'Regular Joining Form'") &&
-    operatorBlock.includes("name: 'Joining Submissions'") &&
-    operatorBlock.includes("name: 'ID Cards'"),
-    'OPERATOR_NAV_ITEMS strictly displays Regular Joining Form, Joining Submissions, and ID Cards'
+    operatorBlock.includes("name: 'Joining Submissions'"),
+    'OPERATOR_NAV_ITEMS strictly displays only Regular Joining Form and Joining Submissions'
   );
 
   // ----------------------------------------------------------------------------
@@ -490,10 +488,16 @@ async function runTestSuite() {
     'utf8'
   );
   assert(
-    dossierFile.includes('Open in ID Cards Directory') &&
-    !dossierFile.includes('!isOperator && employee?.id') &&
-    !dossierFile.includes('/* Navigate to ID Cards Section Button (Admins only) */'),
-    'RegularJoiningSubmissionDossier allows operators to navigate to ID cards and directory'
+    dossierFile.includes('Generate Employee ID Card') &&
+    dossierFile.includes('id-card-governance') &&
+    dossierFile.includes('!isOperator && employee?.id &&'),
+    'RegularJoiningSubmissionDossier embeds ID card generation inside joining workflow and restricts directory navigation for operators'
+  );
+  assert(
+    dossierFile.includes('isVerified && (') &&
+    dossierFile.includes('RegularReferenceSlipModal') &&
+    dossierFile.includes('EmployeeIdCardPanel'),
+    'RegularJoiningSubmissionDossier strictly requires verification before exposing Reference Slip or ID Card generation'
   );
 
   // ----------------------------------------------------------------------------

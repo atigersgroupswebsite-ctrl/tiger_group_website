@@ -563,36 +563,35 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
                 <span>Generate Employee Reference Slip</span>
               </button>
 
-              {/* Navigate to ID Cards Section Button */}
-              {(
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (employee?.id) {
-                      navigate(`/admin/employees/${employee.id}`);
-                    } else {
-                      navigate('/admin/employees');
-                    }
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.45rem',
-                    padding: '0.55rem 1rem',
-                    backgroundColor: '#0F1B38',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <CreditCard size={15} style={{ color: '#C5A059' }} />
-                  <span>Open in ID Cards Section</span>
-                  <ExternalLink size={13} />
-                </button>
-              )}
+              {/* Generate Employee ID Card Action */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isOperator && employee?.id) {
+                    navigate(`/admin/employees/${employee.id}`);
+                  } else {
+                    document.getElementById('id-card-governance')?.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  padding: '0.55rem 1rem',
+                  backgroundColor: '#0F1B38',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}
+              >
+                <CreditCard size={15} style={{ color: '#C5A059' }} />
+                <span>Generate Employee ID Card</span>
+                {!isOperator && <ExternalLink size={13} />}
+              </button>
             </>
           ) : isPending ? (
             <>
@@ -1115,7 +1114,7 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
           </div>
 
           {/* Employee ID Card Governance Box */}
-          <div style={{ background: '#FFFFFF', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '1.5rem' }}>
+          <div id="id-card-governance" style={{ background: '#FFFFFF', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '1.5rem', scrollMarginTop: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F1B38', margin: '0 0 0.25rem 0' }}>
@@ -1126,7 +1125,7 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
                 </p>
               </div>
 
-              {employee?.id && (
+              {!isOperator && employee?.id && (
                 <button
                   type="button"
                   onClick={() => navigate(`/admin/employees/${employee.id}`)}

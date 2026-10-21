@@ -53,8 +53,7 @@ const CORE_NAV_ITEMS: NavItemDef[] = [
 
 const OPERATOR_NAV_ITEMS: NavItemDef[] = [
   { name: 'Regular Joining Form', path: ADMIN_ROUTES.regularJoining, icon: FileCheck2 },
-  { name: 'Joining Submissions', path: ADMIN_ROUTES.regularJoiningList, icon: FileCheck2 },
-  { name: 'ID Cards', path: ADMIN_ROUTES.employees, icon: CreditCard }
+  { name: 'Joining Submissions', path: ADMIN_ROUTES.regularJoiningList, icon: FileCheck2 }
 ];
 
 const MANAGEMENT_SUITE_ITEMS: NavItemDef[] = [

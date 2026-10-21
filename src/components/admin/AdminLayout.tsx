@@ -45,15 +45,6 @@ export const AdminLayout: React.FC = () => {
           { label: 'Joining Dossier' }
         ];
       }
-      if (path === ADMIN_ROUTES.employees) {
-        return [{ label: 'Joining Operations' }, { label: 'ID Cards' }];
-      }
-      if (path.startsWith('/admin/employees/')) {
-        return [
-          { label: 'ID Cards', path: ADMIN_ROUTES.employees },
-          { label: 'Employee ID Card' }
-        ];
-      }
       return [{ label: 'Joining Operations' }];
     }
 
