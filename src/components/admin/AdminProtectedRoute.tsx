@@ -258,8 +258,13 @@ export const AdminProtectedRoute: React.FC = () => {
 
     if (isOperator) {
       const cleanPath = location.pathname.replace(/\/+$/, '') || '/admin';
+
+      // Redirect operator from /admin root to their authorized landing page (Joining Submissions)
+      if (cleanPath === '/admin') {
+        return <Navigate to={ADMIN_ROUTES.regularJoiningList} replace />;
+      }
+
       const isAllowed =
-        cleanPath === '/admin' ||
         cleanPath === '/admin/regular-joining' ||
         cleanPath.startsWith('/admin/regular-joining/') ||
         cleanPath === '/admin/regular-joining-list' ||
@@ -329,14 +334,14 @@ export const AdminProtectedRoute: React.FC = () => {
                 margin: '0 0 2rem 0'
               }}
             >
-              Administrative modules (Applications, Enquiries, Financials, Directory, Settings) are strictly protected.
+              Administrative modules (Dashboard, Applications, Enquiries, Financials, Directory, Settings) are strictly protected.
             </p>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
               <button
                 type="button"
                 onClick={() => {
-                  window.location.href = ADMIN_ROUTES.dashboard;
+                  window.location.href = ADMIN_ROUTES.regularJoiningList;
                 }}
                 style={{
                   display: 'inline-flex',
@@ -352,7 +357,7 @@ export const AdminProtectedRoute: React.FC = () => {
                   cursor: 'pointer'
                 }}
               >
-                <span>Return to Operator Dashboard</span>
+                <span>Return to Joining Submissions</span>
               </button>
 
               <button

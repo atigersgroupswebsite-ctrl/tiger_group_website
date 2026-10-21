@@ -235,6 +235,16 @@ export async function getPaymentConfigHandler(
       if (!adminProfile) {
         return { status: 403, data: { success: false, error: 'Access denied for this application' } };
       }
+
+      if (adminProfile.role === 'REGULAR_JOINING_OPERATOR') {
+        return {
+          status: 403,
+          data: {
+            success: false,
+            error: 'Forbidden: Regular Joining Operators are not authorized to view general application payment configs.'
+          }
+        };
+      }
     }
 
     const { data: payments } = await supabase
@@ -394,6 +404,16 @@ export async function createPaymentOrderHandler(
 
       if (!adminProfile) {
         return { status: 403, data: { success: false, error: 'Unauthorized to initiate payment for this candidate' } };
+      }
+
+      if (adminProfile.role === 'REGULAR_JOINING_OPERATOR') {
+        return {
+          status: 403,
+          data: {
+            success: false,
+            error: 'Forbidden: Regular Joining Operators are not authorized to initiate payments for general applications.'
+          }
+        };
       }
     }
 
@@ -1394,6 +1414,29 @@ export async function resendReceiptEmailHandler(
   const auth = await authenticateRequest(authHeader);
   if (!auth.authenticated || !auth.user) {
     return { status: 401, data: { success: false, error: auth.error || 'Unauthorized' } };
+  }
+
+  // Verify admin authorization & hardened role checks
+  const { data: adminProfile } = await getSupabaseServer()
+    .from('admin_profiles')
+    .select('role, active')
+    .eq('id', auth.user.id)
+    .eq('active', true)
+    .maybeSingle();
+
+  if (!adminProfile) {
+    return { status: 403, data: { success: false, error: 'Only authorized administrators can resend payment receipts.' } };
+  }
+
+  const allowedRoles = ['SUPER_ADMIN', 'COORDINATOR', 'ACCOUNTANT'];
+  if (!allowedRoles.includes(adminProfile.role)) {
+    return {
+      status: 403,
+      data: {
+        success: false,
+        error: `Role '${adminProfile.role}' is not authorized to resend payment receipts.`
+      }
+    };
   }
 
   // Find payment and application

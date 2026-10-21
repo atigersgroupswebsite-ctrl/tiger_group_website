@@ -5,7 +5,7 @@
 // ==============================================================================
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { useAdminNotifications } from '../../contexts/AdminNotificationContext';
@@ -13,7 +13,7 @@ import type { ApplicationRow } from '../../types/database';
 import { AdminMetricCard } from '../../components/admin/AdminMetricCard';
 import { AdminStatusBadge } from '../../components/admin/AdminStatusBadge';
 import { AdminEmptyState } from '../../components/admin/AdminEmptyState';
-import { AdminOperatorDashboardPage } from './AdminOperatorDashboardPage';
+import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 import {
   FileText,
   UserPlus,
@@ -34,8 +34,9 @@ import {
 export const AdminDashboardPage: React.FC = () => {
   const { isJoiningOperator, role } = useAdminAuth();
 
+  // Operators are strictly blocked from dashboard and redirected to their authorized joining workflow
   if (isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR') {
-    return <AdminOperatorDashboardPage />;
+    return <Navigate to={ADMIN_ROUTES.regularJoiningList} replace />;
   }
 
   const [loading, setLoading] = useState<boolean>(true);

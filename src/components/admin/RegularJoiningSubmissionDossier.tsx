@@ -32,6 +32,7 @@ import {
   X,
   XCircle
 } from 'lucide-react';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import type { RegularJoiningFormData, RegularJoiningDocItem } from '../../services/regularJoiningService';
 import {
   verifyRegularJoiningSubmission,
@@ -68,6 +69,8 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
   onRefresh
 }) => {
   const navigate = useNavigate();
+  const { isJoiningOperator, role } = useAdminAuth();
+  const isOperator = isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR';
 
   // Verification & Action states
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
@@ -379,7 +382,7 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
             type="button"
-            onClick={() => navigate('/admin/joining')}
+            onClick={() => navigate(isOperator ? '/admin/regular-joining-list' : '/admin/joining')}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -393,7 +396,7 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
             }}
           >
             <ArrowLeft size={16} />
-            <span>Back to Joining Register</span>
+            <span>{isOperator ? 'Back to Joining Submissions' : 'Back to Joining Register'}</span>
           </button>
 
           <span
@@ -560,34 +563,36 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
                 <span>Generate Employee Reference Slip</span>
               </button>
 
-              {/* Navigate to ID Cards Section Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (employee?.id) {
-                    navigate(`/admin/employees/${employee.id}`);
-                  } else {
-                    navigate('/admin/employees');
-                  }
-                }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  padding: '0.55rem 1rem',
-                  backgroundColor: '#0F1B38',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                <CreditCard size={15} style={{ color: '#C5A059' }} />
-                <span>Open in ID Cards Section</span>
-                <ExternalLink size={13} />
-              </button>
+              {/* Navigate to ID Cards Section Button (Admins only) */}
+              {!isOperator && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (employee?.id) {
+                      navigate(`/admin/employees/${employee.id}`);
+                    } else {
+                      navigate('/admin/employees');
+                    }
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    padding: '0.55rem 1rem',
+                    backgroundColor: '#0F1B38',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <CreditCard size={15} style={{ color: '#C5A059' }} />
+                  <span>Open in ID Cards Section</span>
+                  <ExternalLink size={13} />
+                </button>
+              )}
             </>
           ) : isPending ? (
             <>
@@ -1121,7 +1126,7 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
                 </p>
               </div>
 
-              {employee?.id && (
+              {!isOperator && employee?.id && (
                 <button
                   type="button"
                   onClick={() => navigate(`/admin/employees/${employee.id}`)}

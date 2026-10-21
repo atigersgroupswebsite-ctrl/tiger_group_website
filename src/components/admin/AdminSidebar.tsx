@@ -52,7 +52,6 @@ const CORE_NAV_ITEMS: NavItemDef[] = [
 ];
 
 const OPERATOR_NAV_ITEMS: NavItemDef[] = [
-  { name: 'Dashboard', path: ADMIN_ROUTES.dashboard, icon: LayoutDashboard },
   { name: 'Regular Joining Form', path: ADMIN_ROUTES.regularJoining, icon: FileCheck2 },
   { name: 'Joining Submissions', path: ADMIN_ROUTES.regularJoiningList, icon: FileCheck2 }
 ];

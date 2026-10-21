@@ -323,7 +323,7 @@ export async function documentSignedUrlServerHandler(
       };
     }
 
-    // 3. Determine if caller is an active admin
+    // 3. Determine caller authorization and role
     const { data: adminProfile } = await supabaseAdmin
       .from('admin_profiles')
       .select('id, role, active')
@@ -331,10 +331,46 @@ export async function documentSignedUrlServerHandler(
       .eq('active', true)
       .maybeSingle();
 
-    const isAdmin = Boolean(adminProfile);
+    const isOperator = adminProfile?.role === 'REGULAR_JOINING_OPERATOR';
+    const isFullAdmin = Boolean(adminProfile && adminProfile.active && !isOperator);
 
-    // 4. If not an admin, strictly verify candidate dossier ownership
-    if (!isAdmin) {
+    // 4. Role-based scoping: Operators can ONLY access documents linked to regular joining forms
+    if (isOperator) {
+      if (!doc.joining_form_id) {
+        return {
+          status: 403,
+          data: {
+            success: false,
+            error: 'Forbidden: Regular Joining Operators cannot access documents outside the regular joining workflow.'
+          }
+        };
+      }
+
+      const { data: jf } = await supabaseAdmin
+        .from('joining_forms')
+        .select('id, workflow_type, joining_reference, employee_code, custom_fields')
+        .eq('id', doc.joining_form_id)
+        .maybeSingle();
+
+      const customFields = (jf?.custom_fields || {}) as Record<string, any>;
+      const isRegular =
+        Boolean(jf) &&
+        (jf?.workflow_type === 'REGULAR' ||
+          customFields?.workflowType === 'REGULAR' ||
+          String(jf?.joining_reference || '').startsWith('ATG-') ||
+          String(jf?.employee_code || '').startsWith('ATG-'));
+
+      if (!isRegular) {
+        return {
+          status: 403,
+          data: {
+            success: false,
+            error: 'Forbidden: Regular Joining Operators are restricted exclusively to regular joining documents.'
+          }
+        };
+      }
+    } else if (!isFullAdmin) {
+      // 5. If not an admin or operator, strictly verify candidate dossier ownership
       let isAuthorized = false;
 
       if (doc.joining_form_id) {

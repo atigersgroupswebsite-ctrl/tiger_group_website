@@ -12,16 +12,41 @@ import { AdminHeader } from './AdminHeader';
 import { AdminErrorBoundary } from './AdminErrorBoundary';
 import { AdminNotificationToast } from './AdminNotificationToast';
 import { AdminNotificationProvider } from '../../contexts/AdminNotificationContext';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import type { BreadcrumbItem } from './AdminBreadcrumbs';
 import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 
 export const AdminLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const location = useLocation();
+  const { isJoiningOperator, role } = useAdminAuth();
+  const isOperator = isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR';
 
   // Generate dynamic breadcrumbs based on pathname
   const generateBreadcrumbs = (): BreadcrumbItem[] => {
     const path = location.pathname;
+
+    if (isOperator) {
+      if (path === ADMIN_ROUTES.regularJoining) {
+        return [{ label: 'Joining Operations' }, { label: 'Regular Joining Form' }];
+      }
+      if (path.startsWith('/admin/regular-joining/')) {
+        return [
+          { label: 'Joining Submissions', path: ADMIN_ROUTES.regularJoiningList },
+          { label: 'Edit Regular Joining' }
+        ];
+      }
+      if (path === ADMIN_ROUTES.regularJoiningList) {
+        return [{ label: 'Joining Operations' }, { label: 'Joining Submissions' }];
+      }
+      if (path.startsWith('/admin/joining/')) {
+        return [
+          { label: 'Joining Submissions', path: ADMIN_ROUTES.regularJoiningList },
+          { label: 'Joining Dossier' }
+        ];
+      }
+      return [{ label: 'Joining Operations' }];
+    }
 
     if (path === ADMIN_ROUTES.dashboard) {
       return [{ label: 'Dashboard' }];

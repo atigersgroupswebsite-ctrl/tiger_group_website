@@ -71,10 +71,20 @@ async function runTestSuite() {
   // ----------------------------------------------------------------------------
   console.log('\n--- SECTION 2: NAVIGATION RESTRICTIONS & DIRECT URL GUARD ---');
 
+  const adminProtectedRouteFile = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/components/admin/AdminProtectedRoute.tsx'),
+    'utf8'
+  );
+
+  assert(
+    adminProtectedRouteFile.includes("cleanPath === '/admin'") &&
+    adminProtectedRouteFile.includes("ADMIN_ROUTES.regularJoiningList"),
+    'AdminProtectedRoute redirects operator from /admin to regularJoiningList'
+  );
+
   function isOperatorAllowedPath(pathname: string): boolean {
     const cleanPath = pathname.replace(/\/+$/, '') || '/admin';
     return (
-      cleanPath === '/admin' ||
       cleanPath === '/admin/regular-joining' ||
       cleanPath.startsWith('/admin/regular-joining/') ||
       cleanPath === '/admin/regular-joining-list' ||
@@ -83,7 +93,6 @@ async function runTestSuite() {
   }
 
   // Operator Allowed Paths
-  assert(isOperatorAllowedPath('/admin'), 'Operator allowed to access Dashboard (/admin)');
   assert(isOperatorAllowedPath('/admin/regular-joining'), 'Operator allowed to access Regular Joining Form');
   assert(isOperatorAllowedPath('/admin/regular-joining/form-uuid-123'), 'Operator allowed to access specific Regular Joining Form');
   assert(isOperatorAllowedPath('/admin/regular-joining-list'), 'Operator allowed to access Regular Joining Submissions List');
@@ -91,6 +100,7 @@ async function runTestSuite() {
 
   // Operator Denied Paths (Direct URL Attack simulation)
   const forbiddenPaths = [
+    '/admin', // General dashboard denied (redirected)
     '/admin/applications',
     '/admin/applications/app-123',
     '/admin/employer-enquiries',
@@ -143,6 +153,16 @@ async function runTestSuite() {
   assert(
     adminSidebarFile.includes('Joining Operations'),
     'AdminSidebar renders isolated Joining Operations group for operators'
+  );
+  const operatorBlock = adminSidebarFile.slice(
+    adminSidebarFile.indexOf('const OPERATOR_NAV_ITEMS'),
+    adminSidebarFile.indexOf('const MANAGEMENT_SUITE_ITEMS')
+  );
+  assert(
+    !operatorBlock.includes("name: 'Dashboard'") &&
+    operatorBlock.includes("name: 'Regular Joining Form'") &&
+    operatorBlock.includes("name: 'Joining Submissions'"),
+    'OPERATOR_NAV_ITEMS strictly displays only Regular Joining Form and Joining Submissions'
   );
 
   // ----------------------------------------------------------------------------
@@ -293,8 +313,8 @@ async function runTestSuite() {
     'utf8'
   );
   assert(
-    adminDashboardPageFile.includes('<AdminOperatorDashboardPage />'),
-    'AdminDashboardPage dynamically renders AdminOperatorDashboardPage when operator is logged in'
+    adminDashboardPageFile.includes('regularJoiningList') && adminDashboardPageFile.includes('Navigate'),
+    'AdminDashboardPage dynamically protects dashboard by redirecting operators directly to regularJoiningList'
   );
 
   // ----------------------------------------------------------------------------
@@ -400,6 +420,59 @@ async function runTestSuite() {
   assert(
     authCallbackFile.includes("target.startsWith('/admin')"),
     'AuthCallbackPage resolves and permits /admin destinations for seamless magic link clicks'
+  );
+
+  // ----------------------------------------------------------------------------
+  // SECTION 10: Backend API & Document Access Authorization
+  // ----------------------------------------------------------------------------
+  console.log('\n--- SECTION 10: BACKEND API & DOCUMENT AUTHORIZATION ---');
+
+  const candidateAccountServiceFile = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/server/candidateAccountService.ts'),
+    'utf8'
+  );
+  assert(
+    candidateAccountServiceFile.includes('isOperator') &&
+    candidateAccountServiceFile.includes('doc.joining_form_id') &&
+    candidateAccountServiceFile.includes('Forbidden: Regular Joining Operators cannot access documents outside the regular joining workflow'),
+    'candidateAccountService strictly restricts operator to regular joining documents'
+  );
+
+  const paymentServerFile = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/server/paymentServer.ts'),
+    'utf8'
+  );
+  assert(
+    paymentServerFile.includes("Role '${adminProfile.role}' is not authorized to resend payment receipts"),
+    'paymentServer resendReceiptEmailHandler strictly blocks operators with 403'
+  );
+  assert(
+    paymentServerFile.includes('Forbidden: Regular Joining Operators are not authorized to view general application payment configs'),
+    'paymentServer getPaymentConfigHandler blocks operator from general application payments'
+  );
+  assert(
+    paymentServerFile.includes('Forbidden: Regular Joining Operators are not authorized to initiate payments for general applications'),
+    'paymentServer createPaymentOrderHandler blocks operator from general application payment initiation'
+  );
+
+  const adminLayoutFile = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/components/admin/AdminLayout.tsx'),
+    'utf8'
+  );
+  assert(
+    adminLayoutFile.includes('isOperator') && adminLayoutFile.includes('Joining Operations'),
+    'AdminLayout breadcrumbs protect against dashboard links for operators'
+  );
+
+  const dossierFile = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/components/admin/RegularJoiningSubmissionDossier.tsx'),
+    'utf8'
+  );
+  assert(
+    dossierFile.includes('!isOperator && (') &&
+    dossierFile.includes('Open in ID Cards Section') &&
+    dossierFile.includes('Open in ID Cards Directory'),
+    'RegularJoiningSubmissionDossier hides employee ID card navigation for operators'
   );
 
   // ----------------------------------------------------------------------------
