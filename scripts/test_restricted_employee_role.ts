@@ -255,6 +255,24 @@ async function runTestSuite() {
     'Migration updates admin_profiles_role_check constraint with all supported roles (SUPER_ADMIN, ADMIN, COORDINATOR, DOCUMENT_VERIFIER, ACCOUNTANT, FINANCE, REGULAR_JOINING_OPERATOR)'
   );
   assert(
+    migrationContent.includes('pg_get_constraintdef(con.oid) ILIKE \'%role%\''),
+    'Migration safely inspects and drops any existing role check constraints'
+  );
+  assert(
+    migrationContent.includes('UPDATE public.admin_profiles') &&
+    migrationContent.includes('SET role = UPPER(TRIM(role))'),
+    'Migration safely normalizes existing admin roles before applying check constraint'
+  );
+  assert(
+    migrationContent.includes('CREATE OR REPLACE FUNCTION public.is_active_admin()') &&
+    migrationContent.includes("'SUPER_ADMIN', 'ADMIN', 'COORDINATOR', 'DOCUMENT_VERIFIER', 'ACCOUNTANT', 'FINANCE'") &&
+    !migrationContent.slice(
+      migrationContent.indexOf('CREATE OR REPLACE FUNCTION public.is_active_admin()'),
+      migrationContent.indexOf('CREATE OR REPLACE FUNCTION public.is_joining_operator()')
+    ).includes('REGULAR_JOINING_OPERATOR'),
+    'Migration reaffirms is_active_admin() preserving all 6 full admin roles and strictly excluding REGULAR_JOINING_OPERATOR'
+  );
+  assert(
     migrationContent.includes('CREATE OR REPLACE FUNCTION public.is_joining_operator()'),
     'Migration creates public.is_joining_operator() function'
   );

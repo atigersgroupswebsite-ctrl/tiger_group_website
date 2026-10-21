@@ -16,11 +16,71 @@
 -- ==============================================================================
 
 -- ------------------------------------------------------------------------------
--- 1. Update public.admin_profiles Role Check Constraint
+-- 1. Safely Update public.admin_profiles Role Check Constraint
 -- ------------------------------------------------------------------------------
-ALTER TABLE public.admin_profiles DROP CONSTRAINT IF EXISTS admin_profiles_role_check;
+-- Normalize any existing role values to uppercase trimmed text
+UPDATE public.admin_profiles
+SET role = UPPER(TRIM(role))
+WHERE role IS NOT NULL;
+
+-- Safely drop any existing role check constraints on public.admin_profiles
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (
+        SELECT con.conname
+        FROM pg_constraint con
+        INNER JOIN pg_class rel ON rel.oid = con.conrelid
+        INNER JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+        WHERE nsp.nspname = 'public'
+          AND rel.relname = 'admin_profiles'
+          AND con.contype = 'c'
+          AND pg_get_constraintdef(con.oid) ILIKE '%role%'
+    ) LOOP
+        EXECUTE 'ALTER TABLE public.admin_profiles DROP CONSTRAINT IF EXISTS ' || quote_ident(r.conname);
+    END LOOP;
+END $$;
+
+-- Add updated check constraint with all supported roles preserved
 ALTER TABLE public.admin_profiles ADD CONSTRAINT admin_profiles_role_check
-  CHECK (role IN ('SUPER_ADMIN', 'ADMIN', 'COORDINATOR', 'DOCUMENT_VERIFIER', 'ACCOUNTANT', 'FINANCE', 'REGULAR_JOINING_OPERATOR'));
+  CHECK (role IN (
+    'SUPER_ADMIN',
+    'ADMIN',
+    'COORDINATOR',
+    'DOCUMENT_VERIFIER',
+    'ACCOUNTANT',
+    'FINANCE',
+    'REGULAR_JOINING_OPERATOR'
+  ));
+
+-- ------------------------------------------------------------------------------
+-- 1B. Reaffirm Full Administrator Verification (Preserving All Admin Roles)
+-- ------------------------------------------------------------------------------
+-- Keeps SUPER_ADMIN, ADMIN, COORDINATOR, DOCUMENT_VERIFIER, ACCOUNTANT, FINANCE
+-- as active administrators with full governance access across applications,
+-- enquiries, payments, and system settings, while strictly EXCLUDING REGULAR_JOINING_OPERATOR.
+CREATE OR REPLACE FUNCTION public.is_active_admin()
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN false;
+  END IF;
+
+  RETURN EXISTS (
+    SELECT 1 FROM public.admin_profiles
+    WHERE id = auth.uid()
+      AND active = true
+      AND role IN ('SUPER_ADMIN', 'ADMIN', 'COORDINATOR', 'DOCUMENT_VERIFIER', 'ACCOUNTANT', 'FINANCE')
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_active_admin() TO authenticated;
 
 -- ------------------------------------------------------------------------------
 -- 2. Helper Function: is_joining_operator()
@@ -73,7 +133,6 @@ CREATE POLICY "Joining operators can view regular joining forms"
   TO authenticated
   USING (
     public.is_joining_operator() AND (
-      workflow_type = 'REGULAR' OR
       custom_fields->>'workflowType' = 'REGULAR' OR
       joining_reference ILIKE 'ATG-%' OR
       employee_code ILIKE 'ATG-%' OR
@@ -88,9 +147,9 @@ CREATE POLICY "Joining operators can insert regular joining forms"
   TO authenticated
   WITH CHECK (
     public.is_joining_operator() AND (
-      workflow_type = 'REGULAR' OR
       joining_reference ILIKE 'ATG-%' OR
-      employee_code ILIKE 'ATG-%'
+      employee_code ILIKE 'ATG-%' OR
+      custom_fields->>'workflowType' = 'REGULAR'
     )
   );
 
@@ -101,17 +160,17 @@ CREATE POLICY "Joining operators can update regular joining forms"
   TO authenticated
   USING (
     public.is_joining_operator() AND (
-      workflow_type = 'REGULAR' OR
       joining_reference ILIKE 'ATG-%' OR
       employee_code ILIKE 'ATG-%' OR
+      custom_fields->>'workflowType' = 'REGULAR' OR
       created_by_admin_id = auth.uid()
     )
   )
   WITH CHECK (
     public.is_joining_operator() AND (
-      workflow_type = 'REGULAR' OR
       joining_reference ILIKE 'ATG-%' OR
       employee_code ILIKE 'ATG-%' OR
+      custom_fields->>'workflowType' = 'REGULAR' OR
       created_by_admin_id = auth.uid()
     )
   );
@@ -130,7 +189,11 @@ CREATE POLICY "Joining operators can view documents for regular joining"
     EXISTS (
       SELECT 1 FROM public.joining_forms jf
       WHERE jf.id = documents.joining_form_id
-        AND (jf.workflow_type = 'REGULAR' OR jf.joining_reference ILIKE 'ATG-%' OR jf.employee_code ILIKE 'ATG-%')
+        AND (
+          jf.custom_fields->>'workflowType' = 'REGULAR' OR
+          jf.joining_reference ILIKE 'ATG-%' OR
+          jf.employee_code ILIKE 'ATG-%'
+        )
     )
   );
 
@@ -145,7 +208,11 @@ CREATE POLICY "Joining operators can insert documents for regular joining"
     EXISTS (
       SELECT 1 FROM public.joining_forms jf
       WHERE jf.id = documents.joining_form_id
-        AND (jf.workflow_type = 'REGULAR' OR jf.joining_reference ILIKE 'ATG-%' OR jf.employee_code ILIKE 'ATG-%')
+        AND (
+          jf.custom_fields->>'workflowType' = 'REGULAR' OR
+          jf.joining_reference ILIKE 'ATG-%' OR
+          jf.employee_code ILIKE 'ATG-%'
+        )
     )
   );
 
@@ -164,7 +231,11 @@ CREATE POLICY "Joining operators can view regular employees"
       EXISTS (
         SELECT 1 FROM public.joining_forms jf
         WHERE jf.id = employees.joining_form_id
-          AND (jf.workflow_type = 'REGULAR' OR jf.joining_reference ILIKE 'ATG-%')
+          AND (
+            jf.custom_fields->>'workflowType' = 'REGULAR' OR
+            jf.joining_reference ILIKE 'ATG-%' OR
+            jf.employee_code ILIKE 'ATG-%'
+          )
       )
     )
   );

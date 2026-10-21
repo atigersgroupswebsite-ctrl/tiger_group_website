@@ -348,15 +348,14 @@ export async function documentSignedUrlServerHandler(
 
       const { data: jf } = await supabaseAdmin
         .from('joining_forms')
-        .select('id, workflow_type, joining_reference, employee_code, custom_fields')
+        .select('id, joining_reference, employee_code, custom_fields')
         .eq('id', doc.joining_form_id)
         .maybeSingle();
 
       const customFields = (jf?.custom_fields || {}) as Record<string, any>;
       const isRegular =
         Boolean(jf) &&
-        (jf?.workflow_type === 'REGULAR' ||
-          customFields?.workflowType === 'REGULAR' ||
+        (customFields?.workflowType === 'REGULAR' ||
           String(jf?.joining_reference || '').startsWith('ATG-') ||
           String(jf?.employee_code || '').startsWith('ATG-'));
 
