@@ -563,8 +563,8 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
                 <span>Generate Employee Reference Slip</span>
               </button>
 
-              {/* Navigate to ID Cards Section Button (Admins only) */}
-              {!isOperator && (
+              {/* Navigate to ID Cards Section Button */}
+              {(
                 <button
                   type="button"
                   onClick={() => {
@@ -1126,7 +1126,7 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
                 </p>
               </div>
 
-              {!isOperator && employee?.id && (
+              {employee?.id && (
                 <button
                   type="button"
                   onClick={() => navigate(`/admin/employees/${employee.id}`)}

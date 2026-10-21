@@ -262,8 +262,10 @@ export async function sendReferenceSlipServerHandler(
     return { status: 403, data: { success: false, error: 'Unauthorized admin user' } };
   }
 
-  const allowedRoles = ['SUPER_ADMIN', 'COORDINATOR'];
-  if (!allowedRoles.includes(adminProfile.role)) {
+  const isSuperOrCoordinator = ['SUPER_ADMIN', 'COORDINATOR'].includes(adminProfile.role);
+  const isOperator = adminProfile.role === 'REGULAR_JOINING_OPERATOR';
+
+  if (!isSuperOrCoordinator && !isOperator) {
     return {
       status: 403,
       data: { success: false, error: `Role '${adminProfile.role}' is not authorized to send Reference Slips.` }
@@ -294,6 +296,13 @@ export async function sendReferenceSlipServerHandler(
   const targetJfId = slip.joining_form_id || joiningFormId;
   const targetAppId = slip.application_id || applicationId;
 
+  if (isOperator && targetAppId && !targetJfId) {
+    return {
+      status: 403,
+      data: { success: false, error: 'Forbidden: Regular Joining Operators cannot send reference slips for general applications.' }
+    };
+  }
+
   let candidateEmail = '';
   let candidateName = '';
   let sourceReference = '';
@@ -301,10 +310,26 @@ export async function sendReferenceSlipServerHandler(
   if (targetJfId) {
     const { data: jf } = await supabase
       .from('joining_forms')
-      .select('candidate_name, email, joining_reference')
+      .select('candidate_name, email, joining_reference, employee_code, custom_fields')
       .eq('id', targetJfId)
       .maybeSingle();
+
     if (jf) {
+      if (isOperator) {
+        const custom = (jf.custom_fields as any) || {};
+        const isRegular =
+          (jf.joining_reference && jf.joining_reference.startsWith('ATG-')) ||
+          (jf.employee_code && jf.employee_code.startsWith('ATG-')) ||
+          custom.workflowType === 'REGULAR';
+
+        if (!isRegular) {
+          return {
+            status: 403,
+            data: { success: false, error: 'Forbidden: Regular Joining Operators are restricted exclusively to regular joining reference slips.' }
+          };
+        }
+      }
+
       candidateName = jf.candidate_name || 'Candidate';
       candidateEmail = jf.email || '';
       sourceReference = jf.joining_reference || 'JOIN-STANDALONE';

@@ -154,7 +154,10 @@ export async function sendEmployeeIdCardServerHandler(
     return { status: 403, data: { success: false, error: 'Forbidden: Admin profile is inactive' } };
   }
 
-  if (!['SUPER_ADMIN', 'COORDINATOR'].includes(adminProfile.role)) {
+  const isSuperOrCoordinator = ['SUPER_ADMIN', 'COORDINATOR'].includes(adminProfile.role);
+  const isOperator = adminProfile.role === 'REGULAR_JOINING_OPERATOR';
+
+  if (!isSuperOrCoordinator && !isOperator) {
     return {
       status: 403,
       data: { success: false, error: 'Forbidden: Insufficient privileges to dispatch Employee ID Card' }
@@ -176,6 +179,24 @@ export async function sendEmployeeIdCardServerHandler(
 
   if (empErr || !employee) {
     return { status: 404, data: { success: false, error: 'Employee record not found.' } };
+  }
+
+  // Enforce operator least-privilege scoping: operators may only dispatch ID cards for regular joining employees
+  if (isOperator) {
+    const isRegularJoining =
+      (employee.employee_code && employee.employee_code.startsWith('ATG-')) ||
+      (employee.joining_reference && employee.joining_reference.startsWith('ATG-')) ||
+      Boolean(employee.joining_form_id);
+
+    if (!isRegularJoining) {
+      return {
+        status: 403,
+        data: {
+          success: false,
+          error: 'Forbidden: Regular Joining Operators are restricted exclusively to regular joining employees'
+        }
+      };
+    }
   }
 
   if (!employee.email || !isValidEmail(employee.email)) {

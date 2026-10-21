@@ -50,7 +50,9 @@ export const AdminJoiningDetailPage: React.FC = () => {
   const canVerify =
     profile?.role === 'SUPER_ADMIN' ||
     profile?.role === 'DOCUMENT_VERIFIER' ||
-    profile?.role === 'COORDINATOR';
+    profile?.role === 'COORDINATOR' ||
+    profile?.role === 'REGULAR_JOINING_OPERATOR' ||
+    isJoiningOperator;
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);

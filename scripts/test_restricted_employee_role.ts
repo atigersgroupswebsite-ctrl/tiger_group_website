@@ -88,15 +88,19 @@ async function runTestSuite() {
       cleanPath === '/admin/regular-joining' ||
       cleanPath.startsWith('/admin/regular-joining/') ||
       cleanPath === '/admin/regular-joining-list' ||
-      (cleanPath.startsWith('/admin/joining/') && cleanPath !== '/admin/joining')
+      (cleanPath.startsWith('/admin/joining/') && cleanPath !== '/admin/joining') ||
+      cleanPath === '/admin/employees' ||
+      cleanPath.startsWith('/admin/employees/')
     );
   }
 
-  // Operator Allowed Paths
+  // Operator Allowed Paths (Workflow: Joining Form, Submissions, Verification, ID Cards)
   assert(isOperatorAllowedPath('/admin/regular-joining'), 'Operator allowed to access Regular Joining Form');
   assert(isOperatorAllowedPath('/admin/regular-joining/form-uuid-123'), 'Operator allowed to access specific Regular Joining Form');
   assert(isOperatorAllowedPath('/admin/regular-joining-list'), 'Operator allowed to access Regular Joining Submissions List');
   assert(isOperatorAllowedPath('/admin/joining/some-uuid-456'), 'Operator allowed to access specific Joining Dossier');
+  assert(isOperatorAllowedPath('/admin/employees'), 'Operator allowed to access ID Cards section');
+  assert(isOperatorAllowedPath('/admin/employees/emp-uuid-789'), 'Operator allowed to access specific Employee ID Card');
 
   // Operator Denied Paths (Direct URL Attack simulation)
   const forbiddenPaths = [
@@ -116,8 +120,6 @@ async function runTestSuite() {
     '/admin/payments',
     '/admin/payments/pay-1',
     '/admin/reference-slips',
-    '/admin/employees',
-    '/admin/employees/emp-1',
     '/admin/files',
     '/admin/activity',
     '/admin/settings',
@@ -161,8 +163,9 @@ async function runTestSuite() {
   assert(
     !operatorBlock.includes("name: 'Dashboard'") &&
     operatorBlock.includes("name: 'Regular Joining Form'") &&
-    operatorBlock.includes("name: 'Joining Submissions'"),
-    'OPERATOR_NAV_ITEMS strictly displays only Regular Joining Form and Joining Submissions'
+    operatorBlock.includes("name: 'Joining Submissions'") &&
+    operatorBlock.includes("name: 'ID Cards'"),
+    'OPERATOR_NAV_ITEMS strictly displays Regular Joining Form, Joining Submissions, and ID Cards'
   );
 
   // ----------------------------------------------------------------------------
@@ -487,10 +490,69 @@ async function runTestSuite() {
     'utf8'
   );
   assert(
-    dossierFile.includes('!isOperator && (') &&
-    dossierFile.includes('Open in ID Cards Section') &&
-    dossierFile.includes('Open in ID Cards Directory'),
-    'RegularJoiningSubmissionDossier hides employee ID card navigation for operators'
+    dossierFile.includes('Open in ID Cards Directory') &&
+    !dossierFile.includes('!isOperator && employee?.id') &&
+    !dossierFile.includes('/* Navigate to ID Cards Section Button (Admins only) */'),
+    'RegularJoiningSubmissionDossier allows operators to navigate to ID cards and directory'
+  );
+
+  // ----------------------------------------------------------------------------
+  // SECTION 11: Complete Joining Workflow Permissions & Service Authorizations
+  // ----------------------------------------------------------------------------
+  console.log('\n--- SECTION 11: COMPLETE JOINING WORKFLOW PERMISSIONS & LEAST-PRIVILEGE ---');
+
+  const joiningDetailPageFile = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/pages/admin/AdminJoiningDetailPage.tsx'),
+    'utf8'
+  );
+  assert(
+    joiningDetailPageFile.includes("profile?.role === 'REGULAR_JOINING_OPERATOR' ||") &&
+    joiningDetailPageFile.includes('isJoiningOperator'),
+    'AdminJoiningDetailPage includes REGULAR_JOINING_OPERATOR and isJoiningOperator in canVerify'
+  );
+
+  const employeesPageFile = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/pages/admin/AdminEmployeesPage.tsx'),
+    'utf8'
+  );
+  assert(
+    employeesPageFile.includes('scopedEmployees = isOperator') &&
+    employeesPageFile.includes("e.employee_code.startsWith('ATG-')"),
+    'AdminEmployeesPage strictly scopes employee records to regular joining workflow for operators'
+  );
+  assert(
+    employeesPageFile.includes("canManage = !isOperator && (role === 'SUPER_ADMIN' || role === 'COORDINATOR')"),
+    'AdminEmployeesPage strictly blocks operators from adding or promoting candidates'
+  );
+
+  const employeeDetailPageFile = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/pages/admin/AdminEmployeeDetailPage.tsx'),
+    'utf8'
+  );
+  assert(
+    employeeDetailPageFile.includes('isOperator && !isRegularJoiningRecord') &&
+    employeeDetailPageFile.includes('Access Denied — Standard Pipeline Employee'),
+    'AdminEmployeeDetailPage blocks operators from accessing non-regular-joining employees'
+  );
+
+  const employeeEmailServiceFile = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/server/employeeEmailService.ts'),
+    'utf8'
+  );
+  assert(
+    employeeEmailServiceFile.includes("adminProfile.role === 'REGULAR_JOINING_OPERATOR'") &&
+    employeeEmailServiceFile.includes('Forbidden: Regular Joining Operators are restricted exclusively to regular joining employees'),
+    'employeeEmailService permits operators for regular joining employee ID cards and rejects others with 403'
+  );
+
+  const referenceSlipEmailServiceFile = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/server/referenceSlipEmailService.ts'),
+    'utf8'
+  );
+  assert(
+    referenceSlipEmailServiceFile.includes("adminProfile.role === 'REGULAR_JOINING_OPERATOR'") &&
+    referenceSlipEmailServiceFile.includes('Forbidden: Regular Joining Operators cannot send reference slips for general applications'),
+    'referenceSlipEmailService permits operators for regular joining reference slips and rejects general applications with 403'
   );
 
   // ----------------------------------------------------------------------------

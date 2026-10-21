@@ -79,8 +79,9 @@ const STATUS_CONFIG: Record<
 };
 
 export const AdminEmployeesPage: React.FC = () => {
-  const { role, user } = useAdminAuth();
-  const canManage = role === 'SUPER_ADMIN' || role === 'COORDINATOR';
+  const { role, user, isJoiningOperator } = useAdminAuth();
+  const isOperator = isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR';
+  const canManage = !isOperator && (role === 'SUPER_ADMIN' || role === 'COORDINATOR');
 
   const [employees, setEmployees] = useState<EmployeeWithRelations[]>([]);
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
@@ -140,7 +141,16 @@ export const AdminEmployeesPage: React.FC = () => {
       if (!empRes.success) {
         throw new Error(empRes.error || 'Failed to load employees.');
       }
-      setEmployees(empRes.data);
+      const rawEmployees = empRes.data || [];
+      const scopedEmployees = isOperator
+        ? rawEmployees.filter(
+            (e) =>
+              (e.employee_code && e.employee_code.startsWith('ATG-')) ||
+              (e.joining_reference && e.joining_reference.startsWith('ATG-')) ||
+              Boolean(e.joining_form_id)
+          )
+        : rawEmployees;
+      setEmployees(scopedEmployees);
 
       if (compRes.success && compRes.data) {
         setCompanies(compRes.data);
@@ -340,7 +350,9 @@ export const AdminEmployeesPage: React.FC = () => {
             </h1>
           </div>
           <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
-            Operational workforce register, company deployment tracking, and separate Identity Card governance.
+            {isOperator
+              ? 'Operational regular joining workforce register, employee verification, and Identity Card governance.'
+              : 'Operational workforce register, company deployment tracking, and separate Identity Card governance.'}
           </p>
         </div>
 
@@ -791,26 +803,47 @@ export const AdminEmployeesPage: React.FC = () => {
                             <span>{emp.joining_reference || 'Joining Form'}</span>
                           </Link>
                         ) : emp.application_id ? (
-                          <Link
-                            to={ADMIN_ROUTES.applicationDetail(emp.application_id)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.35rem',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              padding: '0.2rem 0.5rem',
-                              borderRadius: '4px',
-                              backgroundColor: '#EFF6FF',
-                              color: '#1E40AF',
-                              border: '1px solid #BFDBFE',
-                              textDecoration: 'none'
-                            }}
-                            title="Application Candidate"
-                          >
-                            <UserCheck size={12} />
-                            <span>{emp.application?.application_number || 'Application'}</span>
-                          </Link>
+                          isOperator ? (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: '4px',
+                                backgroundColor: '#EFF6FF',
+                                color: '#1E40AF',
+                                border: '1px solid #BFDBFE'
+                              }}
+                              title="Application Candidate"
+                            >
+                              <UserCheck size={12} />
+                              <span>{emp.application?.application_number || 'Application'}</span>
+                            </span>
+                          ) : (
+                            <Link
+                              to={ADMIN_ROUTES.applicationDetail(emp.application_id)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: '4px',
+                                backgroundColor: '#EFF6FF',
+                                color: '#1E40AF',
+                                border: '1px solid #BFDBFE',
+                                textDecoration: 'none'
+                              }}
+                              title="Application Candidate"
+                            >
+                              <UserCheck size={12} />
+                              <span>{emp.application?.application_number || 'Application'}</span>
+                            </Link>
+                          )
                         ) : (
                           <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>—</span>
                         )}
@@ -819,20 +852,35 @@ export const AdminEmployeesPage: React.FC = () => {
                       {/* Company */}
                       <td style={{ padding: '1rem 1.25rem', fontSize: '0.8125rem' }}>
                         {emp.company ? (
-                          <Link
-                            to={ADMIN_ROUTES.companyDetail(emp.company.id)}
-                            style={{
-                              color: 'var(--color-midnight-navy)',
-                              textDecoration: 'none',
-                              fontWeight: 600,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.35rem'
-                            }}
-                          >
-                            <Building2 size={14} style={{ color: '#94A3B8', flexShrink: 0 }} />
-                            <span>{emp.company.name}</span>
-                          </Link>
+                          isOperator ? (
+                            <span
+                              style={{
+                                color: 'var(--color-midnight-navy)',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.35rem'
+                              }}
+                            >
+                              <Building2 size={14} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                              <span>{emp.company.name}</span>
+                            </span>
+                          ) : (
+                            <Link
+                              to={ADMIN_ROUTES.companyDetail(emp.company.id)}
+                              style={{
+                                color: 'var(--color-midnight-navy)',
+                                textDecoration: 'none',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.35rem'
+                              }}
+                            >
+                              <Building2 size={14} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                              <span>{emp.company.name}</span>
+                            </Link>
+                          )
                         ) : (
                           <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Unassigned</span>
                         )}

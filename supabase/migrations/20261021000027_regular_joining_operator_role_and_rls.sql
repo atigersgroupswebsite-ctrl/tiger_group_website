@@ -216,6 +216,38 @@ CREATE POLICY "Joining operators can insert documents for regular joining"
     )
   );
 
+DROP POLICY IF EXISTS "Joining operators can update documents for regular joining" ON public.documents;
+CREATE POLICY "Joining operators can update documents for regular joining"
+  ON public.documents
+  FOR UPDATE
+  TO authenticated
+  USING (
+    public.is_joining_operator() AND
+    joining_form_id IS NOT NULL AND
+    EXISTS (
+      SELECT 1 FROM public.joining_forms jf
+      WHERE jf.id = documents.joining_form_id
+        AND (
+          jf.custom_fields->>'workflowType' = 'REGULAR' OR
+          jf.joining_reference ILIKE 'ATG-%' OR
+          jf.employee_code ILIKE 'ATG-%'
+        )
+    )
+  )
+  WITH CHECK (
+    public.is_joining_operator() AND
+    joining_form_id IS NOT NULL AND
+    EXISTS (
+      SELECT 1 FROM public.joining_forms jf
+      WHERE jf.id = documents.joining_form_id
+        AND (
+          jf.custom_fields->>'workflowType' = 'REGULAR' OR
+          jf.joining_reference ILIKE 'ATG-%' OR
+          jf.employee_code ILIKE 'ATG-%'
+        )
+    )
+  );
+
 -- ------------------------------------------------------------------------------
 -- 6. Scoped Row Level Security (RLS) on public.employees
 -- ------------------------------------------------------------------------------
@@ -311,6 +343,129 @@ CREATE POLICY "Joining operators can upload generated documents"
   WITH CHECK (
     bucket_id = 'generated-documents' AND
     public.is_joining_operator()
+  );
+
+-- ------------------------------------------------------------------------------
+-- 8. Scoped Row Level Security (RLS) on public.generated_files
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Joining operators can view regular generated files" ON public.generated_files;
+CREATE POLICY "Joining operators can view regular generated files"
+  ON public.generated_files
+  FOR SELECT
+  TO authenticated
+  USING (
+    public.is_joining_operator() AND
+    joining_form_id IS NOT NULL AND
+    EXISTS (
+      SELECT 1 FROM public.joining_forms jf
+      WHERE jf.id = generated_files.joining_form_id
+        AND (
+          jf.custom_fields->>'workflowType' = 'REGULAR' OR
+          jf.joining_reference ILIKE 'ATG-%' OR
+          jf.employee_code ILIKE 'ATG-%'
+        )
+    )
+  );
+
+DROP POLICY IF EXISTS "Joining operators can insert regular generated files" ON public.generated_files;
+CREATE POLICY "Joining operators can insert regular generated files"
+  ON public.generated_files
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    public.is_joining_operator() AND
+    joining_form_id IS NOT NULL AND
+    EXISTS (
+      SELECT 1 FROM public.joining_forms jf
+      WHERE jf.id = generated_files.joining_form_id
+        AND (
+          jf.custom_fields->>'workflowType' = 'REGULAR' OR
+          jf.joining_reference ILIKE 'ATG-%' OR
+          jf.employee_code ILIKE 'ATG-%'
+        )
+    )
+  );
+
+-- ------------------------------------------------------------------------------
+-- 9. Scoped Row Level Security (RLS) on public.reference_slips
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Joining operators can view regular reference slips" ON public.reference_slips;
+CREATE POLICY "Joining operators can view regular reference slips"
+  ON public.reference_slips
+  FOR SELECT
+  TO authenticated
+  USING (
+    public.is_joining_operator() AND
+    joining_form_id IS NOT NULL AND
+    EXISTS (
+      SELECT 1 FROM public.joining_forms jf
+      WHERE jf.id = reference_slips.joining_form_id
+        AND (
+          jf.custom_fields->>'workflowType' = 'REGULAR' OR
+          jf.joining_reference ILIKE 'ATG-%' OR
+          jf.employee_code ILIKE 'ATG-%'
+        )
+    )
+  );
+
+DROP POLICY IF EXISTS "Joining operators can insert regular reference slips" ON public.reference_slips;
+CREATE POLICY "Joining operators can insert regular reference slips"
+  ON public.reference_slips
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    public.is_joining_operator() AND
+    joining_form_id IS NOT NULL AND
+    EXISTS (
+      SELECT 1 FROM public.joining_forms jf
+      WHERE jf.id = reference_slips.joining_form_id
+        AND (
+          jf.custom_fields->>'workflowType' = 'REGULAR' OR
+          jf.joining_reference ILIKE 'ATG-%' OR
+          jf.employee_code ILIKE 'ATG-%'
+        )
+    )
+  );
+
+-- ------------------------------------------------------------------------------
+-- 10. Scoped Row Level Security (RLS) on public.activity_logs
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Joining operators can insert regular activity logs" ON public.activity_logs;
+CREATE POLICY "Joining operators can insert regular activity logs"
+  ON public.activity_logs
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    public.is_joining_operator() AND
+    entity_type IN ('JOINING_FORM', 'EMPLOYEE', 'DOCUMENT', 'GENERATED_FILE', 'REFERENCE_SLIP')
+  );
+
+DROP POLICY IF EXISTS "Joining operators can view regular employee activity logs" ON public.activity_logs;
+CREATE POLICY "Joining operators can view regular employee activity logs"
+  ON public.activity_logs
+  FOR SELECT
+  TO authenticated
+  USING (
+    public.is_joining_operator() AND (
+      (entity_type = 'EMPLOYEE' AND EXISTS (
+        SELECT 1 FROM public.employees e
+        WHERE e.id::text = activity_logs.entity_id
+          AND (
+            e.employee_code ILIKE 'ATG-%' OR
+            e.joining_reference ILIKE 'ATG-%' OR
+            e.joining_form_id IS NOT NULL
+          )
+      )) OR
+      (entity_type = 'JOINING_FORM' AND EXISTS (
+        SELECT 1 FROM public.joining_forms jf
+        WHERE jf.id::text = activity_logs.entity_id
+          AND (
+            jf.custom_fields->>'workflowType' = 'REGULAR' OR
+            jf.joining_reference ILIKE 'ATG-%' OR
+            jf.employee_code ILIKE 'ATG-%'
+          )
+      ))
+    )
   );
 
 -- End of Migration 20261021000027_regular_joining_operator_role_and_rls.sql
