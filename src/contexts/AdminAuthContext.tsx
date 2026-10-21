@@ -10,6 +10,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo, useCall
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured, supabaseDiagnostics } from '../lib/supabaseClient';
 import type { AdminProfileRow, AdminRole } from '../types/database';
+import { getAuthRedirectUrl } from '../utils/authRedirect';
 
 export type AdminAuthErrorCode =
   | 'CONFIG_ERROR'
@@ -34,6 +35,8 @@ export interface AdminAuthContextType {
   profile: AdminProfileRow | null;
   role: AdminRole | null;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
+  isJoiningOperator: boolean;
   adminState: AdminAuthState;
   loading: boolean;
   authLoading: boolean;
@@ -41,13 +44,22 @@ export interface AdminAuthContextType {
   error: string | null;
   errorCode: AdminAuthErrorCode | null;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string; errorCode?: AdminAuthErrorCode }>;
+  sendSignInLink: (email: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
 
-const ALLOWED_ADMIN_ROLES: AdminRole[] = ['SUPER_ADMIN', 'COORDINATOR', 'DOCUMENT_VERIFIER', 'ACCOUNTANT'];
+const ALLOWED_ADMIN_ROLES: AdminRole[] = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'COORDINATOR',
+  'DOCUMENT_VERIFIER',
+  'ACCOUNTANT',
+  'FINANCE',
+  'REGULAR_JOINING_OPERATOR'
+];
 
 interface ProfileFetchResult {
   profile: AdminProfileRow | null;
@@ -145,6 +157,11 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         errorCode: 'PROFILE_INACTIVE',
         errorReason: 'Access Denied: Your administrator profile is currently marked inactive. Please contact the Super Administrator.'
       };
+    }
+
+    const normalizedRole = ((adminProfile.role || '').toUpperCase()) as AdminRole;
+    if (ALLOWED_ADMIN_ROLES.includes(normalizedRole)) {
+      adminProfile.role = normalizedRole;
     }
 
     if (!ALLOWED_ADMIN_ROLES.includes(adminProfile.role)) {
@@ -357,6 +374,56 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
+  const sendSignInLink = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    if (!isSupabaseConfigured) {
+      const configMsg =
+        'Supabase configuration error: Environment variables missing. ' +
+        'Please verify that VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are configured.';
+      setError(configMsg);
+      setErrorCode('CONFIG_ERROR');
+      return { success: false, error: configMsg };
+    }
+
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      let redirectUrl: string | undefined;
+      try {
+        redirectUrl = getAuthRedirectUrl('/admin');
+      } catch {
+        redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback?next=%2Fadmin` : undefined;
+      }
+
+      // shouldCreateUser: false ensures only accounts created by Super Admin in the Admin Directory can receive sign-in links
+      const { error: magicLinkError } = await supabase.auth.signInWithOtp({
+        email: cleanEmail,
+        options: {
+          emailRedirectTo: redirectUrl,
+          shouldCreateUser: false
+        }
+      });
+
+      if (magicLinkError) {
+        let userMessage = magicLinkError.message;
+        if (
+          magicLinkError.message.toLowerCase().includes('signups not allowed') ||
+          magicLinkError.message.toLowerCase().includes('user not found')
+        ) {
+          userMessage = 'Access denied: No authorized employee or administrator account exists for this email.';
+        }
+        setError(userMessage);
+        return { success: false, error: userMessage };
+      }
+
+      setError(null);
+      setErrorCode(null);
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to send sign-in link.';
+      setError(msg);
+      return { success: false, error: msg };
+    }
+  };
+
   const refreshProfile = async (): Promise<void> => {
     if (user) {
       setProfileLoading(true);
@@ -380,7 +447,8 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!profile.active) {
       return 'AUTHENTICATED_INACTIVE_ADMIN';
     }
-    if (!ALLOWED_ADMIN_ROLES.includes(profile.role)) {
+    const currentRole = ((profile.role || '').toUpperCase()) as AdminRole;
+    if (!ALLOWED_ADMIN_ROLES.includes(currentRole)) {
       return 'AUTHENTICATED_NON_ADMIN';
     }
     return 'AUTHORIZED_ADMIN';
@@ -389,6 +457,14 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const isAdmin = useMemo(() => {
     return adminState === 'AUTHORIZED_ADMIN';
   }, [adminState]);
+
+  const currentRole = useMemo<AdminRole | null>(() => {
+    if (!profile?.role) return null;
+    return ((profile.role || '').toUpperCase()) as AdminRole;
+  }, [profile]);
+
+  const isSuperAdmin = useMemo(() => currentRole === 'SUPER_ADMIN', [currentRole]);
+  const isJoiningOperator = useMemo(() => currentRole === 'REGULAR_JOINING_OPERATOR', [currentRole]);
 
   // Overall loading state is true only while authorization is still resolving
   const loading = useMemo(() => {
@@ -399,8 +475,10 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     user,
     session,
     profile,
-    role: profile?.role ?? null,
+    role: currentRole,
     isAdmin,
+    isSuperAdmin,
+    isJoiningOperator,
     adminState,
     loading,
     authLoading,
@@ -408,9 +486,10 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     error,
     errorCode,
     signIn,
+    sendSignInLink,
     signOut,
     refreshProfile
-  }), [user, session, profile, isAdmin, adminState, loading, authLoading, profileLoading, error, errorCode, signIn, fetchAdminProfile, authorizeUser]);
+  }), [user, session, profile, currentRole, isAdmin, isSuperAdmin, isJoiningOperator, adminState, loading, authLoading, profileLoading, error, errorCode, signIn, sendSignInLink, fetchAdminProfile, authorizeUser]);
 
   return (
     <AdminAuthContext.Provider value={value}>

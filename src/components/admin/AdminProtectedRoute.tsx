@@ -16,7 +16,7 @@ import { Loader2, ShieldAlert, LogOut } from 'lucide-react';
 import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 
 export const AdminProtectedRoute: React.FC = () => {
-  const { adminState, user, signOut } = useAdminAuth();
+  const { adminState, user, signOut, role, isJoiningOperator } = useAdminAuth();
   const location = useLocation();
 
   // 1. Loading state: wait while checking Supabase session and admin profile
@@ -252,8 +252,138 @@ export const AdminProtectedRoute: React.FC = () => {
     );
   }
 
-  // 5. Authorized Admin ONLY
+  // 5. Authorized Admin / Operator Check
   if (adminState === 'AUTHORIZED_ADMIN') {
+    const isOperator = isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR';
+
+    if (isOperator) {
+      const cleanPath = location.pathname.replace(/\/+$/, '') || '/admin';
+      const isAllowed =
+        cleanPath === '/admin' ||
+        cleanPath === '/admin/regular-joining' ||
+        cleanPath.startsWith('/admin/regular-joining/') ||
+        cleanPath === '/admin/regular-joining-list' ||
+        (cleanPath.startsWith('/admin/joining/') && cleanPath !== '/admin/joining');
+
+      if (!isAllowed) {
+        return (
+          <div
+            style={{
+              minHeight: '100vh',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#0F1B38',
+              color: '#FCFBFB',
+              fontFamily: 'Plus Jakarta Sans, Inter, system-ui, sans-serif',
+              padding: '2rem',
+              textAlign: 'center'
+            }}
+          >
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '16px',
+                backgroundColor: 'rgba(247, 215, 148, 0.15)',
+                border: '1px solid #F7D794',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '1.5rem',
+                color: '#F7D794'
+              }}
+            >
+              <ShieldAlert size={32} />
+            </div>
+
+            <h1
+              style={{
+                fontSize: '1.65rem',
+                fontWeight: 800,
+                color: '#FCFBFB',
+                margin: '0 0 0.5rem 0'
+              }}
+            >
+              Access Restricted — Joining Workflow Only
+            </h1>
+
+            <p
+              style={{
+                fontSize: '0.9rem',
+                color: 'rgba(252, 251, 251, 0.8)',
+                maxWidth: '520px',
+                lineHeight: 1.6,
+                margin: '0 0 1rem 0'
+              }}
+            >
+              Your account ({user?.email || 'operator'}) is authorized as a <strong>Regular Joining Operator</strong>. You have permissions restricted exclusively to the candidate Regular Joining Form workflow, submission register, and document generation.
+            </p>
+
+            <p
+              style={{
+                fontSize: '0.8rem',
+                color: 'rgba(252, 251, 251, 0.55)',
+                maxWidth: '480px',
+                margin: '0 0 2rem 0'
+              }}
+            >
+              Administrative modules (Applications, Enquiries, Financials, Directory, Settings) are strictly protected.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = ADMIN_ROUTES.dashboard;
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: '#F7D794',
+                  color: '#192A56',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <span>Return to Operator Dashboard</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  await signOut();
+                  window.location.href = ADMIN_ROUTES.login;
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  color: '#FCFBFB',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  cursor: 'pointer'
+                }}
+              >
+                <LogOut size={16} />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+        );
+      }
+    }
+
     return <Outlet />;
   }
 

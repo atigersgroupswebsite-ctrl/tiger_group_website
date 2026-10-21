@@ -5,6 +5,14 @@ import { paymentApiPlugin } from './src/server/vitePaymentPlugin.ts'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+
+  // Expose loaded environment variables to Node dev server middleware (e.g. paymentApiPlugin, adminServer)
+  for (const [key, val] of Object.entries(env)) {
+    if (process.env[key] === undefined && val) {
+      process.env[key] = val
+    }
+  }
+
   const supabaseUrl =
     env.VITE_SUPABASE_URL ||
     env.SUPABASE_URL ||

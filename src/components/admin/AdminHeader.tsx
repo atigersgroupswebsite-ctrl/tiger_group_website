@@ -31,7 +31,8 @@ interface AdminHeaderProps {
 }
 
 export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOpenMobile }) => {
-  const { user, profile, signOut } = useAdminAuth();
+  const { user, profile, signOut, isJoiningOperator, role } = useAdminAuth();
+  const isOperator = isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR';
   const {
     notifications,
     unreadCount,
@@ -144,7 +145,8 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
 
       {/* Far Right Corner: Notifications Bell & Profile Trigger */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginLeft: 'auto', flexShrink: 0 }}>
-        {/* Realtime Notification Bell */}
+        {/* Realtime Notification Bell (Administrators only) */}
+        {!isOperator && (
         <div ref={notifRef} style={{ position: 'relative' }}>
           <button
             type="button"
@@ -546,6 +548,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
             </div>
           )}
         </div>
+        )}
 
         {/* Profile Trigger & Dropdown Menu */}
         <div ref={profileRef} style={{ position: 'relative' }}>
@@ -613,7 +616,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
                   letterSpacing: '0.04em'
                 }}
               >
-                {profile?.role || 'SUPER_ADMIN'}
+                {isOperator ? 'JOINING OPERATOR' : profile?.role || 'SUPER_ADMIN'}
               </span>
             </div>
 
@@ -692,7 +695,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ breadcrumbs = [], onOp
                     }}
                   >
                     <Shield size={10} />
-                    <span>{profile?.role || 'SUPER_ADMIN'}</span>
+                    <span>{isOperator ? 'REGULAR JOINING OPERATOR' : profile?.role || 'SUPER_ADMIN'}</span>
                   </span>
                 </div>
               </div>

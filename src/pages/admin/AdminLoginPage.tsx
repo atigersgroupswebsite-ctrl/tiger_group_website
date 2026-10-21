@@ -9,7 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
-import { supabase, isSupabaseConfigured, supabaseDiagnostics } from '../../lib/supabaseClient';
+import { isSupabaseConfigured, supabaseDiagnostics } from '../../lib/supabaseClient';
 import {
   Lock,
   Mail,
@@ -19,27 +19,40 @@ import {
   EyeOff,
   ShieldCheck,
   CheckCircle2,
-  KeyRound,
   Send,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 
-type LoginMethod = 'PASSWORD' | 'EMAIL_OTP';
+type LoginMethod = 'MAGIC_LINK' | 'PASSWORD';
 
 export const AdminLoginPage: React.FC = () => {
-  const { signIn, refreshProfile, isAdmin, authLoading, profileLoading, error: authError } = useAdminAuth();
+  const { signIn, sendSignInLink, isAdmin, authLoading, profileLoading, error: authError } = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [method, setMethod] = useState<LoginMethod>('PASSWORD');
+  // Support ?method=password URL query parameter for Super Admin quick access, defaulting to MAGIC_LINK for employee convenience
+  const searchParams = new URLSearchParams(location.search);
+  const initialMethod: LoginMethod = searchParams.get('method') === 'password' ? 'PASSWORD' : 'MAGIC_LINK';
+
+  const [method, setMethod] = useState<LoginMethod>(initialMethod);
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
-  const [otpCode, setOtpCode] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
-  const [otpSent, setOtpSent] = useState<boolean>(false);
+  const [linkSent, setLinkSent] = useState<boolean>(false);
+  const [resendCooldown, setResendCooldown] = useState<number>(0);
+
+  // 60-second cooldown timer for link resend requests
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => {
+      setResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   // If already authenticated and active admin, redirect immediately (safe from login loops)
   useEffect(() => {
@@ -88,73 +101,31 @@ export const AdminLoginPage: React.FC = () => {
     }
   };
 
-  // Handle send OTP / magic link
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle send direct email sign-in link
+  const handleSendSignInLink = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setLocalError(null);
     setSuccessNotice(null);
 
     const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail) {
-      setLocalError('Please enter your administrator email address.');
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setLocalError('Please enter your authorized corporate email address.');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: cleanEmail,
-        options: {
-          emailRedirectTo: `${window.location.origin}/admin`
-        }
-      });
-
-      if (error) {
-        throw error;
+      const res = await sendSignInLink(cleanEmail);
+      if (!res.success) {
+        setLocalError(res.error || 'Unable to send sign-in link. Please check your email.');
+      } else {
+        setLinkSent(true);
+        setResendCooldown(60);
+        setSuccessNotice(`A direct sign-in link has been dispatched to ${cleanEmail}. Please check your inbox and click the link to log in.`);
       }
-
-      setOtpSent(true);
-      setSuccessNotice(`Access code and magic link sent to ${cleanEmail}. Please check your inbox.`);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unable to send access code. Please try again.';
-      setLocalError(msg);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Handle verify OTP code
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLocalError(null);
-    setSuccessNotice(null);
-
-    if (!otpCode.trim()) {
-      setLocalError('Please enter the 6-digit access code from your email.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: email.trim().toLowerCase(),
-        token: otpCode.trim(),
-        type: 'email'
-      });
-
-      if (error || !data.user) {
-        throw new Error(error?.message || 'Invalid or expired access code.');
-      }
-
-      // Ensure admin profile verification completes before navigating
-      await refreshProfile();
-
-      const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/admin';
-      navigate(from, { replace: true });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Verification failed. Please check the code.';
+      const msg = err instanceof Error ? err.message : 'Unable to send sign-in link. Please try again.';
       setLocalError(msg);
     } finally {
       setIsSubmitting(false);
@@ -263,45 +234,55 @@ export const AdminLoginPage: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              setMethod('PASSWORD');
+              setMethod('MAGIC_LINK');
               setLocalError(null);
             }}
             style={{
-              padding: '0.5rem',
+              padding: '0.6rem 0.5rem',
               border: 'none',
               borderRadius: '6px',
-              backgroundColor: method === 'PASSWORD' ? '#FFFFFF' : 'transparent',
-              color: method === 'PASSWORD' ? '#192A56' : '#64748B',
-              fontSize: '0.8rem',
+              backgroundColor: method === 'MAGIC_LINK' ? '#FFFFFF' : 'transparent',
+              color: method === 'MAGIC_LINK' ? '#192A56' : '#64748B',
+              fontSize: '0.825rem',
               fontWeight: 700,
               cursor: 'pointer',
-              boxShadow: method === 'PASSWORD' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-              transition: 'all 0.15s ease'
+              boxShadow: method === 'MAGIC_LINK' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              transition: 'all 0.15s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem'
             }}
           >
-            Password Sign In
+            <Mail size={15} />
+            <span>Email Sign-In Link</span>
           </button>
 
           <button
             type="button"
             onClick={() => {
-              setMethod('EMAIL_OTP');
+              setMethod('PASSWORD');
               setLocalError(null);
             }}
             style={{
-              padding: '0.5rem',
+              padding: '0.6rem 0.5rem',
               border: 'none',
               borderRadius: '6px',
-              backgroundColor: method === 'EMAIL_OTP' ? '#FFFFFF' : 'transparent',
-              color: method === 'EMAIL_OTP' ? '#192A56' : '#64748B',
-              fontSize: '0.8rem',
+              backgroundColor: method === 'PASSWORD' ? '#FFFFFF' : 'transparent',
+              color: method === 'PASSWORD' ? '#192A56' : '#64748B',
+              fontSize: '0.825rem',
               fontWeight: 700,
               cursor: 'pointer',
-              boxShadow: method === 'EMAIL_OTP' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-              transition: 'all 0.15s ease'
+              boxShadow: method === 'PASSWORD' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              transition: 'all 0.15s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem'
             }}
           >
-            Email OTP / Link
+            <Lock size={15} />
+            <span>Password Sign In</span>
           </button>
         </div>
 
@@ -534,14 +515,14 @@ export const AdminLoginPage: React.FC = () => {
           </form>
         )}
 
-        {/* METHOD 2: EMAIL OTP / MAGIC LINK */}
-        {method === 'EMAIL_OTP' && (
+        {/* METHOD 2: DIRECT EMAIL SIGN-IN LINK */}
+        {method === 'MAGIC_LINK' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
-            {!otpSent ? (
-              <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+            {!linkSent ? (
+              <form onSubmit={handleSendSignInLink} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
                 <div>
                   <label
-                    htmlFor="admin-email-otp"
+                    htmlFor="admin-email-link"
                     style={{
                       display: 'block',
                       fontSize: '0.75rem',
@@ -552,7 +533,7 @@ export const AdminLoginPage: React.FC = () => {
                       letterSpacing: '0.05em'
                     }}
                   >
-                    Administrator Email
+                    Employee / Administrator Email
                   </label>
                   <div style={{ position: 'relative' }}>
                     <Mail
@@ -566,12 +547,13 @@ export const AdminLoginPage: React.FC = () => {
                       }}
                     />
                     <input
-                      id="admin-email-otp"
+                      id="admin-email-link"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@atigergroups.com"
+                      placeholder="employee@atigergroups.com"
                       required
+                      autoComplete="email"
                       style={{
                         width: '100%',
                         boxSizing: 'border-box',
@@ -585,6 +567,9 @@ export const AdminLoginPage: React.FC = () => {
                       }}
                     />
                   </div>
+                  <p style={{ margin: '0.35rem 0 0', fontSize: '0.75rem', color: '#64748B' }}>
+                    A direct, single-use authentication link will be sent to your registered corporate email.
+                  </p>
                 </div>
 
                 <button
@@ -605,112 +590,114 @@ export const AdminLoginPage: React.FC = () => {
                   {isSubmitting ? (
                     <>
                       <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-                      <span>SENDING CODE...</span>
+                      <span>DISPATCHING SIGN-IN LINK...</span>
                     </>
                   ) : (
                     <>
                       <Send size={18} />
-                      <span>SEND ACCESS CODE / MAGIC LINK</span>
+                      <span>SEND SIGN-IN LINK</span>
                     </>
                   )}
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
-                <div>
-                  <label
-                    htmlFor="otp-code"
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                  padding: '1.25rem',
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '10px',
+                  textAlign: 'center'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <div
                     style={{
-                      display: 'block',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      color: '#192A56',
-                      marginBottom: '0.4rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '50%',
+                      backgroundColor: '#EFF6FF',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#1D4ED8'
                     }}
                   >
-                    Enter 6-Digit Email Code
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <KeyRound
-                      size={18}
-                      style={{
-                        position: 'absolute',
-                        left: '12px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: '#64748B'
-                      }}
-                    />
-                    <input
-                      id="otp-code"
-                      type="text"
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value)}
-                      placeholder="123456"
-                      maxLength={6}
-                      required
-                      autoFocus
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                        backgroundColor: '#FCFBFB',
-                        border: '1px solid #D2CECE',
-                        borderRadius: '8px',
-                        color: '#192A56',
-                        fontSize: '1.1rem',
-                        letterSpacing: '0.2em',
-                        outline: 'none'
-                      }}
-                    />
+                    <Mail size={22} />
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="btn-admin-primary"
-                  style={{
-                    padding: '0.85rem',
-                    fontSize: '0.9rem',
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem',
-                    cursor: isSubmitting ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-                      <span>VERIFYING CODE...</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck size={18} />
-                      <span>VERIFY CODE & SIGN IN</span>
-                    </>
-                  )}
-                </button>
+                <div>
+                  <h3 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', fontWeight: 700, color: '#192A56' }}>
+                    Check Your Email
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.825rem', color: '#475569', lineHeight: 1.5 }}>
+                    We sent a sign-in link to:
+                  </p>
+                  <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.875rem', fontWeight: 700, color: '#0F1B38' }}>
+                    {email}
+                  </p>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => setOtpSent(false)}
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748B', lineHeight: 1.5 }}>
+                  Click the link in the email to log in directly to your dashboard. No password or verification code is required.
+                </p>
+
+                <div
                   style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#64748B',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    textDecoration: 'underline'
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '1rem',
+                    marginTop: '0.5rem',
+                    paddingTop: '0.75rem',
+                    borderTop: '1px solid #E2E8F0'
                   }}
                 >
-                  Re-send code or use another email
-                </button>
-              </form>
+                  <button
+                    type="button"
+                    disabled={resendCooldown > 0 || isSubmitting}
+                    onClick={() => handleSendSignInLink()}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: resendCooldown > 0 ? '#94A3B8' : '#192A56',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: resendCooldown > 0 ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem'
+                    }}
+                  >
+                    <RefreshCw size={14} />
+                    <span>
+                      {resendCooldown > 0 ? `Resend link in ${resendCooldown}s` : 'Resend Sign-In Link'}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLinkSent(false);
+                      setLocalError(null);
+                      setSuccessNotice(null);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#64748B',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    Use different email
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}

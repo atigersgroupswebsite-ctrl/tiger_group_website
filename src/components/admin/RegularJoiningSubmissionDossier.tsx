@@ -1063,6 +1063,7 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
           formData={formData}
           employee={employee}
           companySignatureUrl={companySignatureUrl}
+          companyStampUrl={companyStampUrl}
           verifierName={verifierName}
           onRefresh={onRefresh}
         />

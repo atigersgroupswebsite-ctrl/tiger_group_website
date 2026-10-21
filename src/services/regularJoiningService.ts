@@ -242,9 +242,20 @@ export async function saveRegularJoiningForm(
       }
     }
 
-    // 2. Comprehensive custom_fields payload (100% resilient across all DB states)
+    // 2. Resolve authenticated operator
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUserId = sessionData?.session?.user?.id || null;
+    const currentUserEmail = sessionData?.session?.user?.email || null;
+
+    // 3. Comprehensive custom_fields payload (100% resilient across all DB states)
     const customFieldsPayload = {
       workflowType: 'REGULAR',
+      createdByAdminId: currentUserId,
+      created_by_admin_id: currentUserId,
+      operatorId: currentUserId,
+      operator_id: currentUserId,
+      operatorEmail: currentUserEmail,
+      operator_email: currentUserEmail,
       companyName: formData.companyName?.trim() || '',
       unitName: formData.unitName?.trim() || '',
       factorySupervisorName: formData.factorySupervisorName?.trim() || '',

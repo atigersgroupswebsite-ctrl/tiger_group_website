@@ -7,11 +7,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { useAdminNotifications } from '../../contexts/AdminNotificationContext';
 import type { ApplicationRow } from '../../types/database';
 import { AdminMetricCard } from '../../components/admin/AdminMetricCard';
 import { AdminStatusBadge } from '../../components/admin/AdminStatusBadge';
 import { AdminEmptyState } from '../../components/admin/AdminEmptyState';
+import { AdminOperatorDashboardPage } from './AdminOperatorDashboardPage';
 import {
   FileText,
   UserPlus,
@@ -30,6 +32,12 @@ import {
 } from 'lucide-react';
 
 export const AdminDashboardPage: React.FC = () => {
+  const { isJoiningOperator, role } = useAdminAuth();
+
+  if (isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR') {
+    return <AdminOperatorDashboardPage />;
+  }
+
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);

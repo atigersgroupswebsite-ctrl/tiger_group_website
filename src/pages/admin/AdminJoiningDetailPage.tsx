@@ -46,7 +46,7 @@ import type { JoiningFormData } from '../../types/joining';
 export const AdminJoiningDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { profile } = useAdminAuth();
+  const { profile, isJoiningOperator } = useAdminAuth();
   const canVerify =
     profile?.role === 'SUPER_ADMIN' ||
     profile?.role === 'DOCUMENT_VERIFIER' ||
@@ -166,14 +166,18 @@ export const AdminJoiningDetailPage: React.FC = () => {
     );
   }
 
-  if (error || !formData) {
+  // Operators are restricted exclusively to Regular Joining workflow records
+  const isOperator = isJoiningOperator || profile?.role === 'REGULAR_JOINING_OPERATOR';
+  if (isOperator && !isRegularJoining) {
     return (
       <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', color: '#991B1B' }}>
         <AlertCircle size={36} style={{ margin: '0 auto 0.75rem auto' }} />
-        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.5rem' }}>Unable to Open Dossier</h3>
-        <p style={{ fontSize: '0.85rem', marginBottom: '1.25rem' }}>{error || 'Submission not found.'}</p>
+        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.5rem' }}>Access Denied — Standard Pipeline Record</h3>
+        <p style={{ fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+          Your operator credentials are strictly restricted to candidate records processed through the Regular Joining Form workflow.
+        </p>
         <button
-          onClick={() => navigate('/admin/joining')}
+          onClick={() => navigate('/admin/regular-joining-list')}
           style={{
             padding: '0.5rem 1rem',
             backgroundColor: '#0F1B38',
@@ -185,7 +189,32 @@ export const AdminJoiningDetailPage: React.FC = () => {
             cursor: 'pointer'
           }}
         >
-          Return to Joining List
+          Return to Regular Joining Submissions
+        </button>
+      </div>
+    );
+  }
+
+  if (error || !formData) {
+    return (
+      <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', color: '#991B1B' }}>
+        <AlertCircle size={36} style={{ margin: '0 auto 0.75rem auto' }} />
+        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.5rem' }}>Unable to Open Dossier</h3>
+        <p style={{ fontSize: '0.85rem', marginBottom: '1.25rem' }}>{error || 'Submission not found.'}</p>
+        <button
+          onClick={() => navigate(isOperator ? '/admin/regular-joining-list' : '/admin/joining')}
+          style={{
+            padding: '0.5rem 1rem',
+            backgroundColor: '#0F1B38',
+            color: '#FFFFFF',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            cursor: 'pointer'
+          }}
+        >
+          {isOperator ? 'Return to Regular Joining List' : 'Return to Joining List'}
         </button>
       </div>
     );

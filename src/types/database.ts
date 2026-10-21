@@ -94,9 +94,12 @@ export type GeneratedFileType =
 
 export type AdminRole =
   | 'SUPER_ADMIN'
+  | 'ADMIN'
   | 'COORDINATOR'
   | 'DOCUMENT_VERIFIER'
-  | 'ACCOUNTANT';
+  | 'ACCOUNTANT'
+  | 'FINANCE'
+  | 'REGULAR_JOINING_OPERATOR';
 
 export type NotificationType =
   | 'NEW_JOB_ENQUIRY'

@@ -30,12 +30,13 @@ export const AuthCallbackPage: React.FC = () => {
     if (target.startsWith('//') || target.includes('://') || !target.startsWith('/')) {
       return '/joining';
     }
-    // Allow candidate joining paths, password recovery, and candidate portal
+    // Allow candidate joining paths, password recovery, candidate portal, and admin portal
     if (
       target.startsWith('/joining') ||
       target.startsWith('/reset-password') ||
       target.startsWith('/forgot-password') ||
-      target.startsWith('/candidate-portal')
+      target.startsWith('/candidate-portal') ||
+      target.startsWith('/admin')
     ) {
       return target;
     }

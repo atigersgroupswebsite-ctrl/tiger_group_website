@@ -27,6 +27,7 @@ import {
   X
 } from 'lucide-react';
 import { ADMIN_ROUTES } from '../../constants/adminRoutes';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 interface AdminSidebarProps {
   mobileOpen: boolean;
@@ -50,6 +51,12 @@ const CORE_NAV_ITEMS: NavItemDef[] = [
   { name: 'Exports', path: ADMIN_ROUTES.exports, icon: Download }
 ];
 
+const OPERATOR_NAV_ITEMS: NavItemDef[] = [
+  { name: 'Dashboard', path: ADMIN_ROUTES.dashboard, icon: LayoutDashboard },
+  { name: 'Regular Joining Form', path: ADMIN_ROUTES.regularJoining, icon: FileCheck2 },
+  { name: 'Joining Submissions', path: ADMIN_ROUTES.regularJoiningList, icon: FileCheck2 }
+];
+
 const MANAGEMENT_SUITE_ITEMS: NavItemDef[] = [
   { name: 'Jobs', path: ADMIN_ROUTES.jobs, icon: Briefcase, isStage3: true },
   { name: 'Companies', path: ADMIN_ROUTES.companies, icon: Factory, isStage3: true },
@@ -64,6 +71,9 @@ const MANAGEMENT_SUITE_ITEMS: NavItemDef[] = [
 ];
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseMobile }) => {
+  const { isJoiningOperator, role } = useAdminAuth();
+  const isOperator = isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR';
+
   return (
     <aside className={`admin-sidebar ${mobileOpen ? 'open' : ''}`}>
       {/* Brand Header with A TIGER GROUPS Client Logo */}
@@ -75,7 +85,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseM
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="admin-sidebar-title">TIGER GROUPS</div>
-          <div className="admin-sidebar-subtitle">Internal Administration</div>
+          <div className="admin-sidebar-subtitle">
+            {isOperator ? 'Joining Operator Panel' : 'Internal Administration'}
+          </div>
         </div>
 
         {/* Mobile close button */}
@@ -98,65 +110,92 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseM
 
       {/* Navigation List */}
       <div className="admin-sidebar-nav">
-        {/* Core Operations Group */}
-        <div>
-          <div className="admin-nav-group-title">Core Operations</div>
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            {CORE_NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  end={item.path === ADMIN_ROUTES.dashboard}
-                  onClick={onCloseMobile}
-                  className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}
-                >
-                  <Icon size={17} />
-                  <span>{item.name}</span>
-                </NavLink>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Management Suite Group */}
-        <div>
-          <div
-            className="admin-nav-group-title"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-          >
-            <span>Operations Suite</span>
-            <span
-              style={{
-                fontSize: '0.625rem',
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                color: 'rgba(252, 251, 251, 0.7)',
-                padding: '2px 6px',
-                borderRadius: '4px'
-              }}
-            >
-              Stage 3
-            </span>
+        {isOperator ? (
+          /* Scoped Operator Navigation Group */
+          <div>
+            <div className="admin-nav-group-title">Joining Operations</div>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              {OPERATOR_NAV_ITEMS.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    end={item.path === ADMIN_ROUTES.dashboard}
+                    onClick={onCloseMobile}
+                    className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}
+                  >
+                    <Icon size={17} />
+                    <span>{item.name}</span>
+                  </NavLink>
+                );
+              })}
+            </nav>
           </div>
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {MANAGEMENT_SUITE_ITEMS.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  onClick={onCloseMobile}
-                  className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}
-                  style={{ opacity: 0.85 }}
+        ) : (
+          /* Administrator Full Operations Navigation Groups */
+          <>
+            {/* Core Operations Group */}
+            <div>
+              <div className="admin-nav-group-title">Core Operations</div>
+              <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                {CORE_NAV_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      end={item.path === ADMIN_ROUTES.dashboard}
+                      onClick={onCloseMobile}
+                      className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}
+                    >
+                      <Icon size={17} />
+                      <span>{item.name}</span>
+                    </NavLink>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {/* Management Suite Group */}
+            <div>
+              <div
+                className="admin-nav-group-title"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <span>Operations Suite</span>
+                <span
+                  style={{
+                    fontSize: '0.625rem',
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    color: 'rgba(252, 251, 251, 0.7)',
+                    padding: '2px 6px',
+                    borderRadius: '4px'
+                  }}
                 >
-                  <Icon size={16} />
-                  <span style={{ fontSize: '0.825rem' }}>{item.name}</span>
-                </NavLink>
-              );
-            })}
-          </nav>
-        </div>
+                  Stage 3
+                </span>
+              </div>
+              <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                {MANAGEMENT_SUITE_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      onClick={onCloseMobile}
+                      className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}
+                      style={{ opacity: 0.85 }}
+                    >
+                      <Icon size={16} />
+                      <span style={{ fontSize: '0.825rem' }}>{item.name}</span>
+                    </NavLink>
+                  );
+                })}
+              </nav>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Footer link to public website */}

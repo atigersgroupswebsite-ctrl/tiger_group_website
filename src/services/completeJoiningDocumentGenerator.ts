@@ -35,26 +35,34 @@ export interface CompleteJoiningDocOptions {
 }
 
 /**
+/**
  * Resolves an image source (data URL, storage path, or HTTP URL) to a base64 Data URL.
+ * Strictly verifies image validity and handles storage buckets reliably.
  */
 async function resolveImageToDataUrl(source?: string | null): Promise<string | null> {
-  if (!source) return null;
+  if (!source || typeof source !== 'string') return null;
+  const trimmed = source.trim();
+  if (!trimmed) return null;
 
-  if (source.startsWith('data:image/')) {
-    return source;
+  if (trimmed.startsWith('data:image/')) {
+    return trimmed;
   }
 
   try {
-    let fetchUrl = source;
+    let fetchUrl = trimmed;
 
-    if (!source.startsWith('http://') && !source.startsWith('https://') && isSupabaseConfigured) {
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://') && isSupabaseConfigured) {
       let bucket = 'candidate-documents';
-      let cleanPath = source;
-      if (source.startsWith('candidate-documents/')) {
-        cleanPath = source.replace(/^candidate-documents\//, '');
-      } else if (source.startsWith('company-assets/')) {
+      let cleanPath = trimmed;
+      if (trimmed.startsWith('candidate-documents/')) {
+        cleanPath = trimmed.replace(/^candidate-documents\//, '');
+      } else if (
+        trimmed.startsWith('company-assets/') ||
+        trimmed.startsWith('signatures/') ||
+        trimmed.startsWith('stamps/')
+      ) {
         bucket = 'company-assets';
-        cleanPath = source.replace(/^company-assets\//, '');
+        cleanPath = trimmed.replace(/^company-assets\//, '');
       }
 
       const { data } = await supabase.storage.from(bucket).createSignedUrl(cleanPath, 3600);
@@ -67,10 +75,22 @@ async function resolveImageToDataUrl(source?: string | null): Promise<string | n
 
     const res = await fetch(fetchUrl);
     if (!res.ok) return null;
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType && !contentType.startsWith('image/')) {
+      console.warn('[resolveImageToDataUrl] Non-image MIME type received:', contentType);
+      return null;
+    }
     const blob = await res.blob();
     return await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        if (result && result.startsWith('data:image/')) {
+          resolve(result);
+        } else {
+          resolve('');
+        }
+      };
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
@@ -106,7 +126,7 @@ function addFittedImage(
   maxH: number,
   preferredFormat: 'PNG' | 'JPEG' = 'PNG'
 ): boolean {
-  if (!imgData) return false;
+  if (!imgData || !imgData.startsWith('data:image/')) return false;
   try {
     let drawW = maxW;
     let drawH = maxH;
@@ -127,9 +147,251 @@ function addFittedImage(
     const fmt = imgData.includes('jpeg') || imgData.includes('jpg') ? 'JPEG' : preferredFormat;
     doc.addImage(imgData, fmt, drawX, drawY, drawW, drawH, undefined, 'FAST');
     return true;
-  } catch {
+  } catch (err) {
+    console.warn('[addFittedImage] Failed to embed image in PDF:', err);
     return false;
   }
+}
+
+/**
+ * Exhaustively resolves candidate signature source from any form or employee representation.
+ * Strictly prevents substituting unrelated files, wallpapers, avatars, or company logos.
+ */
+export function resolveCandidateSignatureSource(
+  data: RegularJoiningFormData | any,
+  options: CompleteJoiningDocOptions = {}
+): string | null {
+  if (options.signatureDataUrl && typeof options.signatureDataUrl === 'string' && options.signatureDataUrl.trim()) {
+    return options.signatureDataUrl.trim();
+  }
+  if (!data) return null;
+
+  // 1. Direct signature field (object or string)
+  if (data.signature) {
+    if (typeof data.signature === 'string' && data.signature.trim()) {
+      return data.signature.trim();
+    }
+    if (typeof data.signature === 'object') {
+      if (typeof data.signature.dataUrl === 'string' && data.signature.dataUrl.trim()) {
+        return data.signature.dataUrl.trim();
+      }
+      if (typeof data.signature.storagePath === 'string' && data.signature.storagePath.trim()) {
+        return data.signature.storagePath.trim();
+      }
+    }
+  }
+
+  // 2. candidate_signature_path on employee / joining form record
+  if (typeof data.candidate_signature_path === 'string' && data.candidate_signature_path.trim()) {
+    return data.candidate_signature_path.trim();
+  }
+
+  // 3. Alternative direct properties
+  if (typeof data.signatureUrl === 'string' && data.signatureUrl.trim()) return data.signatureUrl.trim();
+  if (typeof data.signature_path === 'string' && data.signature_path.trim()) return data.signature_path.trim();
+  if (typeof data.signature_url === 'string' && data.signature_url.trim()) return data.signature_url.trim();
+
+  // 4. Documents metadata
+  if (data.documentsMetadata?.signature?.storagePath) {
+    return data.documentsMetadata.signature.storagePath;
+  }
+  if (data.custom_fields?.documentsMetadata?.signature?.storagePath) {
+    return data.custom_fields.documentsMetadata.signature.storagePath;
+  }
+
+  // 5. Nested documents collection
+  if (data.documents) {
+    if (Array.isArray(data.documents)) {
+      const sigDoc = data.documents.find(
+        (d: any) => (d.document_type === 'SIGNATURE' || d.type === 'SIGNATURE') && !d.is_deleted
+      );
+      if (sigDoc?.storage_path) return sigDoc.storage_path;
+      if (sigDoc?.dataUrl) return sigDoc.dataUrl;
+      if (sigDoc?.file?.dataUrl) return sigDoc.file.dataUrl;
+      if (sigDoc?.file?.storagePath) return sigDoc.file.storagePath;
+    } else if (typeof data.documents === 'object') {
+      const sigDoc = data.documents.SIGNATURE;
+      if (sigDoc) {
+        if (sigDoc.file?.dataUrl) return sigDoc.file.dataUrl;
+        if (sigDoc.file?.storagePath) return sigDoc.file.storagePath;
+        if (sigDoc.storagePath) return sigDoc.storagePath;
+        if (sigDoc.dataUrl) return sigDoc.dataUrl;
+      }
+    }
+  }
+
+  // 6. Sub-objects
+  if (data.declarations?.signatureUrl) return data.declarations.signatureUrl;
+  if (data.personal?.signatureUrl) return data.personal.signatureUrl;
+
+  return null;
+}
+
+/**
+ * Concurrently resolves company authorized signature and company stamp assets.
+ */
+export async function resolveCompanyAssets(
+  options: CompleteJoiningDocOptions = {}
+): Promise<{ companySigDataUrl: string | null; companyStampDataUrl: string | null }> {
+  const [activeCompanySigUrl, activeCompanyStampUrl] = await Promise.all([
+    options.companySignatureUrl
+      ? Promise.resolve(options.companySignatureUrl)
+      : getActiveCompanySignatureSignedUrl().catch(() => null),
+    options.companyStampUrl
+      ? Promise.resolve(options.companyStampUrl)
+      : getActiveCompanyStampSignedUrl().catch(() => null)
+  ]);
+
+  const [companySigDataUrl, companyStampDataUrl] = await Promise.all([
+    resolveImageToDataUrl(activeCompanySigUrl),
+    resolveImageToDataUrl(activeCompanyStampUrl)
+  ]);
+
+  return { companySigDataUrl, companyStampDataUrl };
+}
+
+/**
+ * Shared Dual Execution Block renderer for Page 03 and Page 09 of the Joining Dossier.
+ * Guarantees:
+ *  - 100% Pure White `#FFFFFF` card backgrounds (completely prevents dark navy bleed)
+ *  - High contrast for company stamp, authorized signature, and candidate signature
+ *  - Preserved aspect ratios without distortion or clipping
+ *  - Clean missing-asset placeholders when signatures or stamps are unconfigured
+ */
+export function drawDossierExecutionBlock(
+  doc: jsPDF,
+  startY: number,
+  candidateTitle: string,
+  emp: { employeeName: string },
+  place: string,
+  joiningDate: string,
+  sigUrl: string | null,
+  companyStampDataUrl: string | null,
+  companySigDataUrl: string | null,
+  verifierName: string
+): void {
+  const sigBoxW = 86;
+  const sigBoxH = 36;
+  const leftX = 15;
+  const rightX = 109;
+
+  // -------------------------------------------------------------------------
+  // LEFT BOX: CANDIDATE SIGNATURE
+  // -------------------------------------------------------------------------
+  doc.setFillColor(255, 255, 255);
+  doc.rect(leftX, startY, sigBoxW, sigBoxH, 'F');
+  doc.setDrawColor(...PALETTE.borderCol);
+  doc.setLineWidth(0.3);
+  doc.rect(leftX, startY, sigBoxW, sigBoxH, 'S');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...PALETTE.navy);
+  doc.text(candidateTitle, leftX + 4, startY + 5);
+
+  const sigAreaX = leftX + 4;
+  const sigAreaY = startY + 6.5;
+  const sigAreaW = 78;
+  const sigAreaH = 18;
+
+  let candidateSigRendered = false;
+  if (sigUrl) {
+    candidateSigRendered = addFittedImage(doc, sigUrl, sigAreaX, sigAreaY, sigAreaW, sigAreaH);
+  }
+
+  if (!candidateSigRendered) {
+    doc.setFillColor(248, 250, 252);
+    doc.rect(sigAreaX, sigAreaY, sigAreaW, sigAreaH, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(sigAreaX, sigAreaY, sigAreaW, sigAreaH, 'S');
+
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PALETTE.textMuted);
+    doc.text('Signature not uploaded', sigAreaX + sigAreaW / 2, sigAreaY + 10.5, { align: 'center' });
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...PALETTE.navy);
+  doc.text(emp.employeeName, leftX + 4, startY + 28);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(...PALETTE.textMuted);
+  doc.text(`Place: ${place} | Date: ${joiningDate}`, leftX + 4, startY + 32.5);
+
+  // -------------------------------------------------------------------------
+  // RIGHT BOX: COMPANY AUTHORIZATION & REGISTRATION SEAL
+  // -------------------------------------------------------------------------
+  // CRITICAL: Explicitly set fill color to pure white so it never inherits dark navy
+  doc.setFillColor(255, 255, 255);
+  doc.rect(rightX, startY, sigBoxW, sigBoxH, 'F');
+  doc.setDrawColor(...PALETTE.borderCol);
+  doc.setLineWidth(0.3);
+  doc.rect(rightX, startY, sigBoxW, sigBoxH, 'S');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...PALETTE.navy);
+  doc.text('COMPANY AUTHORIZATION & REGISTRATION SEAL:', rightX + 4, startY + 5);
+
+  // Slot 1: Official Company Seal (Stamp)
+  const stampX = rightX + 4;
+  const stampY = startY + 6.5;
+  const stampW = 36;
+  const stampH = 18;
+
+  let stampRendered = false;
+  if (companyStampDataUrl) {
+    stampRendered = addFittedImage(doc, companyStampDataUrl, stampX, stampY, stampW, stampH);
+  }
+
+  if (!stampRendered) {
+    doc.setFillColor(248, 250, 252);
+    doc.rect(stampX, stampY, stampW, stampH, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(stampX, stampY, stampW, stampH, 'S');
+
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(6.8);
+    doc.setTextColor(...PALETTE.textMuted);
+    doc.text('Official Stamp Pending', stampX + stampW / 2, stampY + 10.5, { align: 'center' });
+  }
+
+  // Slot 2: Company Authorized Signatory
+  const compSigX = rightX + 42;
+  const compSigY = startY + 6.5;
+  const compSigW = 40;
+  const compSigH = 18;
+
+  let compSigRendered = false;
+  if (companySigDataUrl) {
+    compSigRendered = addFittedImage(doc, companySigDataUrl, compSigX, compSigY, compSigW, compSigH);
+  }
+
+  if (!compSigRendered) {
+    doc.setFillColor(248, 250, 252);
+    doc.rect(compSigX, compSigY, compSigW, compSigH, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(compSigX, compSigY, compSigW, compSigH, 'S');
+
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(6.8);
+    doc.setTextColor(...PALETTE.textMuted);
+    doc.text('Authorized Signatory', compSigX + compSigW / 2, compSigY + 10.5, { align: 'center' });
+  }
+
+  // Officer name & Company name (Full contrast on pure white background)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...PALETTE.navy);
+  doc.text(`Authorized Officer: ${verifierName}`, rightX + 4, startY + 28);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.8);
+  doc.setTextColor(...PALETTE.textDark);
+  doc.text('A TIGER GLOBAL Career Solution & Consultancy', rightX + 4, startY + 32.5);
 }
 
 /**
@@ -559,37 +821,103 @@ function drawContractAppointmentLetterPage(
   doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
   const openText = 'We are pleased to appoint you in A TIGER GLOBAL CAREER SOLUTION AND CONSULTANCY on a contractual basis for operational deployment with the organization/client unit under the terms and conditions outlined below:';
-  doc.text(openText, tableX, y, { maxWidth: tableW, lineHeightFactor: 1.45 });
-  y += 12;
+  const contentMaxW = 174; // Safe printable width respecting left margin (tableX=14mm) and right margin inside 200mm border box
+  doc.text(openText, tableX, y, { maxWidth: contentMaxW, lineHeightFactor: 1.45 });
+  const openLines = doc.splitTextToSize(openText, contentMaxW);
+  y += openLines.length * 4.2 + 3.0;
 
   // Terms 1 to 7
   const terms = [
-    { num: '1. Nature of Contract Engagement:', body: ' This appointment is on a contractual basis for operational deployment with the organization/client unit.' },
-    { num: '2. Remuneration:', body: ` You shall receive a fixed consolidated salary of ${emp.salary}, subject to applicable statutory deductions.` },
-    { num: '3. Statutory Benefits:', body: " You shall be eligible for statutory benefits, including Employees' Provident Fund (EPF) and Employee State Insurance (ESIC) where applicable, in accordance with applicable statutory provisions." },
-    { num: '4. Working Hours & Overtime:', body: ' You shall observe the standard working hours and operational shift requirements assigned at your deployment facility. Any overtime work performed shall be compensated strictly according to applicable company rules and operational policies.' },
-    { num: '5. Work Location / Duties:', body: ' You shall diligently perform your assigned duties at the designated work location or client site, maintaining workplace discipline, safety standards, and adherence to applicable operational rules.' },
-    { num: '6. Leave:', body: ' Leave entitlements shall be governed by applicable company rules and require prior authorization from your designated supervisor or management.' },
-    { num: '7. Transfer / Site Allocation:', body: ' The employee may be transferred or reassigned to another site or location according to work requirements.' }
+    { num: '1. Nature of Contract Engagement:', body: 'This appointment is on a contractual basis for operational deployment with the organization/client unit.' },
+    { num: '2. Remuneration:', body: `You shall receive a fixed consolidated salary of ${emp.salary}, subject to applicable statutory deductions.` },
+    { num: '3. Statutory Benefits:', body: "You shall be eligible for statutory benefits, including Employees' Provident Fund (EPF) and Employee State Insurance (ESIC) where applicable, in accordance with applicable statutory provisions." },
+    { num: '4. Working Hours & Overtime:', body: 'You shall observe the standard working hours and operational shift requirements assigned at your deployment facility. Any overtime work performed shall be compensated strictly according to applicable company rules and operational policies.' },
+    { num: '5. Work Location / Duties:', body: 'You shall diligently perform your assigned duties at the designated work location or client site, maintaining workplace discipline, safety standards, and adherence to applicable operational rules.' },
+    { num: '6. Leave:', body: 'Leave entitlements shall be governed by applicable company rules and require prior authorization from your designated supervisor or management.' },
+    { num: '7. Transfer / Site Allocation:', body: 'The employee may be transferred or reassigned to another site or location according to work requirements.' }
   ];
 
-  terms.forEach((term) => {
+  const drawClause = (num: string, bodyText: string): void => {
+    // Sanitize currency symbol to standard ASCII Rs. to avoid jsPDF UTF-16 stream corruption and line overflow
+    const cleanBody = bodyText.trim().replace(/₹/g, 'Rs. ').replace(/\u20B9/g, 'Rs. ');
+
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.8);
+    doc.setFontSize(8);
+    const cleanNum = num.trim() + ' ';
+    const headingW = doc.getTextWidth(cleanNum);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+
+    // Split body into words
+    const words = cleanBody.split(/\s+/);
+    let line1Text = '';
+    let wordIdx = 0;
+
+    // Build first line (shares line with heading)
+    while (wordIdx < words.length) {
+      const word = words[wordIdx];
+      const test = line1Text ? line1Text + ' ' + word : word;
+      if (headingW + doc.getTextWidth(test) <= contentMaxW) {
+        line1Text = test;
+        wordIdx++;
+      } else {
+        break;
+      }
+    }
+
+    // Build subsequent lines (start at tableX, full contentMaxW)
+    const subsequentLines: string[] = [];
+    let curSubLine = '';
+    while (wordIdx < words.length) {
+      const word = words[wordIdx];
+      const test = curSubLine ? curSubLine + ' ' + word : word;
+      if (doc.getTextWidth(test) <= contentMaxW) {
+        curSubLine = test;
+        wordIdx++;
+      } else {
+        if (curSubLine) {
+          subsequentLines.push(curSubLine);
+          curSubLine = word;
+          wordIdx++;
+        } else {
+          subsequentLines.push(word);
+          wordIdx++;
+        }
+      }
+    }
+    if (curSubLine) {
+      subsequentLines.push(curSubLine);
+    }
+
+    // Render Line 1: Heading in bold, followed by body in normal
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
-    const prefixW = doc.getTextWidth(term.num);
-    doc.text(term.num, tableX, y);
+    doc.text(cleanNum, tableX, y);
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(15, 23, 42);
-    doc.text(term.body, tableX + prefixW, y, { maxWidth: tableW - prefixW, lineHeightFactor: 1.4 });
+    if (line1Text) {
+      doc.text(line1Text, tableX + headingW, y);
+    }
 
-    const totalLines = doc.splitTextToSize(term.body, tableW - prefixW).length;
-    y += Math.max(8.5, totalLines * 4.2);
+    // Render Subsequent Lines
+    const lineStep = 4.2;
+    subsequentLines.forEach((sLine) => {
+      y += lineStep;
+      doc.text(sLine, tableX, y);
+    });
+
+    // Dynamic spacing before the next clause
+    y += lineStep + 2.0;
+  };
+
+  terms.forEach((term) => {
+    drawClause(term.num, term.body);
   });
 
-  // Authorization & Acceptance Section
-  const bottomSectionY = 238;
+  // Authorization & Acceptance Section (dynamically positioned below clauses)
+  const bottomSectionY = Math.max(236, y + 4);
   doc.setDrawColor(203, 213, 225);
   doc.setLineWidth(0.3);
   doc.line(tableX, bottomSectionY, tableX + tableW, bottomSectionY);
@@ -779,15 +1107,9 @@ export async function generateFiveOfficialJoiningDocumentsPdf(
   const emp = extractDynamicEmployeeData(data);
 
   // Resolve assets concurrently
-  const [activeCompanySigUrl, activeCompanyStampUrl] = await Promise.all([
-    options.companySignatureUrl ? Promise.resolve(options.companySignatureUrl) : getActiveCompanySignatureSignedUrl().catch(() => null),
-    options.companyStampUrl ? Promise.resolve(options.companyStampUrl) : getActiveCompanyStampSignedUrl().catch(() => null)
-  ]);
-
-  const [sigUrl, companySigDataUrl, companyStampDataUrl] = await Promise.all([
-    resolveImageToDataUrl(options.signatureDataUrl || data.signature?.dataUrl || data.signature?.storagePath),
-    resolveImageToDataUrl(activeCompanySigUrl),
-    resolveImageToDataUrl(activeCompanyStampUrl)
+  const [sigUrl, { companySigDataUrl, companyStampDataUrl }] = await Promise.all([
+    resolveImageToDataUrl(resolveCandidateSignatureSource(data, options)),
+    resolveCompanyAssets(options)
   ]);
 
   // PAGE 1: SELF DECLARATION (PDF Page 5)
@@ -889,18 +1211,12 @@ export async function generateCompleteJoiningDocumentPdf(
   const place = options.place || 'Nagpur, Maharashtra';
   const verifierName = options.verifierName || 'Administrative Cell';
 
-  const [activeCompanySigUrl, activeCompanyStampUrl] = await Promise.all([
-    options.companySignatureUrl ? Promise.resolve(options.companySignatureUrl) : getActiveCompanySignatureSignedUrl().catch(() => null),
-    options.companyStampUrl ? Promise.resolve(options.companyStampUrl) : getActiveCompanyStampSignedUrl().catch(() => null)
-  ]);
-
-  const [photoUrl, aadhaarUrl, passbookUrl, sigUrl, companySigDataUrl, companyStampDataUrl] = await Promise.all([
-    resolveImageToDataUrl(options.photoDataUrl || data.photo?.dataUrl || data.photo?.storagePath),
-    resolveImageToDataUrl(options.aadhaarDataUrl || data.aadhaar?.dataUrl || data.aadhaar?.storagePath),
-    resolveImageToDataUrl(options.bankPassbookDataUrl || data.bankPassbook?.dataUrl || data.bankPassbook?.storagePath),
-    resolveImageToDataUrl(options.signatureDataUrl || data.signature?.dataUrl || data.signature?.storagePath),
-    resolveImageToDataUrl(activeCompanySigUrl),
-    resolveImageToDataUrl(activeCompanyStampUrl)
+  const [{ companySigDataUrl, companyStampDataUrl }, photoUrl, aadhaarUrl, passbookUrl, sigUrl] = await Promise.all([
+    resolveCompanyAssets(options),
+    resolveImageToDataUrl(options.photoDataUrl || (data as any).photo?.dataUrl || (data as any).photo?.storagePath || (data as any).photo_path),
+    resolveImageToDataUrl(options.aadhaarDataUrl || (data as any).aadhaar?.dataUrl || (data as any).aadhaar?.storagePath || (data as any).aadhaar_path),
+    resolveImageToDataUrl(options.bankPassbookDataUrl || (data as any).bankPassbook?.dataUrl || (data as any).bankPassbook?.storagePath || (data as any).passbook_path),
+    resolveImageToDataUrl(resolveCandidateSignatureSource(data, options))
   ]);
 
   const TOTAL_PAGES = 9;
@@ -1087,9 +1403,11 @@ export async function generateCompleteJoiningDocumentPdf(
     doc.setTextColor(...PALETTE.navy);
     doc.text(`${num}. ${label}`, x + 4, y + 5);
 
+    let rendered = false;
     if (imgDataUrl) {
-      addFittedImage(doc, imgDataUrl, x + 4, y + 10, boxW - 8, boxH - 14);
-    } else {
+      rendered = addFittedImage(doc, imgDataUrl, x + 4, y + 10, boxW - 8, boxH - 14);
+    }
+    if (!rendered) {
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
       doc.setTextColor(...PALETTE.textMuted);
@@ -1147,35 +1465,19 @@ export async function generateCompleteJoiningDocumentPdf(
   });
   currentY += 54;
 
-  // Mid execution box
-  const sigBoxW = 86;
-  const sigBoxH = 34;
-  doc.setFillColor(255, 255, 255);
-  doc.rect(15, currentY, sigBoxW, sigBoxH, 'F');
-  doc.setDrawColor(...PALETTE.borderCol);
-  doc.rect(15, currentY, sigBoxW, sigBoxH, 'S');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(...PALETTE.navy);
-  doc.text('CANDIDATE REPORTING SIGNATURE:', 19, currentY + 5);
-  if (sigUrl) addFittedImage(doc, sigUrl, 19, currentY + 7, 50, 16);
-  doc.text(emp.employeeName, 19, currentY + 26);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.text(`Place: ${place} | Date: ${joiningDate}`, 19, currentY + 30.5);
-
-  doc.rect(109, currentY, sigBoxW, sigBoxH, 'F');
-  doc.rect(109, currentY, sigBoxW, sigBoxH, 'S');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(...PALETTE.navy);
-  doc.text('COMPANY AUTHORIZATION & REGISTRATION SEAL:', 113, currentY + 5);
-  if (companyStampDataUrl) addFittedImage(doc, companyStampDataUrl, 113, currentY + 7, 36, 16);
-  if (companySigDataUrl) addFittedImage(doc, companySigDataUrl, 153, currentY + 7, 38, 16);
-  doc.text(`Authorized Officer: ${verifierName}`, 113, currentY + 26);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.8);
-  doc.text('A TIGER GLOBAL Career Solution & Consultancy', 113, currentY + 30.5);
+  // Page 03 Execution Block
+  drawDossierExecutionBlock(
+    doc,
+    currentY,
+    'CANDIDATE REPORTING SIGNATURE:',
+    emp,
+    place,
+    joiningDate,
+    sigUrl,
+    companyStampDataUrl,
+    companySigDataUrl,
+    verifierName
+  );
 
   // PAGES 4 TO 8: THE FIVE OFFICIAL DOCUMENTS (SOURCE PDF PAGES 5 TO 9)
   // Page 4: Self Declaration
@@ -1246,32 +1548,19 @@ export async function generateCompleteJoiningDocumentPdf(
   currentY += 28;
 
   // Final Master Execution Block
-  doc.setFillColor(255, 255, 255);
-  doc.rect(15, currentY, sigBoxW, sigBoxH, 'F');
-  doc.setDrawColor(...PALETTE.borderCol);
-  doc.rect(15, currentY, sigBoxW, sigBoxH, 'S');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(...PALETTE.navy);
-  doc.text('CANDIDATE FINAL SIGNATURE:', 19, currentY + 5);
-  if (sigUrl) addFittedImage(doc, sigUrl, 19, currentY + 7, 50, 16);
-  doc.text(emp.employeeName, 19, currentY + 26);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.text(`Place: ${place} | Date: ${joiningDate}`, 19, currentY + 30.5);
-
-  doc.rect(109, currentY, sigBoxW, sigBoxH, 'F');
-  doc.rect(109, currentY, sigBoxW, sigBoxH, 'S');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(...PALETTE.navy);
-  doc.text('COMPANY AUTHORIZATION & REGISTRATION SEAL:', 113, currentY + 5);
-  if (companyStampDataUrl) addFittedImage(doc, companyStampDataUrl, 113, currentY + 7, 36, 16);
-  if (companySigDataUrl) addFittedImage(doc, companySigDataUrl, 153, currentY + 7, 38, 16);
-  doc.text(`Authorized Officer: ${verifierName}`, 113, currentY + 26);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.8);
-  doc.text('A TIGER GLOBAL Career Solution & Consultancy', 113, currentY + 30.5);
+  // Page 09 Execution Block
+  drawDossierExecutionBlock(
+    doc,
+    currentY,
+    'CANDIDATE FINAL SIGNATURE:',
+    emp,
+    place,
+    joiningDate,
+    sigUrl,
+    companyStampDataUrl,
+    companySigDataUrl,
+    verifierName
+  );
 
   return doc;
 }

@@ -34,9 +34,12 @@ import {
 
 const ROLE_CONFIG: Record<AdminRole, { label: string; color: string; bg: string }> = {
   SUPER_ADMIN: { label: 'Super Admin', color: '#991B1B', bg: '#FEE2E2' },
+  ADMIN: { label: 'Administrator', color: '#B91C1C', bg: '#FEE2E2' },
   COORDINATOR: { label: 'Coordinator', color: '#1E40AF', bg: '#DBEAFE' },
   DOCUMENT_VERIFIER: { label: 'Doc Verifier', color: '#065F46', bg: '#D1FAE5' },
-  ACCOUNTANT: { label: 'Accountant', color: '#92400E', bg: '#FEF3C7' }
+  ACCOUNTANT: { label: 'Accountant', color: '#92400E', bg: '#FEF3C7' },
+  FINANCE: { label: 'Finance Officer', color: '#B45309', bg: '#FEF3C7' },
+  REGULAR_JOINING_OPERATOR: { label: 'Regular Joining Operator', color: '#0369A1', bg: '#E0F2FE' }
 };
 
 export const AdminUsersPage: React.FC = () => {
@@ -349,6 +352,7 @@ export const AdminUsersPage: React.FC = () => {
             <option value="COORDINATOR">Coordinator</option>
             <option value="DOCUMENT_VERIFIER">Doc Verifier</option>
             <option value="ACCOUNTANT">Accountant</option>
+            <option value="REGULAR_JOINING_OPERATOR">Joining Operator</option>
           </select>
         </div>
 
@@ -741,6 +745,7 @@ export const AdminUsersPage: React.FC = () => {
                   <option value="DOCUMENT_VERIFIER">Document Verifier (Verification Access)</option>
                   <option value="ACCOUNTANT">Accountant (Payment Reconciliation Access)</option>
                   <option value="SUPER_ADMIN">Super Admin (Full Governance Access)</option>
+                  <option value="REGULAR_JOINING_OPERATOR">Regular Joining Operator (Restricted Joining Workflow Only)</option>
                 </select>
               </div>
 

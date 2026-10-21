@@ -24,9 +24,12 @@ export interface AdminDirectoryUser {
 
 const VALID_ADMIN_ROLES: AdminRole[] = [
   'SUPER_ADMIN',
+  'ADMIN',
   'COORDINATOR',
   'DOCUMENT_VERIFIER',
-  'ACCOUNTANT'
+  'ACCOUNTANT',
+  'FINANCE',
+  'REGULAR_JOINING_OPERATOR'
 ];
 
 /**
@@ -150,7 +153,8 @@ export async function inviteAdminUserHandler(
     return { status: 400, data: { success: false, error: 'Full Name is required.' } };
   }
 
-  if (!role || !VALID_ADMIN_ROLES.includes(role)) {
+  const normalizedRole = ((role || '').toUpperCase()) as AdminRole;
+  if (!role || !VALID_ADMIN_ROLES.includes(normalizedRole)) {
     return {
       status: 400,
       data: {
@@ -181,65 +185,93 @@ export async function inviteAdminUserHandler(
       }
     }
 
-    // 2. If not existing, invite or create auth user
-    if (!targetUserId) {
-      // Try inviteUserByEmail first
-      const { data: inviteData, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(
-        normalizedEmail,
-        {
-          data: { full_name: trimmedName }
-        }
-      );
+    // 2. If user already exists in auth, check if they already have an administrator profile
+    let isOrphanedRecovery = false;
+    if (targetUserId) {
+      const { data: existingProfile } = await supabase
+        .from('admin_profiles')
+        .select('id, full_name, role, active')
+        .eq('id', targetUserId)
+        .maybeSingle();
 
-      if (!inviteErr && inviteData?.user) {
-        targetUserId = inviteData.user.id;
-      } else {
-        // Fallback to createUser if invite service is unconfigured or rate-limited
-        const { data: createData, error: createErr } = await supabase.auth.admin.createUser({
-          email: normalizedEmail,
-          email_confirm: true,
-          user_metadata: { full_name: trimmedName }
-        });
-
-        if (createErr || !createData?.user) {
-          return {
-            status: 500,
-            data: {
-              success: false,
-              error: createErr?.message || inviteErr?.message || 'Failed to create auth user.'
+      if (existingProfile) {
+        return {
+          status: 409,
+          data: {
+            success: false,
+            error: `An administrator profile already exists for ${normalizedEmail} with role '${existingProfile.role}'. To change their role or status, use the Admin Directory controls instead of re-creating the user.`,
+            existingUser: {
+              id: targetUserId,
+              email: normalizedEmail,
+              role: existingProfile.role,
+              active: existingProfile.active
             }
-          };
-        }
-        targetUserId = createData.user.id;
+          }
+        };
       }
+
+      // Auth user exists without an admin_profiles row: orphaned user recovery flow
+      isOrphanedRecovery = true;
     }
 
-    // 3. Upsert admin_profiles row
+    // 3. If not existing in auth, create confirmed auth user (ready for 6-digit OTP login)
+    if (!targetUserId) {
+      const { data: createData, error: createErr } = await supabase.auth.admin.createUser({
+        email: normalizedEmail,
+        email_confirm: true,
+        user_metadata: { full_name: trimmedName }
+      });
+
+      if (createErr || !createData?.user) {
+        return {
+          status: 500,
+          data: {
+            success: false,
+            error: createErr?.message || 'Failed to create auth user.'
+          }
+        };
+      }
+      targetUserId = createData.user.id;
+    }
+
+    // 4. Upsert admin_profiles row
     const { error: upsertErr } = await supabase
       .from('admin_profiles')
       .upsert({
         id: targetUserId,
         full_name: trimmedName,
-        role,
+        role: normalizedRole,
         active: true
       }, { onConflict: 'id' });
 
     if (upsertErr) {
+      const isRoleCheckErr = upsertErr.message?.includes('admin_profiles_role_check');
+      const errorMsg = isRoleCheckErr
+        ? `Database check constraint rejected role '${normalizedRole}'. The database migration updating 'admin_profiles_role_check' must be applied in the Supabase SQL Editor.`
+        : `Auth account exists, but administrator profile assignment failed: ${upsertErr.message}`;
+
       return {
         status: 500,
-        data: { success: false, error: `Auth created, but profile assignment failed: ${upsertErr.message}` }
+        data: {
+          success: false,
+          error: errorMsg,
+          authUserId: targetUserId,
+          isOrphaned: true
+        }
       };
     }
 
-    // 4. Log governance security event to activity_logs
+    // 5. Log governance security event to activity_logs
     try {
       await supabase.from('activity_logs').insert({
         admin_user_id: authCheck.user!.id,
-        action: 'ADMIN_CREATED',
+        action: isOrphanedRecovery ? 'ADMIN_PROFILE_RECOVERED' : 'ADMIN_CREATED',
         entity_type: 'ADMIN_USER',
         entity_id: targetUserId,
-        description: `Admin profile created for ${normalizedEmail} with role ${role}`,
-        metadata: { email: normalizedEmail, role, active: true }
+        description: isOrphanedRecovery
+          ? `Orphaned admin profile recovered for ${normalizedEmail} with role ${normalizedRole}`
+          : `Admin profile created for ${normalizedEmail} with role ${normalizedRole}`,
+        metadata: { email: normalizedEmail, role: normalizedRole, active: true, isOrphanedRecovery }
       });
     } catch (logErr) {
       console.warn('[AdminServer] Failed to write activity log:', logErr);
@@ -249,12 +281,14 @@ export async function inviteAdminUserHandler(
       status: 200,
       data: {
         success: true,
-        message: `Admin user ${normalizedEmail} successfully authorized with role ${role}.`,
+        message: isOrphanedRecovery
+          ? `Successfully linked administrator profile for existing account ${normalizedEmail} with role ${normalizedRole}.`
+          : `Admin user ${normalizedEmail} successfully authorized with role ${normalizedRole}.`,
         user: {
           id: targetUserId,
           email: normalizedEmail,
           fullName: trimmedName,
-          role,
+          role: normalizedRole,
           active: true
         }
       }

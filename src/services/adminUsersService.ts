@@ -51,11 +51,58 @@ export async function listAdminUsers(): Promise<AdminUsersServiceResult<AdminDir
 
     const json = await res.json();
     if (!res.ok || !json.success) {
+      // Fallback: If server endpoint fails but client is an authenticated admin with RLS read access,
+      // query admin_profiles table directly to ensure directory resilience.
+      try {
+        const { data: profiles, error: rlsErr } = await supabase
+          .from('admin_profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!rlsErr && profiles && profiles.length > 0) {
+          const fallbackAdmins: AdminDirectoryUser[] = (profiles as any[]).map((p) => ({
+            id: p.id,
+            email: p.email || 'N/A',
+            fullName: p.full_name || 'Admin User',
+            role: p.role,
+            active: !!p.active,
+            createdAt: p.created_at,
+            lastSignInAt: null
+          }));
+          return { success: true, data: fallbackAdmins };
+        }
+      } catch {
+        // Fallback suppressed; return primary error below
+      }
+
       return { success: false, error: json.error || 'Failed to fetch admin users' };
     }
 
     return { success: true, data: json.admins };
   } catch (err: any) {
+    // Also try direct table fallback on network error
+    try {
+      const { data: profiles, error: rlsErr } = await supabase
+        .from('admin_profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!rlsErr && profiles && profiles.length > 0) {
+        const fallbackAdmins: AdminDirectoryUser[] = (profiles as any[]).map((p) => ({
+          id: p.id,
+          email: p.email || 'N/A',
+          fullName: p.full_name || 'Admin User',
+          role: p.role,
+          active: !!p.active,
+          createdAt: p.created_at,
+          lastSignInAt: null
+        }));
+        return { success: true, data: fallbackAdmins };
+      }
+    } catch {
+      // Ignore
+    }
+
     return { success: false, error: err.message || 'Network error fetching admin users' };
   }
 }

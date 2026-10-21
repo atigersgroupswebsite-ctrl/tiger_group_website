@@ -27,8 +27,6 @@ export interface CandidateRegisterResult {
 const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
 const DEFAULT_SUPABASE_URL = 'https://bhfxqtaesvfsbdckgeka.supabase.co';
-const DEFAULT_SUPABASE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoZnhxdGFlc3Zmc2JkY2tnZWthIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODYxNjg3NSwiZXhwIjoyMTA0MTkyODc1fQ.wgYwkEqnhRs-sdi7YRx_A6nUYuCOhvVwuF54M1HeU-k';
 
 function getSupabaseAdmin() {
   const supabaseUrl =
@@ -37,8 +35,11 @@ function getSupabaseAdmin() {
     DEFAULT_SUPABASE_URL;
   const serviceKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
-    DEFAULT_SUPABASE_KEY;
+    process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!serviceKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is required');
+  }
 
   return createClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false }

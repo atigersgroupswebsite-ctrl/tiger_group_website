@@ -48,6 +48,19 @@ export const AdminLayout: React.FC = () => {
     if (path === ADMIN_ROUTES.companies) {
       return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Partner Companies' }];
     }
+    if (path === ADMIN_ROUTES.regularJoining) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Regular Joining Form' }];
+    }
+    if (path.startsWith('/admin/regular-joining/')) {
+      return [
+        { label: 'Dashboard', path: ADMIN_ROUTES.dashboard },
+        { label: 'Joining Submissions', path: ADMIN_ROUTES.regularJoiningList },
+        { label: 'Edit Regular Joining' }
+      ];
+    }
+    if (path === ADMIN_ROUTES.regularJoiningList) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Regular Joining Submissions' }];
+    }
     if (path === ADMIN_ROUTES.joining) {
       return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Digital Joining Packets' }];
     }

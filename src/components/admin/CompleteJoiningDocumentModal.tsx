@@ -31,8 +31,10 @@ import type { RegularJoiningFormData } from '../../services/regularJoiningServic
 import {
   extractDynamicEmployeeData,
   downloadCompleteJoiningDocumentPdf,
-  downloadFiveOfficialJoiningDocumentsPdf
+  downloadFiveOfficialJoiningDocumentsPdf,
+  resolveCandidateSignatureSource
 } from '../../services/completeJoiningDocumentGenerator';
+import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 import {
   FORMAL_JOINING_UNDERTAKING,
   MASTER_ATTESTATION
@@ -67,9 +69,52 @@ export const CompleteJoiningDocumentModal: React.FC<CompleteJoiningDocumentModal
   const [activeCompanySig, setActiveCompanySig] = useState<string | null>(propSigUrl || null);
   const [activeCompanyStamp, setActiveCompanyStamp] = useState<string | null>(propStampUrl || null);
 
+  const [candidateSigUrl, setCandidateSigUrl] = useState<string | null>(null);
+
   useEffect(() => {
     setActiveViewMode(initialMode);
   }, [initialMode, isOpen]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const rawSig = resolveCandidateSignatureSource(formData);
+    if (!rawSig) {
+      setCandidateSigUrl(null);
+    } else if (rawSig.startsWith('data:image/') || rawSig.startsWith('http://') || rawSig.startsWith('https://')) {
+      setCandidateSigUrl(rawSig);
+    } else if (isSupabaseConfigured) {
+      let bucket = 'candidate-documents';
+      let cleanPath = rawSig;
+      if (rawSig.startsWith('candidate-documents/')) {
+        cleanPath = rawSig.replace(/^candidate-documents\//, '');
+      } else if (
+        rawSig.startsWith('company-assets/') ||
+        rawSig.startsWith('signatures/') ||
+        rawSig.startsWith('stamps/')
+      ) {
+        bucket = 'company-assets';
+        cleanPath = rawSig.replace(/^company-assets\//, '');
+      }
+
+      supabase.storage
+        .from(bucket)
+        .createSignedUrl(cleanPath, 3600)
+        .then(({ data }) => {
+          if (isMounted && data?.signedUrl) {
+            setCandidateSigUrl(data.signedUrl);
+          }
+        })
+        .catch(() => {
+          if (isMounted) setCandidateSigUrl(null);
+        });
+    } else {
+      setCandidateSigUrl(null);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [formData]);
 
   useEffect(() => {
     if (propSigUrl) setActiveCompanySig(propSigUrl);
@@ -98,7 +143,7 @@ export const CompleteJoiningDocumentModal: React.FC<CompleteJoiningDocumentModal
   const employeeCode = emp.employeeCode;
   const joiningDate = emp.joiningDate;
   const place = 'Nagpur, Maharashtra';
-  const sigDataUrl = formData.signature?.dataUrl || formData.signature?.storagePath || null;
+  const sigDataUrl = candidateSigUrl || formData.signature?.dataUrl || null;
 
   const handleDownloadCompletePdf = async () => {
     try {
@@ -259,7 +304,7 @@ export const CompleteJoiningDocumentModal: React.FC<CompleteJoiningDocumentModal
                 style={{ maxHeight: '42px', maxWidth: '150px', objectFit: 'contain' }}
               />
             ) : (
-              <span style={{ fontSize: '10px', color: '#94A3B8', fontStyle: 'italic' }}>Specimen On File</span>
+              <span style={{ fontSize: '10px', color: '#94A3B8', fontStyle: 'italic' }}>Signature not uploaded</span>
             )}
           </div>
           <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#0F1B38' }}>
@@ -302,7 +347,7 @@ export const CompleteJoiningDocumentModal: React.FC<CompleteJoiningDocumentModal
                 />
               ) : (
                 <div style={{ fontSize: '9px', color: '#64748B', textAlign: 'center', lineHeight: 1.2, border: '1px dashed #CBD5E1', padding: '2px 4px', borderRadius: '3px' }}>
-                  <strong>[ OFFICIAL STAMP ]</strong><br />Pending Upload
+                  <strong>[ OFFICIAL STAMP ]</strong><br />Pending Configuration
                 </div>
               )}
             </div>
