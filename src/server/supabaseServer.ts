@@ -120,12 +120,12 @@ export async function authenticateRequest(authHeader: string | undefined | null)
 
   if (process.env.NODE_ENV === 'test' && token.startsWith('mock_gmail_')) {
     const raw = token.replace('mock_gmail_', '');
-    const [mockUid, mockEmail] = raw.includes(':') ? raw.split(':') : [raw, 'subadmin@gmail.com'];
+    const [mockUid, mockEmail] = raw.includes(':') ? raw.split(':') : [raw, ''];
     return {
       authenticated: true as const,
       user: {
         id: mockUid,
-        email: mockEmail,
+        email: mockEmail || undefined,
         user_metadata: { full_name: 'Gmail Sub-Admin' }
       }
     };
