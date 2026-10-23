@@ -14,6 +14,7 @@
 // ==============================================================================
 
 import { jsPDF } from 'jspdf';
+import { PDFDocument } from 'pdf-lib';
 import { persistGeneratedDocument } from './filePersistenceService';
 import { logActivity } from './activityService';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
@@ -63,6 +64,21 @@ export const ID_CARD_DIMENSIONS = {
   heightMm: 54.0,
   orientation: 'landscape' as const,
   unit: 'mm' as const
+};
+
+/**
+ * Official ID Card Print Page Dimensions: 6 × 4 Inch Landscape Page
+ * Standard 6 x 4 inch print page (152.4 mm x 101.6 mm / 432 pt x 288 pt)
+ * Accommodates front and back sides together side-by-side on a single sheet.
+ */
+export const ID_CARD_PRINT_PAGE_DIMENSIONS = {
+  widthInches: 6,
+  heightInches: 4,
+  widthPt: 432, // 6 * 72 pt
+  heightPt: 288, // 4 * 72 pt
+  widthMm: 152.4,
+  heightMm: 101.6,
+  orientation: 'landscape' as const
 };
 
 /**
@@ -566,14 +582,50 @@ export async function generateEmployeeIdCardPdf(
   doc.setFontSize(4);
   doc.text("A TIGER GROUP'S — WORKFORCE ONBOARDING & COMPLIANCE DIVISION", cardWidth / 2, 51.2, { align: 'center' });
 
-  // 3. Produce output
-  const pdfBytes = doc.output('arraybuffer');
-  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  // 3. Compose Front and Back onto a single 6 × 4 inch landscape page for printing
+  const rawBytes = doc.output('arraybuffer');
+  const srcDoc = await PDFDocument.load(rawBytes);
+
+  const outDoc = await PDFDocument.create();
+  const PAGE_WIDTH_PT = ID_CARD_PRINT_PAGE_DIMENSIONS.widthPt; // 432 pt (6 inches)
+  const PAGE_HEIGHT_PT = ID_CARD_PRINT_PAGE_DIMENSIONS.heightPt; // 288 pt (4 inches)
+
+  const printPage = outDoc.addPage([PAGE_WIDTH_PT, PAGE_HEIGHT_PT]);
+
+  const [embeddedFront, embeddedBack] = await outDoc.embedPages([
+    srcDoc.getPage(0),
+    srcDoc.getPage(1)
+  ]);
+
+  // Card dimensions and layout
+  // Scale proportionally to fit side by side with clean margins and gap
+  const singleCardWidth = 198; // pt (~69.85 mm)
+  const singleCardHeight = (embeddedFront.height / embeddedFront.width) * singleCardWidth; // 124.91 pt (~44.06 mm)
+  const gap = 12; // pt (~4.23 mm)
+  const marginX = (PAGE_WIDTH_PT - (singleCardWidth * 2 + gap)) / 2; // 12 pt (~4.23 mm)
+  const marginY = (PAGE_HEIGHT_PT - singleCardHeight) / 2; // 81.54 pt (~28.77 mm)
+
+  printPage.drawPage(embeddedFront, {
+    x: marginX,
+    y: marginY,
+    width: singleCardWidth,
+    height: singleCardHeight
+  });
+
+  printPage.drawPage(embeddedBack, {
+    x: marginX + singleCardWidth + gap,
+    y: marginY,
+    width: singleCardWidth,
+    height: singleCardHeight
+  });
+
+  const pdfBytes = await outDoc.save();
+  const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
   const sanitizedCode = (data.employeeCode || 'ATG-EMP').replace(/[^a-zA-Z0-9_-]/g, '_');
   const sanitizedName = (data.employeeName || 'Candidate').replace(/[^a-zA-Z0-9_-]/g, '_');
   const fileName = `${sanitizedCode}-${sanitizedName}-ID-Card.pdf`;
 
-  return { blob, pdfBytes: new Uint8Array(pdfBytes), fileName };
+  return { blob, pdfBytes, fileName };
 }
 
 /**

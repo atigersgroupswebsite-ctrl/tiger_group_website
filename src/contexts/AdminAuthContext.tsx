@@ -11,6 +11,7 @@ import type { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured, supabaseDiagnostics } from '../lib/supabaseClient';
 import type { AdminProfileRow, AdminRole } from '../types/database';
 import { getAuthRedirectUrl } from '../utils/authRedirect';
+import { ALL_PERMISSIONS, type PermissionKey, type ModuleKey } from '../types/rbac';
 
 export type AdminAuthErrorCode =
   | 'CONFIG_ERROR'
@@ -36,7 +37,12 @@ export interface AdminAuthContextType {
   role: AdminRole | null;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  isSubAdmin: boolean;
   isJoiningOperator: boolean;
+  permissions: PermissionKey[];
+  hasPermission: (key: PermissionKey | string) => boolean;
+  hasAnyPermission: (keys: (PermissionKey | string)[]) => boolean;
+  hasModuleAccess: (moduleName: ModuleKey | string) => boolean;
   adminState: AdminAuthState;
   loading: boolean;
   authLoading: boolean;
@@ -53,6 +59,7 @@ const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefin
 
 const ALLOWED_ADMIN_ROLES: AdminRole[] = [
   'SUPER_ADMIN',
+  'SUB_ADMIN',
   'ADMIN',
   'COORDINATOR',
   'DOCUMENT_VERIFIER',
@@ -77,6 +84,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<AdminProfileRow | null>(null);
+  const [permissions, setPermissions] = useState<PermissionKey[]>([]);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [profileLoading, setProfileLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,25 +129,63 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const authorizeUser = useCallback(async (currentUser: User | null): Promise<AuthorizationResult> => {
     if (!currentUser) {
       setProfile(null);
+      setPermissions([]);
       return { authorized: false, profile: null };
     }
 
     const { profile: adminProfile, error: queryError } = await fetchAdminProfile(currentUser.id);
 
-    if (queryError) {
-      console.error('[AdminAuth] RLS or query error during authorization:', queryError);
-      setProfile(null);
-      return {
-        authorized: false,
-        profile: null,
-        errorCode: 'RLS_ERROR',
-        errorReason: `Database Error: Unable to query admin profile (${queryError.message}). Check RLS policies.`
-      };
+    let resolvedProfile: AdminProfileRow | null = adminProfile;
+
+    // If query failed or profile missing from client-side table, check backend permissions endpoint
+    if (!resolvedProfile) {
+      try {
+        const { data: { session: curSession } } = await supabase.auth.getSession();
+        const localToken = typeof window !== 'undefined' ? localStorage.getItem('tiger_admin_token') : null;
+        const authToken = curSession?.access_token || localToken;
+        if (authToken) {
+          const res = await fetch('/api/admin/users/me/permissions', {
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${authToken}`
+            }
+          });
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success && json.user) {
+              resolvedProfile = {
+                id: json.user.id,
+                full_name: json.user.name || json.user.fullName || null,
+                role: json.user.role === 'ADMIN' ? 'SUB_ADMIN' : json.user.role,
+                active: json.user.active ?? true,
+                designation: json.user.designation || null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+            }
+          }
+        }
+      } catch {
+        // Fallback failed
+      }
     }
 
-    if (!adminProfile) {
+    if (!resolvedProfile) {
+      if (queryError) {
+        console.error('[AdminAuth] RLS or query error during authorization:', queryError);
+        setProfile(null);
+        setPermissions([]);
+        return {
+          authorized: false,
+          profile: null,
+          errorCode: 'RLS_ERROR',
+          errorReason: `Database Error: Unable to query admin profile (${queryError.message}). Check RLS policies.`
+        };
+      }
+
       console.warn(`[AdminAuth] Access Denied: User (${currentUser.id}) has no record in public.admin_profiles.`);
       setProfile(null);
+      setPermissions([]);
       return {
         authorized: false,
         profile: null,
@@ -148,9 +194,10 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
     }
 
-    if (!adminProfile.active) {
-      console.warn(`[AdminAuth] Access Denied: Admin profile (${adminProfile.id}) is inactive.`);
+    if (!resolvedProfile.active) {
+      console.warn(`[AdminAuth] Access Denied: Admin profile (${resolvedProfile.id}) is inactive.`);
       setProfile(null);
+      setPermissions([]);
       return {
         authorized: false,
         profile: null,
@@ -159,24 +206,80 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
     }
 
-    const normalizedRole = ((adminProfile.role || '').toUpperCase()) as AdminRole;
+    const normalizedRole = ((resolvedProfile.role || '').toUpperCase()) as AdminRole;
     if (ALLOWED_ADMIN_ROLES.includes(normalizedRole)) {
-      adminProfile.role = normalizedRole;
+      resolvedProfile.role = normalizedRole === 'ADMIN' ? 'SUB_ADMIN' : normalizedRole;
     }
 
-    if (!ALLOWED_ADMIN_ROLES.includes(adminProfile.role)) {
-      console.warn(`[AdminAuth] Access Denied: Role '${adminProfile.role}' is not permitted.`);
+    if (!ALLOWED_ADMIN_ROLES.includes(resolvedProfile.role)) {
+      console.warn(`[AdminAuth] Access Denied: Role '${resolvedProfile.role}' is not permitted.`);
       setProfile(null);
+      setPermissions([]);
       return {
         authorized: false,
         profile: null,
         errorCode: 'ROLE_UNAUTHORIZED',
-        errorReason: `Access Denied: Your role (${adminProfile.role}) does not have administrative dashboard access permissions.`
+        errorReason: `Access Denied: Your role (${resolvedProfile.role}) does not have administrative dashboard access permissions.`
       };
     }
 
-    setProfile(adminProfile);
-    return { authorized: true, profile: adminProfile };
+    setProfile(resolvedProfile);
+
+    // Fetch granular permissions
+    let userPermissions: PermissionKey[] = [];
+    if (resolvedProfile.role === 'SUPER_ADMIN') {
+      userPermissions = ALL_PERMISSIONS.map((p) => p.key);
+    } else {
+      try {
+        const { data: { session: curSession } } = await supabase.auth.getSession();
+        const localToken = typeof window !== 'undefined' ? localStorage.getItem('tiger_admin_token') : null;
+        const authToken = curSession?.access_token || localToken;
+        const res = await fetch('/api/admin/users/me/permissions', {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+          }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.permissions)) {
+            userPermissions = json.permissions;
+          }
+        }
+      } catch {
+        // fallback
+      }
+
+      if (userPermissions.length === 0) {
+        if (resolvedProfile.role === 'REGULAR_JOINING_OPERATOR') {
+          userPermissions = [
+            'dashboard.view',
+            'regular_joining.view',
+            'regular_joining.submissions',
+            'regular_joining.candidate_details',
+            'regular_joining.edit',
+            'regular_joining.verify',
+            'regular_joining.generate_slip',
+            'regular_joining.generate_id_card',
+            'regular_joining.download_docs',
+            'regular_joining.export_excel'
+          ];
+        } else if (resolvedProfile.role === 'DOCUMENT_VERIFIER') {
+          userPermissions = [
+            'dashboard.view',
+            'regular_joining.view',
+            'regular_joining.submissions',
+            'regular_joining.candidate_details',
+            'regular_joining.verify',
+            'documents.view',
+            'documents.download'
+          ];
+        }
+      }
+    }
+    setPermissions(userPermissions);
+
+    return { authorized: true, profile: resolvedProfile };
   }, [fetchAdminProfile]);
 
   // Initialize session on mount
@@ -199,10 +302,6 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         if (sessionError) {
           console.error('[AdminAuth] Session retrieval error:', sessionError.message);
-          if (mounted) {
-            setAuthLoading(false);
-          }
-          return;
         }
 
         if (initialSession?.user && mounted) {
@@ -213,6 +312,80 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           if (mounted) {
             setProfile(authResult.profile);
             setProfileLoading(false);
+          }
+        } else if (mounted) {
+          // Check for restored local admin session
+          const localToken = typeof window !== 'undefined' ? localStorage.getItem('tiger_admin_token') : null;
+          if (localToken) {
+            try {
+              const res = await fetch('/api/admin/users/me/permissions', {
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${localToken}`
+                }
+              });
+              if (res.ok) {
+                const json = await res.json();
+                if (json.success && json.user) {
+                  const restoredProfile: AdminProfileRow = {
+                    id: json.user.id,
+                    full_name: json.user.name || json.user.fullName || null,
+                    role: json.user.role === 'ADMIN' ? 'SUB_ADMIN' : json.user.role,
+                    active: json.user.active ?? true,
+                    designation: json.user.designation || null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  };
+
+                  const restoredUser: User = {
+                    id: json.user.id,
+                    app_metadata: {},
+                    user_metadata: { name: json.user.name },
+                    aud: 'authenticated',
+                    created_at: new Date().toISOString(),
+                    email: json.user.email
+                  };
+
+                  const restoredSession: Session = {
+                    access_token: localToken,
+                    token_type: 'bearer',
+                    expires_in: 86400,
+                    expires_at: Math.floor(Date.now() / 1000) + 86400,
+                    refresh_token: 'local_subadmin_refresh_token',
+                    user: restoredUser
+                  };
+
+                  if (!restoredProfile.active) {
+                    setError('Access Denied: Your administrator profile is currently marked inactive. Please contact the Super Administrator.');
+                    setErrorCode('PROFILE_INACTIVE');
+                    setProfile(null);
+                    setUser(null);
+                    setSession(null);
+                    setPermissions([]);
+                    if (typeof window !== 'undefined') {
+                      localStorage.removeItem('tiger_admin_token');
+                      localStorage.removeItem('tiger_admin_user');
+                      localStorage.removeItem('tiger_admin_profile');
+                      localStorage.removeItem('tiger_admin_permissions');
+                    }
+                  } else {
+                    setUser(restoredUser);
+                    setSession(restoredSession);
+                    setProfile(restoredProfile);
+                    setPermissions(json.permissions || []);
+                  }
+                } else {
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('tiger_admin_token');
+                    localStorage.removeItem('tiger_admin_user');
+                    localStorage.removeItem('tiger_admin_profile');
+                    localStorage.removeItem('tiger_admin_permissions');
+                  }
+                }
+              }
+            } catch (restoreErr) {
+              console.warn('[AdminAuth] Local session restoration error:', restoreErr);
+            }
           }
         }
       } catch (err) {
@@ -231,11 +404,15 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!mounted) return;
 
       if (event === 'SIGNED_OUT' || !newSession?.user) {
-        setSession(null);
-        setUser(null);
-        setProfile(null);
-        setProfileLoading(false);
-        setAuthLoading(false);
+        // If local token exists, don't clear on unrelated Supabase SIGNED_OUT
+        const localToken = typeof window !== 'undefined' ? localStorage.getItem('tiger_admin_token') : null;
+        if (!localToken) {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setProfileLoading(false);
+          setAuthLoading(false);
+        }
         return;
       }
 
@@ -280,12 +457,55 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     try {
       // 2. Perform Supabase authentication
+      const cleanEmail = email.trim().toLowerCase();
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+        email: cleanEmail,
         password
       });
 
       if (signInError) {
+        // Fallback: Check backend admin login endpoint (/api/admin/users/login)
+        try {
+          const res = await fetch('/api/admin/users/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: cleanEmail, password })
+          });
+          if (res.ok) {
+            const result = await res.json();
+            if (result.success && result.session && result.user) {
+              const localSession = result.session;
+              const localUser = result.user;
+              const localProfile = result.profile;
+              const localPermissions = result.permissions || [];
+
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('tiger_admin_token', localSession.access_token);
+                localStorage.setItem('tiger_admin_user', JSON.stringify(localUser));
+                localStorage.setItem('tiger_admin_profile', JSON.stringify(localProfile));
+                localStorage.setItem('tiger_admin_permissions', JSON.stringify(localPermissions));
+              }
+
+              setUser(localUser);
+              setSession(localSession);
+              setProfile(localProfile);
+              setPermissions(localPermissions);
+              setAuthLoading(false);
+              setProfileLoading(false);
+              setError(null);
+              setErrorCode(null);
+              return { success: true };
+            } else if (result.error && result.error.toLowerCase().includes('inactive')) {
+              setError(result.error);
+              setErrorCode('PROFILE_INACTIVE');
+              setAuthLoading(false);
+              return { success: false, error: result.error, errorCode: 'PROFILE_INACTIVE' };
+            }
+          }
+        } catch (fallbackErr) {
+          console.warn('[AdminAuth] Server admin login fallback error:', fallbackErr);
+        }
+
         let userMessage = signInError.message;
         let code: AdminAuthErrorCode = 'AUTH_ERROR';
 
@@ -329,7 +549,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setProfileLoading(false);
         setAuthLoading(false);
 
-        const deniedMsg = 'Invalid administrator credentials or unauthorized account.';
+        const deniedMsg = authResult.errorReason || 'Invalid administrator credentials or unauthorized account.';
         const code = authResult.errorCode || 'PROFILE_MISSING';
         setError(deniedMsg);
         setErrorCode(code);
@@ -362,11 +582,18 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const signOut = async (): Promise<void> => {
     setAuthLoading(true);
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('tiger_admin_token');
+        localStorage.removeItem('tiger_admin_user');
+        localStorage.removeItem('tiger_admin_profile');
+        localStorage.removeItem('tiger_admin_permissions');
+      }
       await supabase.auth.signOut();
     } finally {
       setUser(null);
       setSession(null);
       setProfile(null);
+      setPermissions([]);
       setError(null);
       setErrorCode(null);
       setProfileLoading(false);
@@ -460,16 +687,47 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const currentRole = useMemo<AdminRole | null>(() => {
     if (!profile?.role) return null;
-    return ((profile.role || '').toUpperCase()) as AdminRole;
+    const r = ((profile.role || '').toUpperCase()) as AdminRole;
+    if (r === 'ADMIN') return 'SUB_ADMIN';
+    return r;
   }, [profile]);
 
   const isSuperAdmin = useMemo(() => currentRole === 'SUPER_ADMIN', [currentRole]);
+  const isSubAdmin = useMemo(() => currentRole === 'SUB_ADMIN', [currentRole]);
   const isJoiningOperator = useMemo(() => currentRole === 'REGULAR_JOINING_OPERATOR', [currentRole]);
 
   // Overall loading state is true only while authorization is still resolving
   const loading = useMemo(() => {
     return adminState === 'AUTH_LOADING';
   }, [adminState]);
+
+  // Granular RBAC Check Helpers
+  const hasPermission = useCallback((key: PermissionKey | string): boolean => {
+    if (isSuperAdmin) return true;
+    if (!profile?.active) return false;
+    return permissions.includes(key as PermissionKey);
+  }, [isSuperAdmin, profile, permissions]);
+
+  const hasAnyPermission = useCallback((keys: (PermissionKey | string)[]): boolean => {
+    if (isSuperAdmin) return true;
+    if (!profile?.active) return false;
+    return keys.some((k) => permissions.includes(k as PermissionKey));
+  }, [isSuperAdmin, profile, permissions]);
+
+  const hasModuleAccess = useCallback((moduleName: ModuleKey | string): boolean => {
+    if (isSuperAdmin) return true;
+    if (!profile?.active) return false;
+    // Find all permissions under this module
+    const modulePerms = ALL_PERMISSIONS.filter(
+      (p) => p.module.toLowerCase() === moduleName.toLowerCase()
+    );
+    if (modulePerms.length === 0) {
+      // Fallback: key prefix check
+      const prefix = moduleName.toLowerCase().replace(/\s+/g, '_');
+      return permissions.some((k) => k.startsWith(prefix));
+    }
+    return modulePerms.some((p) => permissions.includes(p.key));
+  }, [isSuperAdmin, profile, permissions]);
 
   const value = useMemo<AdminAuthContextType>(() => ({
     user,
@@ -478,7 +736,12 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     role: currentRole,
     isAdmin,
     isSuperAdmin,
+    isSubAdmin,
     isJoiningOperator,
+    permissions,
+    hasPermission,
+    hasAnyPermission,
+    hasModuleAccess,
     adminState,
     loading,
     authLoading,
@@ -489,7 +752,30 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     sendSignInLink,
     signOut,
     refreshProfile
-  }), [user, session, profile, currentRole, isAdmin, isSuperAdmin, isJoiningOperator, adminState, loading, authLoading, profileLoading, error, errorCode, signIn, sendSignInLink, fetchAdminProfile, authorizeUser]);
+  }), [
+    user,
+    session,
+    profile,
+    currentRole,
+    isAdmin,
+    isSuperAdmin,
+    isSubAdmin,
+    isJoiningOperator,
+    permissions,
+    hasPermission,
+    hasAnyPermission,
+    hasModuleAccess,
+    adminState,
+    loading,
+    authLoading,
+    profileLoading,
+    error,
+    errorCode,
+    signIn,
+    sendSignInLink,
+    fetchAdminProfile,
+    authorizeUser
+  ]);
 
   return (
     <AdminAuthContext.Provider value={value}>

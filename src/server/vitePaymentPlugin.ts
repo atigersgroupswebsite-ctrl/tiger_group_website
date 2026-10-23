@@ -54,33 +54,106 @@ export function paymentApiPlugin(): Plugin {
           }
         }
 
-        // Handle privileged Admin Directory operations
-        if (url.startsWith('/api/admin/users')) {
+        // Handle privileged Admin Directory & Sub-Admin RBAC operations
+        if (url.startsWith('/api/admin/users') || url.startsWith('/api/admin/audit-logs') || url.startsWith('/api/admin/permissions')) {
           const method = req.method?.toUpperCase();
           const authHeader = req.headers['authorization'];
           try {
             const {
               listAdminUsersHandler,
+              createSubAdminHandler,
+              updateSubAdminPermissionsHandler,
+              resetSubAdminPasswordHandler,
+              deleteSubAdminHandler,
+              toggleAdminStatusHandler,
               inviteAdminUserHandler,
-              toggleAdminStatusHandler
-            } = await import('./adminServer');
+              getAdminAuditLogsHandler,
+              getCurrentUserPermissionsHandler,
+              adminLoginHandler
+            } = await import('./adminServer.js');
+            const { ALL_PERMISSIONS, PERMISSION_MODULES, ROLE_TEMPLATES } = await import('../types/rbac.js');
 
+            // Sub-Admin Direct / Fallback Login: POST /api/admin/users/login
+            if (url === '/api/admin/users/login' && method === 'POST') {
+              const rawBody = await parseRequestBody(req);
+              const body = JSON.parse(rawBody || '{}');
+              const result = await adminLoginHandler(body);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
+
+            // Public / Authorized catalog: GET /api/admin/permissions
+            if (url === '/api/admin/permissions' && method === 'GET') {
+              return sendJsonResponse(res, 200, {
+                success: true,
+                permissions: ALL_PERMISSIONS,
+                modules: PERMISSION_MODULES,
+                roleTemplates: ROLE_TEMPLATES
+              });
+            }
+
+            // Current user permissions: GET /api/admin/users/me/permissions
+            if (url === '/api/admin/users/me/permissions' && method === 'GET') {
+              const result = await getCurrentUserPermissionsHandler(authHeader);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
+
+            // Audit Logs: GET /api/admin/audit-logs
+            if (url.startsWith('/api/admin/audit-logs') && method === 'GET') {
+              const result = await getAdminAuditLogsHandler(authHeader);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
+
+            // List users: GET /api/admin/users
             if (url === '/api/admin/users' && method === 'GET') {
               const result = await listAdminUsersHandler(authHeader);
               return sendJsonResponse(res, result.status || 200, result.data);
             }
 
-            if (url === '/api/admin/users/invite' && method === 'POST') {
+            // Create Sub-Admin: POST /api/admin/users/create-sub-admin
+            if (url === '/api/admin/users/create-sub-admin' && method === 'POST') {
               const rawBody = await parseRequestBody(req);
               const body = JSON.parse(rawBody || '{}');
-              const result = await inviteAdminUserHandler(body, authHeader);
+              const result = await createSubAdminHandler(body, authHeader);
               return sendJsonResponse(res, result.status || 200, result.data);
             }
 
+            // Update Permissions: POST /api/admin/users/update-permissions
+            if (url === '/api/admin/users/update-permissions' && method === 'POST') {
+              const rawBody = await parseRequestBody(req);
+              const body = JSON.parse(rawBody || '{}');
+              const result = await updateSubAdminPermissionsHandler(body, authHeader);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
+
+            // Reset Password: POST /api/admin/users/reset-password
+            if (url === '/api/admin/users/reset-password' && method === 'POST') {
+              const rawBody = await parseRequestBody(req);
+              const body = JSON.parse(rawBody || '{}');
+              const result = await resetSubAdminPasswordHandler(body, authHeader);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
+
+            // Delete Sub-Admin: POST /api/admin/users/delete
+            if (url === '/api/admin/users/delete' && method === 'POST') {
+              const rawBody = await parseRequestBody(req);
+              const body = JSON.parse(rawBody || '{}');
+              const result = await deleteSubAdminHandler(body, authHeader);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
+
+            // Toggle Status: POST /api/admin/users/toggle-status
             if (url === '/api/admin/users/toggle-status' && method === 'POST') {
               const rawBody = await parseRequestBody(req);
               const body = JSON.parse(rawBody || '{}');
               const result = await toggleAdminStatusHandler(body, authHeader);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
+
+            // Legacy Invite: POST /api/admin/users/invite
+            if (url === '/api/admin/users/invite' && method === 'POST') {
+              const rawBody = await parseRequestBody(req);
+              const body = JSON.parse(rawBody || '{}');
+              const result = await inviteAdminUserHandler(body, authHeader);
               return sendJsonResponse(res, result.status || 200, result.data);
             }
 

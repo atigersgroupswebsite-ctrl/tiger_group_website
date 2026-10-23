@@ -31,7 +31,7 @@ import { AdminJoiningListPage } from './pages/admin/AdminJoiningListPage';
 import { AdminJoiningDetailPage } from './pages/admin/AdminJoiningDetailPage';
 import { AdminRegularJoiningPage } from './pages/admin/AdminRegularJoiningPage';
 import { AdminRegularJoiningListPage } from './pages/admin/AdminRegularJoiningListPage';
-import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+import { AdminManagementPage } from './pages/admin/AdminManagementPage';
 import { AdminCompaniesPage } from './pages/admin/AdminCompaniesPage';
 import { AdminCompanyDetailPage } from './pages/admin/AdminCompanyDetailPage';
 import { AdminJobsPage } from './pages/admin/AdminJobsPage';
@@ -102,8 +102,10 @@ export const App: React.FC = () => {
               <Route path="regular-joining" element={<AdminRegularJoiningPage />} />
               <Route path="regular-joining/:id" element={<AdminRegularJoiningPage />} />
               <Route path="regular-joining-list" element={<AdminRegularJoiningListPage />} />
-              <Route path="admin-users" element={<AdminUsersPage />} />
-              <Route path="settings/admin-users" element={<AdminUsersPage />} />
+              <Route path="admin-management" element={<AdminManagementPage />} />
+              <Route path="sub-admins" element={<AdminManagementPage />} />
+              <Route path="admin-users" element={<AdminManagementPage />} />
+              <Route path="settings/admin-users" element={<AdminManagementPage />} />
               <Route path="exports" element={<AdminExportsPage />} />
 
               {/* Management Suite Modules */}

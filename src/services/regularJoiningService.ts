@@ -10,7 +10,7 @@
 // ==============================================================================
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
-import type { DocumentType, DocumentRow, EmployeeRow } from '../types/database';
+import type { DocumentType, DocumentRow, EmployeeRow, DocumentSide } from '../types/database';
 import { logActivity } from './activityService';
 import {
   generateAndPersistEmployeeIdCard,
@@ -24,6 +24,7 @@ export interface RegularJoiningDocItem {
   storagePath?: string;
   dataUrl?: string;
   verified?: boolean;
+  side?: DocumentSide;
 }
 
 export interface RegularJoiningFormData {
@@ -66,7 +67,9 @@ export interface RegularJoiningFormData {
   // Section D: Documents
   photo: RegularJoiningDocItem | null;
   aadhaar: RegularJoiningDocItem | null;
+  aadhaarBack?: RegularJoiningDocItem | null;
   bankPassbook: RegularJoiningDocItem | null;
+  bankPassbookBack?: RegularJoiningDocItem | null;
   signature: RegularJoiningDocItem | null;
 
   // Metadata
@@ -271,7 +274,9 @@ export async function saveRegularJoiningForm(
       documentsMetadata: {
         photo: formData.photo ? { name: formData.photo.name, storagePath: formData.photo.storagePath } : null,
         aadhaar: formData.aadhaar ? { name: formData.aadhaar.name, storagePath: formData.aadhaar.storagePath } : null,
+        aadhaarBack: formData.aadhaarBack ? { name: formData.aadhaarBack.name, storagePath: formData.aadhaarBack.storagePath } : null,
         bankPassbook: formData.bankPassbook ? { name: formData.bankPassbook.name, storagePath: formData.bankPassbook.storagePath } : null,
+        bankPassbookBack: formData.bankPassbookBack ? { name: formData.bankPassbookBack.name, storagePath: formData.bankPassbookBack.storagePath } : null,
         signature: formData.signature ? { name: formData.signature.name, storagePath: formData.signature.storagePath } : null
       }
     };
@@ -430,30 +435,38 @@ export async function saveRegularJoiningForm(
  * Synchronizes uploaded document references into public.documents table.
  */
 async function syncDocumentsTable(formId: string, data: RegularJoiningFormData) {
-  const docSpecs: Array<{ type: DocumentType; item: RegularJoiningDocItem | null }> = [
-    { type: 'PHOTO', item: data.photo },
-    { type: 'AADHAAR', item: data.aadhaar },
-    { type: 'BANK_PASSBOOK', item: data.bankPassbook },
-    { type: 'SIGNATURE', item: data.signature }
+  const docSpecs: Array<{ type: DocumentType; side: DocumentSide; item: RegularJoiningDocItem | null }> = [
+    { type: 'PHOTO', side: 'SINGLE', item: data.photo },
+    { type: 'AADHAAR', side: 'FRONT', item: data.aadhaar },
+    { type: 'AADHAAR', side: 'BACK', item: data.aadhaarBack || null },
+    { type: 'BANK_PASSBOOK', side: 'FRONT', item: data.bankPassbook },
+    { type: 'BANK_PASSBOOK', side: 'BACK', item: data.bankPassbookBack || null },
+    { type: 'SIGNATURE', side: 'SINGLE', item: data.signature }
   ];
 
-  for (const { type, item } of docSpecs) {
+  for (const { type, side, item } of docSpecs) {
     if (!item?.storagePath) continue;
 
     try {
       // Check if document already exists
-      const { data: existingDoc } = await supabase
+      let query = supabase
         .from('documents')
         .select('id')
         .eq('joining_form_id', formId)
-        .eq('document_type', type)
-        .maybeSingle();
+        .eq('document_type', type);
+
+      if (side) {
+        query = query.eq('document_side', side);
+      }
+
+      const { data: existingDoc } = await query.maybeSingle();
 
       const docPayload: any = {
         joining_form_id: formId,
         document_type: type,
+        document_side: side || 'SINGLE',
         storage_path: item.storagePath,
-        original_file_name: item.name || `${type.toLowerCase()}.jpg`,
+        original_file_name: item.name || `${type.toLowerCase()}_${(side || 'single').toLowerCase()}.jpg`,
         mime_type: item.type || 'image/jpeg',
         file_size: item.size || 0,
         verification_status: 'VERIFIED',
@@ -473,7 +486,7 @@ async function syncDocumentsTable(formId: string, data: RegularJoiningFormData) 
           .insert(docPayload);
       }
     } catch (docErr) {
-      console.warn(`[syncDocumentsTable] Could not sync doc ${type}:`, docErr);
+      console.warn(`[syncDocumentsTable] Could not sync doc ${type} (${side}):`, docErr);
     }
   }
 }
@@ -604,14 +617,20 @@ export async function getRegularJoiningForm(id: string): Promise<RegularJoiningR
 
     const custom = (formRow.custom_fields || {}) as any;
 
-    const findDocItem = (type: DocumentType, fallbackPath?: string | null): RegularJoiningDocItem | null => {
-      const found = docList.find((d) => d.document_type === type);
+    const findDocItem = (type: DocumentType, side?: DocumentSide, fallbackPath?: string | null): RegularJoiningDocItem | null => {
+      let found = side
+        ? docList.find((d) => d.document_type === type && d.document_side === side)
+        : docList.find((d) => d.document_type === type);
+      if (!found && side === 'FRONT') {
+        found = docList.find((d) => d.document_type === type && (!d.document_side || d.document_side === 'FRONT'));
+      }
       if (found && found.storage_path) {
         return {
-          name: found.original_file_name || `${type.toLowerCase()}.jpg`,
+          name: found.original_file_name || `${type.toLowerCase()}_${(side || 'single').toLowerCase()}.jpg`,
           size: found.file_size || 0,
           type: found.mime_type || 'image/jpeg',
           storagePath: found.storage_path,
+          side: found.document_side,
           verified: found.verification_status === 'VERIFIED'
         };
       }
@@ -620,28 +639,42 @@ export async function getRegularJoiningForm(id: string): Promise<RegularJoiningR
           name: `${type.toLowerCase()}.jpg`,
           size: 0,
           type: 'image/jpeg',
-          storagePath: fallbackPath
+          storagePath: fallbackPath,
+          side
         };
       }
       return null;
     };
 
-    const photoItem = findDocItem('PHOTO', formRow.photo_path);
-    const aadhaarItem = findDocItem('AADHAAR');
-    const passbookItem = findDocItem('BANK_PASSBOOK');
-    const signatureItem = findDocItem('SIGNATURE', formRow.candidate_signature_path);
+    const photoItem: RegularJoiningDocItem | null = findDocItem('PHOTO', 'SINGLE', formRow.photo_path);
+    const aadhaarItem: RegularJoiningDocItem | null = findDocItem('AADHAAR', 'FRONT') || (custom.documentsMetadata?.aadhaar ? { name: custom.documentsMetadata.aadhaar.name, size: 0, type: 'image/jpeg', storagePath: custom.documentsMetadata.aadhaar.storagePath, side: 'FRONT' } : null);
+    const aadhaarBackItem: RegularJoiningDocItem | null = findDocItem('AADHAAR', 'BACK') || (custom.documentsMetadata?.aadhaarBack ? { name: custom.documentsMetadata.aadhaarBack.name, size: 0, type: 'image/jpeg', storagePath: custom.documentsMetadata.aadhaarBack.storagePath, side: 'BACK' } : null);
+    const passbookItem: RegularJoiningDocItem | null = findDocItem('BANK_PASSBOOK', 'FRONT') || (custom.documentsMetadata?.bankPassbook ? { name: custom.documentsMetadata.bankPassbook.name, size: 0, type: 'image/jpeg', storagePath: custom.documentsMetadata.bankPassbook.storagePath, side: 'FRONT' } : null);
+    const passbookBackItem: RegularJoiningDocItem | null = findDocItem('BANK_PASSBOOK', 'BACK') || (custom.documentsMetadata?.bankPassbookBack ? { name: custom.documentsMetadata.bankPassbookBack.name, size: 0, type: 'image/jpeg', storagePath: custom.documentsMetadata.bankPassbookBack.storagePath, side: 'BACK' } : null);
+    const signatureItem: RegularJoiningDocItem | null = findDocItem('SIGNATURE', 'SINGLE', formRow.candidate_signature_path);
 
     // Concurrently generate signed URLs for all documents
-    const [photoSignedUrl, aadhaarSignedUrl, passbookSignedUrl, sigSignedUrl] = await Promise.all([
+    const [
+      photoSignedUrl,
+      aadhaarSignedUrl,
+      aadhaarBackSignedUrl,
+      passbookSignedUrl,
+      passbookBackSignedUrl,
+      sigSignedUrl
+    ] = await Promise.all([
       resolveDocSignedUrl(photoItem?.storagePath),
       resolveDocSignedUrl(aadhaarItem?.storagePath),
+      resolveDocSignedUrl(aadhaarBackItem?.storagePath),
       resolveDocSignedUrl(passbookItem?.storagePath),
+      resolveDocSignedUrl(passbookBackItem?.storagePath),
       resolveDocSignedUrl(signatureItem?.storagePath)
     ]);
 
     if (photoItem && photoSignedUrl) photoItem.dataUrl = photoSignedUrl;
     if (aadhaarItem && aadhaarSignedUrl) aadhaarItem.dataUrl = aadhaarSignedUrl;
+    if (aadhaarBackItem && aadhaarBackSignedUrl) aadhaarBackItem.dataUrl = aadhaarBackSignedUrl;
     if (passbookItem && passbookSignedUrl) passbookItem.dataUrl = passbookSignedUrl;
+    if (passbookBackItem && passbookBackSignedUrl) passbookBackItem.dataUrl = passbookBackSignedUrl;
     if (signatureItem && sigSignedUrl) signatureItem.dataUrl = sigSignedUrl;
 
     const formData: RegularJoiningFormData = {
@@ -680,7 +713,9 @@ export async function getRegularJoiningForm(id: string): Promise<RegularJoiningR
 
       photo: photoItem,
       aadhaar: aadhaarItem,
+      aadhaarBack: aadhaarBackItem,
       bankPassbook: passbookItem,
+      bankPassbookBack: passbookBackItem,
       signature: signatureItem,
 
       submissionStatus: (formRow.submission_status as any) || 'DRAFT',
@@ -946,10 +981,16 @@ export async function listRegularJoiningForms(): Promise<RegularJoiningResult<Re
           ? { name: custom.documentsMetadata.photo.name || 'photo.jpg', size: 0, type: 'image/jpeg', storagePath: custom.documentsMetadata.photo.storagePath }
           : null,
         aadhaar: custom.documentsMetadata?.aadhaar
-          ? { name: custom.documentsMetadata.aadhaar.name || 'aadhaar.jpg', size: 0, type: 'image/jpeg', storagePath: custom.documentsMetadata.aadhaar.storagePath }
+          ? { name: custom.documentsMetadata.aadhaar.name || 'aadhaar.jpg', size: 0, type: 'image/jpeg', storagePath: custom.documentsMetadata.aadhaar.storagePath, side: 'FRONT' as DocumentSide }
+          : null,
+        aadhaarBack: custom.documentsMetadata?.aadhaarBack
+          ? { name: custom.documentsMetadata.aadhaarBack.name || 'aadhaar_back.jpg', size: 0, type: 'image/jpeg', storagePath: custom.documentsMetadata.aadhaarBack.storagePath, side: 'BACK' as DocumentSide }
           : null,
         bankPassbook: custom.documentsMetadata?.bankPassbook
-          ? { name: custom.documentsMetadata.bankPassbook.name || 'bank_passbook.jpg', size: 0, type: 'image/jpeg', storagePath: custom.documentsMetadata.bankPassbook.storagePath }
+          ? { name: custom.documentsMetadata.bankPassbook.name || 'bank_passbook.jpg', size: 0, type: 'image/jpeg', storagePath: custom.documentsMetadata.bankPassbook.storagePath, side: 'FRONT' as DocumentSide }
+          : null,
+        bankPassbookBack: custom.documentsMetadata?.bankPassbookBack
+          ? { name: custom.documentsMetadata.bankPassbookBack.name || 'bank_passbook_back.jpg', size: 0, type: 'image/jpeg', storagePath: custom.documentsMetadata.bankPassbookBack.storagePath, side: 'BACK' as DocumentSide }
           : null,
         signature: row.candidate_signature_path
           ? { name: 'signature.png', size: 0, type: 'image/png', storagePath: row.candidate_signature_path }

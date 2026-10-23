@@ -37,6 +37,8 @@ export const ADMIN_ROUTES = {
   settings: '/admin/settings',
   joiningFormSettings: '/admin/joining-form-settings',
   adminUsers: '/admin/admin-users',
+  adminManagement: '/admin/admin-management',
+  subAdmins: '/admin/sub-admins',
   settingsAdminUsers: '/admin/settings/admin-users'
 } as const;
 

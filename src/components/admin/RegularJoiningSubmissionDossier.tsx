@@ -69,8 +69,13 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
   onRefresh
 }) => {
   const navigate = useNavigate();
-  const { isJoiningOperator, role } = useAdminAuth();
+  const { isJoiningOperator, role, isSuperAdmin, hasPermission } = useAdminAuth();
   const isOperator = isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR';
+
+  // Granular capability flags
+  const canGenerateSlip = isSuperAdmin || hasPermission('regular_joining.generate_slip') || role !== 'SUB_ADMIN';
+  const canGenerateIdCard = isSuperAdmin || hasPermission('regular_joining.generate_id_card') || role !== 'SUB_ADMIN';
+  const canDownloadDocs = isSuperAdmin || hasPermission('regular_joining.download_docs') || role !== 'SUB_ADMIN';
 
   // Verification & Action states
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
@@ -493,105 +498,113 @@ export const RegularJoiningSubmissionDossier: React.FC<RegularJoiningSubmissionD
         {/* Action Buttons in Top Bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           {/* Download Complete Joining Document Button */}
-          <button
-            type="button"
-            onClick={handleDownloadCompleteDoc}
-            disabled={isDownloadingCompleteDoc}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.55rem 1rem',
-              backgroundColor: '#0F1B38',
-              color: '#C5A059',
-              border: '1px solid #C5A059',
-              borderRadius: '6px',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              cursor: isDownloadingCompleteDoc ? 'not-allowed' : 'pointer',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-            }}
-          >
-            {isDownloadingCompleteDoc ? <Loader2 size={15} className="admin-spinner" /> : <Download size={15} />}
-            <span>Download Complete Joining Document</span>
-          </button>
-
-          {/* View Complete Document & Undertaking Modal Button */}
-          <button
-            type="button"
-            onClick={() => setIsCompleteDocModalOpen(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.55rem 1rem',
-              backgroundColor: '#F8FAFC',
-              color: '#0F1B38',
-              border: '1px solid #CBD5E1',
-              borderRadius: '6px',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            <FileBadge2 size={15} style={{ color: '#C5A059' }} />
-            <span>Complete Document & Undertaking</span>
-          </button>
-
-          {isVerified ? (
+          {canDownloadDocs && (
             <>
-              {/* Generate Employee Reference Slip Button */}
               <button
                 type="button"
-                onClick={() => setIsReferenceSlipModalOpen(true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  padding: '0.55rem 1rem',
-                  backgroundColor: '#C5A059',
-                  color: '#0F1B38',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                }}
-              >
-                <FileCheck2 size={16} />
-                <span>Generate Employee Reference Slip</span>
-              </button>
-
-              {/* Generate Employee ID Card Action */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isOperator && employee?.id) {
-                    navigate(`/admin/employees/${employee.id}`);
-                  } else {
-                    document.getElementById('id-card-governance')?.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }}
+                onClick={handleDownloadCompleteDoc}
+                disabled={isDownloadingCompleteDoc}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.45rem',
                   padding: '0.55rem 1rem',
                   backgroundColor: '#0F1B38',
-                  color: '#FFFFFF',
-                  border: 'none',
+                  color: '#C5A059',
+                  border: '1px solid #C5A059',
                   borderRadius: '6px',
                   fontSize: '0.85rem',
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: isDownloadingCompleteDoc ? 'not-allowed' : 'pointer',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}
               >
-                <CreditCard size={15} style={{ color: '#C5A059' }} />
-                <span>Generate Employee ID Card</span>
-                {!isOperator && <ExternalLink size={13} />}
+                {isDownloadingCompleteDoc ? <Loader2 size={15} className="admin-spinner" /> : <Download size={15} />}
+                <span>Download Complete Joining Document</span>
               </button>
+
+              {/* View Complete Document & Undertaking Modal Button */}
+              <button
+                type="button"
+                onClick={() => setIsCompleteDocModalOpen(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  padding: '0.55rem 1rem',
+                  backgroundColor: '#F8FAFC',
+                  color: '#0F1B38',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <FileBadge2 size={15} style={{ color: '#C5A059' }} />
+                <span>Complete Document & Undertaking</span>
+              </button>
+            </>
+          )}
+
+          {isVerified ? (
+            <>
+              {/* Generate Employee Reference Slip Button */}
+              {canGenerateSlip && (
+                <button
+                  type="button"
+                  onClick={() => setIsReferenceSlipModalOpen(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    padding: '0.55rem 1rem',
+                    backgroundColor: '#C5A059',
+                    color: '#0F1B38',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  <FileCheck2 size={16} />
+                  <span>Generate Employee Reference Slip</span>
+                </button>
+              )}
+
+              {/* Generate Employee ID Card Action */}
+              {canGenerateIdCard && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isOperator && employee?.id) {
+                      navigate(`/admin/employees/${employee.id}`);
+                    } else {
+                      document.getElementById('id-card-governance')?.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    padding: '0.55rem 1rem',
+                    backgroundColor: '#0F1B38',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  <CreditCard size={15} style={{ color: '#C5A059' }} />
+                  <span>Generate Employee ID Card</span>
+                  {!isOperator && <ExternalLink size={13} />}
+                </button>
+              )}
             </>
           ) : isPending ? (
             <>

@@ -17,8 +17,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import type { RegularJoiningFormData } from './regularJoiningService';
 import { persistGeneratedDocument } from './filePersistenceService';
 import {
-  getActiveCompanySignatureDataUrl,
-  getActiveCompanyStampDataUrl
+  getActiveCompanySignatureDataUrl
 } from './companySignatureService';
 
 export interface BuildRegularReferenceSlipOptions {
@@ -181,26 +180,8 @@ export async function buildRegularReferenceSlipPdf(
     }
   }
 
-  // 2. Resolve authentic official company stamp
-  let companyStampImage: any = null;
-  let stampSource = options?.companyStampUrlOrData || (formData as any)?.custom_fields?.companyStampUrl;
-  if (!stampSource) {
-    try {
-      stampSource = await getActiveCompanyStampDataUrl();
-    } catch (_) {}
-  }
-  if (stampSource) {
-    try {
-      const resolvedStamp = await resolveImageBytes(stampSource);
-      if (resolvedStamp) {
-        companyStampImage = resolvedStamp.isPng
-          ? await pdfDoc.embedPng(resolvedStamp.bytes)
-          : await pdfDoc.embedJpg(resolvedStamp.bytes);
-      }
-    } catch (stampErr) {
-      console.warn('[buildRegularReferenceSlipPdf] Could not embed company stamp:', stampErr);
-    }
-  }
+  // Note: Official Company Seal / Stamp (companyStampImage) removed from Reference Slip PDF per specification.
+  // Options companyStampUrlOrData remains accepted on BuildRegularReferenceSlipOptions for backward compatibility.
 
   // 3. Resolve authentic authorized signatory signature
   let companySignatureImage: any = null;
@@ -641,94 +622,101 @@ export async function buildRegularReferenceSlipPdf(
     color: isVerified ? rgb(0.02, 0.47, 0.34) : rgb(0.71, 0.33, 0.04)
   });
 
-  // Left Seal / Stamp Box
-  const sealBoxX = MARGIN_X + 14;
-  const sealBoxY = bottomY + 10;
-  const sealBoxW = 240;
-  const sealBoxH = 120;
+  // Left Side: Official Authorization & Verification Details
+  const authInfoX = MARGIN_X + 16;
+  const authInfoY = bottomY + bottomH - 36;
 
-  page.drawRectangle({
-    x: sealBoxX,
-    y: sealBoxY,
-    width: sealBoxW,
-    height: sealBoxH,
-    borderColor: borderLight,
-    borderWidth: 1,
-    color: white
-  });
-
-  page.drawText('OFFICIAL COMPANY SEAL / STAMP', {
-    x: sealBoxX + 10,
-    y: sealBoxY + sealBoxH - 14,
-    size: 7.5,
+  page.drawText('OFFICIAL AUTHORIZATION DETAILS', {
+    x: authInfoX,
+    y: authInfoY,
+    size: 8,
     font: helveticaBold,
     color: navy
   });
 
-  if (companyStampImage) {
-    const maxImgW = sealBoxW - 24;
-    const maxImgH = sealBoxH - 36;
-    const ratio = companyStampImage.width / companyStampImage.height;
-    let drawW = maxImgW;
-    let drawH = drawW / ratio;
-    if (drawH > maxImgH) {
-      drawH = maxImgH;
-      drawW = drawH * ratio;
-    }
-    const drawX = sealBoxX + (sealBoxW - drawW) / 2;
-    const drawY = sealBoxY + 16 + (maxImgH - drawH) / 2;
-    page.drawImage(companyStampImage, {
-      x: drawX,
-      y: drawY,
-      width: drawW,
-      height: drawH
-    });
-  } else {
-    // Professional placeholder warning when not uploaded
-    page.drawRectangle({
-      x: sealBoxX + 12,
-      y: sealBoxY + 22,
-      width: sealBoxW - 24,
-      height: sealBoxH - 44,
-      borderColor: rgb(0.9, 0.8, 0.7),
-      borderWidth: 0.75,
-      color: rgb(0.99, 0.98, 0.97)
-    });
-    page.drawText('[ OFFICIAL COMPANY STAMP ]', {
-      x: sealBoxX + 46,
-      y: sealBoxY + 68,
-      size: 8,
-      font: helveticaBold,
-      color: rgb(0.65, 0.45, 0.15)
-    });
-    page.drawText('Status: Pending Administrative Upload', {
-      x: sealBoxX + 38,
-      y: sealBoxY + 52,
-      size: 7,
-      font: helveticaOblique,
-      color: textMuted
-    });
-    page.drawText('(Upload official company stamp in Admin Settings)', {
-      x: sealBoxX + 22,
-      y: sealBoxY + 38,
-      size: 6.5,
-      font: helvetica,
-      color: textMuted
-    });
-  }
-
-  page.drawText('A TIGER GLOBAL Career Solution & Consultancy', {
-    x: sealBoxX + 10,
-    y: sealBoxY + 6,
-    size: 6.5,
+  page.drawText('Document Type', {
+    x: authInfoX,
+    y: authInfoY - 16,
+    size: 7.2,
+    font: helveticaBold,
+    color: darkSlate
+  });
+  page.drawText(':', { x: authInfoX + 78, y: authInfoY - 16, size: 7.2, font: helveticaBold, color: textMuted });
+  page.drawText('Employee Reference Slip', {
+    x: authInfoX + 88,
+    y: authInfoY - 16,
+    size: 7.2,
     font: helvetica,
+    color: textBody
+  });
+
+  page.drawText('Reference No.', {
+    x: authInfoX,
+    y: authInfoY - 30,
+    size: 7.2,
+    font: helveticaBold,
+    color: darkSlate
+  });
+  page.drawText(':', { x: authInfoX + 78, y: authInfoY - 30, size: 7.2, font: helveticaBold, color: textMuted });
+  page.drawText(formData.employeeCode || 'ATG-501-2026', {
+    x: authInfoX + 88,
+    y: authInfoY - 30,
+    size: 7.2,
+    font: helveticaBold,
+    color: navy
+  });
+
+  page.drawText('Issuing Entity', {
+    x: authInfoX,
+    y: authInfoY - 44,
+    size: 7.2,
+    font: helveticaBold,
+    color: darkSlate
+  });
+  page.drawText(':', { x: authInfoX + 78, y: authInfoY - 44, size: 7.2, font: helveticaBold, color: textMuted });
+  page.drawText('A TIGER GLOBAL Career Solution & Consultancy', {
+    x: authInfoX + 88,
+    y: authInfoY - 44,
+    size: 7,
+    font: helvetica,
+    color: textBody
+  });
+
+  page.drawText('Authorization', {
+    x: authInfoX,
+    y: authInfoY - 58,
+    size: 7.2,
+    font: helveticaBold,
+    color: darkSlate
+  });
+  page.drawText(':', { x: authInfoX + 78, y: authInfoY - 58, size: 7.2, font: helveticaBold, color: textMuted });
+  page.drawText(isVerified ? 'Verified & Approved Onboarding' : 'Provisional Reference Instrument', {
+    x: authInfoX + 88,
+    y: authInfoY - 58,
+    size: 7,
+    font: helvetica,
+    color: isVerified ? rgb(0.02, 0.47, 0.34) : rgb(0.71, 0.33, 0.04)
+  });
+
+  page.drawText('This reference slip is an authorized onboarding instrument issued for candidate placement.', {
+    x: authInfoX,
+    y: authInfoY - 76,
+    size: 6.8,
+    font: helveticaOblique,
+    color: textMuted
+  });
+  page.drawText('Official authentication is confirmed by the Corporate Onboarding Authority signature.', {
+    x: authInfoX,
+    y: authInfoY - 88,
+    size: 6.8,
+    font: helveticaOblique,
     color: textMuted
   });
 
   // Right Signatory Box
-  const sigBoxX = MARGIN_X + CONTENT_WIDTH - 254;
+  const sigBoxX = MARGIN_X + CONTENT_WIDTH - 250;
   const sigBoxY = bottomY + 10;
-  const sigBoxW = 240;
+  const sigBoxW = 238;
   const sigBoxH = 120;
 
   page.drawRectangle({
@@ -801,19 +789,26 @@ export async function buildRegularReferenceSlipPdf(
     color: borderLight
   });
 
-  page.drawText('A TIGER GLOBAL CAREER SOLUTION & CONSULTANCY', {
-    x: sigBoxX + 10,
+  // Company Name - Centered beneath signature area
+  const compName = 'A TIGER GLOBAL CAREER SOLUTION & CONSULTANCY';
+  const compNameWidth = helveticaBold.widthOfTextAtSize(compName, 6.8);
+  page.drawText(compName, {
+    x: sigBoxX + (sigBoxW - compNameWidth) / 2,
     y: sigBoxY + 18,
-    size: 7,
+    size: 6.8,
     font: helveticaBold,
     color: darkSlate
   });
-  page.drawText('(Corporate Onboarding Authority)', {
-    x: sigBoxX + 10,
+
+  // Signatory Title - Centered "AUTHORIZED SIGNATURE" label beneath signature area
+  const authSigLabel = 'AUTHORIZED SIGNATURE';
+  const authSigLabelWidth = helveticaBold.widthOfTextAtSize(authSigLabel, 7.5);
+  page.drawText(authSigLabel, {
+    x: sigBoxX + (sigBoxW - authSigLabelWidth) / 2,
     y: sigBoxY + 7,
-    size: 6.5,
-    font: helveticaOblique,
-    color: textMuted
+    size: 7.5,
+    font: helveticaBold,
+    color: navy
   });
 
   return await pdfDoc.save();

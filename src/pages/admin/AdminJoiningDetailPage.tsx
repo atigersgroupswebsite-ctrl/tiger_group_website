@@ -46,13 +46,16 @@ import type { JoiningFormData } from '../../types/joining';
 export const AdminJoiningDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { profile, isJoiningOperator } = useAdminAuth();
+  const { profile, isJoiningOperator, isSuperAdmin, hasPermission } = useAdminAuth();
   const canVerify =
-    profile?.role === 'SUPER_ADMIN' ||
-    profile?.role === 'DOCUMENT_VERIFIER' ||
-    profile?.role === 'COORDINATOR' ||
-    profile?.role === 'REGULAR_JOINING_OPERATOR' ||
-    isJoiningOperator;
+    isSuperAdmin ||
+    hasPermission('regular_joining.verify') ||
+    (profile?.role !== 'SUB_ADMIN' && (
+      profile?.role === 'DOCUMENT_VERIFIER' ||
+      profile?.role === 'COORDINATOR' ||
+      profile?.role === 'REGULAR_JOINING_OPERATOR' ||
+      isJoiningOperator
+    ));
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);

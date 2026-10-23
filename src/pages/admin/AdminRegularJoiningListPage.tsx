@@ -47,8 +47,13 @@ import {
   exportIndividualRegularJoiningXlsx
 } from '../../services/regularJoiningExportService';
 import { formatIndianPhoneNumber } from '../../utils/phoneUtils';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 export const AdminRegularJoiningListPage: React.FC = () => {
+  const { isSuperAdmin, role, hasPermission } = useAdminAuth();
+  const canExportExcel = isSuperAdmin || hasPermission('regular_joining.export_excel') || hasPermission('reports.download_excel') || role !== 'SUB_ADMIN';
+  const canGenerateSlip = isSuperAdmin || hasPermission('regular_joining.generate_slip') || role !== 'SUB_ADMIN';
+
   const [items, setItems] = useState<RegularJoiningFormData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -391,6 +396,7 @@ export const AdminRegularJoiningListPage: React.FC = () => {
       )}
 
       {/* Excel Export Toolbar Section */}
+      {canExportExcel && (
       <div
         style={{
           display: 'flex',
@@ -496,6 +502,7 @@ export const AdminRegularJoiningListPage: React.FC = () => {
           </button>
         </div>
       </div>
+      )}
 
       {/* Comprehensive Filter Toolbar */}
       <div
@@ -751,21 +758,23 @@ export const AdminRegularJoiningListPage: React.FC = () => {
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                           {/* Individual Excel Export Button */}
-                          <button
-                            type="button"
-                            onClick={() => handleExportIndividual(item)}
-                            disabled={isIndividualExporting}
-                            className="btn btn-outline btn-sm"
-                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#059669', borderColor: '#A7F3D0' }}
-                            title="Download Individual Employee Details (Excel .xlsx)"
-                          >
-                            {isIndividualExporting ? (
-                              <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                            ) : (
-                              <FileSpreadsheet size={13} />
-                            )}
-                            <span>Excel</span>
-                          </button>
+                          {canExportExcel && (
+                            <button
+                              type="button"
+                              onClick={() => handleExportIndividual(item)}
+                              disabled={isIndividualExporting}
+                              className="btn btn-outline btn-sm"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#059669', borderColor: '#A7F3D0' }}
+                              title="Download Individual Employee Details (Excel .xlsx)"
+                            >
+                              {isIndividualExporting ? (
+                                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                              ) : (
+                                <FileSpreadsheet size={13} />
+                              )}
+                              <span>Excel</span>
+                            </button>
+                          )}
 
                           {/* View / Edit */}
                           <Link
@@ -778,8 +787,8 @@ export const AdminRegularJoiningListPage: React.FC = () => {
                             <span>{isVerified ? 'View' : 'Edit'}</span>
                           </Link>
 
-                          {/* Reference Slip Actions (Only for Verified) */}
-                          {isVerified && (
+                          {/* Reference Slip Actions (Only for Verified + Permitted) */}
+                          {isVerified && canGenerateSlip && (
                             <>
                               <button
                                 onClick={() => setSelectedSlipRecord(item)}
