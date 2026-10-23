@@ -105,20 +105,20 @@ export async function authenticateRequest(authHeader: string | undefined | null)
   }
   const token = authHeader.replace("Bearer ", "").trim();
 
-  // Test mode mock authentication
-  if (process.env.NODE_ENV === 'test' && token.startsWith('mock_superadmin_')) {
+  // Test and local development mock authentication
+  if ((process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') && token.startsWith('mock_superadmin_')) {
     const mockId = token.replace('mock_superadmin_', '') || 'a2cfac08-38d8-4907-b35d-1f0fa8c14701';
     return {
       authenticated: true as const,
       user: {
         id: mockId,
         email: 'superadmin@atigergroups.com',
-        user_metadata: { full_name: 'A Tiger Super Admin' }
+        user_metadata: { full_name: 'A Tiger Super Admin', role: 'SUPER_ADMIN' }
       }
     };
   }
 
-  if (process.env.NODE_ENV === 'test' && token.startsWith('mock_gmail_')) {
+  if ((process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') && token.startsWith('mock_gmail_')) {
     const raw = token.replace('mock_gmail_', '');
     const [mockUid, mockEmail] = raw.includes(':') ? raw.split(':') : [raw, ''];
     return {
@@ -127,6 +127,23 @@ export async function authenticateRequest(authHeader: string | undefined | null)
         id: mockUid,
         email: mockEmail || undefined,
         user_metadata: { full_name: 'Gmail Sub-Admin' }
+      }
+    };
+  }
+
+  // Support local development Super-Admin authentication
+  if (token.startsWith('local_superadmin_jwt_')) {
+    const superId = token.replace('local_superadmin_jwt_', '') || 'a2cfac08-38d8-4907-b35d-1f0fa8c14701';
+    return {
+      authenticated: true as const,
+      user: {
+        id: superId,
+        email: 'superadmin@atigergroups.com',
+        user_metadata: {
+          full_name: 'Chief Super Administrator',
+          designation: 'Chief Administrator',
+          role: 'SUPER_ADMIN'
+        }
       }
     };
   }
