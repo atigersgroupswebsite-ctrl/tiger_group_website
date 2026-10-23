@@ -30,13 +30,16 @@ import {
   Save,
   Loader2,
   ArrowLeft,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
 import { AdminBreadcrumbs } from '../../components/admin/AdminBreadcrumbs';
 import { EmployeeIdCardPanel } from '../../components/admin/EmployeeIdCardPanel';
 import { RegularJoiningReviewModal } from '../../components/admin/RegularJoiningReviewModal';
 import { RegularReferenceSlipModal } from '../../components/admin/RegularReferenceSlipModal';
 import { RegularJoiningSubmittedModal } from '../../components/admin/RegularJoiningSubmittedModal';
+import { DocumentCameraModal } from '../../components/admin/DocumentCameraModal';
 import {
   generateNextRegularEmployeeCode,
   saveRegularJoiningForm,
@@ -47,7 +50,7 @@ import {
 import { uploadCandidateDocument } from '../../services/joiningService';
 import { downloadRegularReferenceSlipPdf } from '../../services/regularReferenceSlipPdfGenerator';
 import { exportIndividualRegularJoiningXlsx } from '../../services/regularJoiningExportService';
-import type { EmployeeRow } from '../../types/database';
+import type { DocumentSide, EmployeeRow } from '../../types/database';
 
 export const AdminRegularJoiningPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -95,7 +98,9 @@ export const AdminRegularJoiningPage: React.FC = () => {
   // Documents
   const [photoDoc, setPhotoDoc] = useState<RegularJoiningDocItem | null>(null);
   const [aadhaarDoc, setAadhaarDoc] = useState<RegularJoiningDocItem | null>(null);
+  const [aadhaarBackDoc, setAadhaarBackDoc] = useState<RegularJoiningDocItem | null>(null);
   const [bankPassbookDoc, setBankPassbookDoc] = useState<RegularJoiningDocItem | null>(null);
+  const [bankPassbookBackDoc, setBankPassbookBackDoc] = useState<RegularJoiningDocItem | null>(null);
   const [signatureDoc, setSignatureDoc] = useState<RegularJoiningDocItem | null>(null);
 
   // Status & metadata
@@ -122,16 +127,28 @@ export const AdminRegularJoiningPage: React.FC = () => {
     joiningDate?: string;
   } | null>(null);
 
-  // Camera Capture State
-  const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  // Camera Modal State
+  const [cameraModalConfig, setCameraModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle?: string;
+    preferredFacingMode: 'user' | 'environment';
+    guideType: 'portrait' | 'card' | 'document';
+    target: 'photo' | 'aadhaar_front' | 'aadhaar_back' | 'passbook_front' | 'passbook_back' | 'signature';
+  }>({
+    isOpen: false,
+    title: '',
+    preferredFacingMode: 'environment',
+    guideType: 'card',
+    target: 'photo'
+  });
 
   // Hidden File Inputs
   const photoInputRef = useRef<HTMLInputElement>(null);
-  const aadhaarInputRef = useRef<HTMLInputElement>(null);
-  const passbookInputRef = useRef<HTMLInputElement>(null);
+  const aadhaarFrontInputRef = useRef<HTMLInputElement>(null);
+  const aadhaarBackInputRef = useRef<HTMLInputElement>(null);
+  const passbookFrontInputRef = useRef<HTMLInputElement>(null);
+  const passbookBackInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
 
   // 1. Initial Load: Load existing record or generate sequential code
@@ -179,7 +196,9 @@ export const AdminRegularJoiningPage: React.FC = () => {
 
           setPhotoDoc(d.photo);
           setAadhaarDoc(d.aadhaar);
+          setAadhaarBackDoc(d.aadhaarBack || null);
           setBankPassbookDoc(d.bankPassbook);
+          setBankPassbookBackDoc(d.bankPassbookBack || null);
           setSignatureDoc(d.signature);
 
           setSubmissionStatus(d.submissionStatus || 'DRAFT');
@@ -209,101 +228,171 @@ export const AdminRegularJoiningPage: React.FC = () => {
     loadInitialData();
   }, [loadInitialData]);
 
-  // Clean up camera stream on unmount
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, []);
-
-  // Camera Handlers
-  const startCamera = async () => {
-    setCameraError(null);
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera access is not supported by your browser.');
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false
-      });
-      streamRef.current = stream;
-      setIsCameraActive(true);
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-        }
-      }, 100);
-    } catch (err: any) {
-      console.warn('[Camera] Access failed:', err);
-      setCameraError(
-        err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
-          ? 'Camera permission was denied. Please allow camera access in browser settings, or select a photo file directly.'
-          : (err.message || 'Unable to open camera. Please upload an image file instead.')
-      );
-      setIsCameraActive(false);
+  // Helper: Open Camera for Target Document
+  const openCameraFor = (
+    target: 'photo' | 'aadhaar_front' | 'aadhaar_back' | 'passbook_front' | 'passbook_back' | 'signature'
+  ) => {
+    switch (target) {
+      case 'photo':
+        setCameraModalConfig({
+          isOpen: true,
+          title: 'Capture Candidate Live Photo',
+          subtitle: 'Position the applicant face within the oval framing guide.',
+          preferredFacingMode: 'user',
+          guideType: 'portrait',
+          target: 'photo'
+        });
+        break;
+      case 'aadhaar_front':
+        setCameraModalConfig({
+          isOpen: true,
+          title: 'Capture Aadhaar Card — Front Side',
+          subtitle: 'Position the front side of the Aadhaar card with photo and details inside the guide.',
+          preferredFacingMode: 'environment',
+          guideType: 'card',
+          target: 'aadhaar_front'
+        });
+        break;
+      case 'aadhaar_back':
+        setCameraModalConfig({
+          isOpen: true,
+          title: 'Capture Aadhaar Card — Back Side',
+          subtitle: 'Position the back side of the Aadhaar card with address & QR code inside the guide.',
+          preferredFacingMode: 'environment',
+          guideType: 'card',
+          target: 'aadhaar_back'
+        });
+        break;
+      case 'passbook_front':
+        setCameraModalConfig({
+          isOpen: true,
+          title: 'Capture Bank Passbook — Front Page',
+          subtitle: 'Ensure account number, IFSC code, and candidate name are clearly legible.',
+          preferredFacingMode: 'environment',
+          guideType: 'document',
+          target: 'passbook_front'
+        });
+        break;
+      case 'passbook_back':
+        setCameraModalConfig({
+          isOpen: true,
+          title: 'Capture Bank Passbook — Inner / Back Page (Optional)',
+          subtitle: 'Capture the second page or reverse endorsement if applicable.',
+          preferredFacingMode: 'environment',
+          guideType: 'document',
+          target: 'passbook_back'
+        });
+        break;
+      case 'signature':
+        setCameraModalConfig({
+          isOpen: true,
+          title: 'Capture Candidate Signature',
+          subtitle: 'Capture the candidate signature on plain white paper in good lighting.',
+          preferredFacingMode: 'environment',
+          guideType: 'card',
+          target: 'signature'
+        });
+        break;
     }
   };
 
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
+  // Helper: Trigger File Input for Target Document
+  const triggerFileInputFor = (target: string) => {
+    switch (target) {
+      case 'photo':
+        photoInputRef.current?.click();
+        break;
+      case 'aadhaar_front':
+        aadhaarFrontInputRef.current?.click();
+        break;
+      case 'aadhaar_back':
+        aadhaarBackInputRef.current?.click();
+        break;
+      case 'passbook_front':
+        passbookFrontInputRef.current?.click();
+        break;
+      case 'passbook_back':
+        passbookBackInputRef.current?.click();
+        break;
+      case 'signature':
+        signatureInputRef.current?.click();
+        break;
     }
-    setIsCameraActive(false);
   };
 
-  const capturePhoto = async () => {
-    if (!videoRef.current) return;
+  // Handler: Camera Capture Confirmation
+  const handleCameraCaptureConfirm = async (file: File, dataUrl: string) => {
+    const target = cameraModalConfig.target;
+    const ownerTag = employeeCode || 'cand_regular';
+    let category: any = 'PHOTO';
+    let side: DocumentSide | undefined = undefined;
+    let setter: (doc: RegularJoiningDocItem) => void = () => {};
+
+    switch (target) {
+      case 'photo':
+        category = 'PHOTO';
+        setter = (d) => setPhotoDoc(d);
+        break;
+      case 'aadhaar_front':
+        category = 'AADHAAR';
+        side = 'FRONT';
+        setter = (d) => setAadhaarDoc(d);
+        break;
+      case 'aadhaar_back':
+        category = 'AADHAAR_BACK';
+        side = 'BACK';
+        setter = (d) => setAadhaarBackDoc(d);
+        break;
+      case 'passbook_front':
+        category = 'BANK_PASSBOOK';
+        side = 'FRONT';
+        setter = (d) => setBankPassbookDoc(d);
+        break;
+      case 'passbook_back':
+        category = 'BANK_PASSBOOK_BACK';
+        side = 'BACK';
+        setter = (d) => setBankPassbookBackDoc(d);
+        break;
+      case 'signature':
+        category = 'SIGNATURE';
+        setter = (d) => setSignatureDoc(d);
+        break;
+    }
+
     try {
-      const video = videoRef.current;
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-
-      // Convert dataUrl to File for storage persistence
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      const file = new File([blob], `live_photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
-
-      // Upload to private candidate-documents storage
-      const ownerTag = employeeCode || 'cand_regular';
-      const uploadRes = await uploadCandidateDocument(ownerTag, 'PHOTO', file);
-
-      setPhotoDoc({
+      const uploadRes = await uploadCandidateDocument(ownerTag, category, file);
+      setter({
         name: file.name,
         size: file.size,
-        type: 'image/jpeg',
+        type: file.type || 'image/jpeg',
         dataUrl,
-        storagePath: uploadRes.success ? uploadRes.data?.storagePath : undefined
+        storagePath: uploadRes.success ? uploadRes.data?.storagePath : undefined,
+        side
       });
-
-      stopCamera();
     } catch (err: any) {
-      console.error('[capturePhoto] Error:', err);
-      alert('Failed to capture photograph. Please try uploading an image.');
+      console.warn('[handleCameraCaptureConfirm] Upload fallback to local:', err);
+      setter({
+        name: file.name,
+        size: file.size,
+        type: file.type || 'image/jpeg',
+        dataUrl,
+        side
+      });
     }
   };
 
-  // Generic Document Upload Handler
+  // Handler: Generic File Upload
   const handleFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    type: 'PHOTO' | 'AADHAAR' | 'BANK_PASSBOOK' | 'SIGNATURE',
-    setter: React.Dispatch<React.SetStateAction<RegularJoiningDocItem | null>>
+    type: 'PHOTO' | 'AADHAAR' | 'AADHAAR_BACK' | 'BANK_PASSBOOK' | 'BANK_PASSBOOK_BACK' | 'SIGNATURE',
+    setter: React.Dispatch<React.SetStateAction<RegularJoiningDocItem | null>>,
+    side?: DocumentSide
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert(`${type} file size must be less than 5MB.`);
+      alert(`File size must be less than 5MB.`);
       return;
     }
 
@@ -317,7 +406,8 @@ export const AdminRegularJoiningPage: React.FC = () => {
         size: file.size,
         type: file.type || 'image/jpeg',
         dataUrl: localDataUrl,
-        storagePath: res.success ? res.data?.storagePath : undefined
+        storagePath: res.success ? res.data?.storagePath : undefined,
+        side
       });
     } catch (err: any) {
       console.warn(`[handleFileUpload] ${type} upload warning:`, err);
@@ -325,8 +415,11 @@ export const AdminRegularJoiningPage: React.FC = () => {
         name: file.name,
         size: file.size,
         type: file.type || 'image/jpeg',
-        dataUrl: localDataUrl
+        dataUrl: localDataUrl,
+        side
       });
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -367,7 +460,9 @@ export const AdminRegularJoiningPage: React.FC = () => {
 
     photo: photoDoc,
     aadhaar: aadhaarDoc,
+    aadhaarBack: aadhaarBackDoc,
     bankPassbook: bankPassbookDoc,
+    bankPassbookBack: bankPassbookBackDoc,
     signature: signatureDoc,
 
     submissionStatus: submissionStatus,
@@ -1277,7 +1372,7 @@ export const AdminRegularJoiningPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
+          <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: '1.25rem' }}>
             {/* 27. Live Photo */}
             <div style={{ border: `1.5px solid ${fieldErrors.photo ? '#EF4444' : '#CBD5E1'}`, borderRadius: '8px', padding: '1rem', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
@@ -1287,86 +1382,95 @@ export const AdminRegularJoiningPage: React.FC = () => {
                 {photoDoc && <CheckCircle2 size={16} style={{ color: '#10B981' }} />}
               </div>
 
-              {/* Camera Stream Viewfinder */}
-              {isCameraActive ? (
-                <div style={{ marginBottom: '0.75rem', position: 'relative', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#000000', textAlign: 'center' }}>
-                  <video
-                    ref={videoRef}
-                    playsInline
-                    muted
-                    style={{ width: '100%', height: '170px', objectFit: 'cover' }}
-                  />
-                  <div style={{ position: 'absolute', bottom: '8px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
-                    <button
-                      type="button"
-                      onClick={capturePhoto}
-                      className="btn btn-primary btn-sm"
-                      style={{ backgroundColor: '#10B981', borderColor: '#10B981', fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
-                    >
-                      Capture Photo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={stopCamera}
-                      className="btn btn-outline btn-sm"
-                      style={{ color: '#FFFFFF', borderColor: '#FFFFFF', fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : photoDoc?.dataUrl ? (
+              {photoDoc?.dataUrl ? (
                 <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
                   <img
                     src={photoDoc.dataUrl}
                     alt="Live Photo"
-                    style={{ width: '110px', height: '135px', objectFit: 'cover', borderRadius: '4px', margin: '0 auto', border: '1px solid #E2E8F0', display: 'block' }}
+                    style={{ width: '120px', height: '145px', objectFit: 'cover', borderRadius: '6px', margin: '0 auto', border: '1px solid #CBD5E1', display: 'block', boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }}
                   />
-                  <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', marginTop: '0.35rem' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#334155', fontWeight: 600, marginTop: '0.45rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {photoDoc.name}
-                  </span>
+                  </div>
+                  {photoDoc.size ? (
+                    <div style={{ fontSize: '0.68rem', color: '#64748B' }}>{(photoDoc.size / 1024).toFixed(1)} KB</div>
+                  ) : null}
+                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.65rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => openCameraFor('photo')}
+                      className="btn btn-outline btn-sm"
+                      style={{ flex: 1, fontSize: '0.72rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                      title="Retake photo using camera"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Retake</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => photoInputRef.current?.click()}
+                      className="btn btn-outline btn-sm"
+                      style={{ flex: 1, fontSize: '0.72rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                      title="Replace photo from file"
+                    >
+                      <UploadCloud size={12} />
+                      <span>Replace</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPhotoDoc(null)}
+                      className="btn btn-outline btn-sm"
+                      style={{ color: '#EF4444', borderColor: '#FCA5A5', padding: '0.35rem 0.55rem' }}
+                      title="Remove photo"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div style={{ height: '135px', border: '1px dashed #CBD5E1', borderRadius: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', marginBottom: '0.75rem', color: '#94A3B8' }}>
-                  <Camera size={28} />
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>No live photo captured</span>
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  <div style={{ minHeight: '140px', border: '1px dashed #CBD5E1', borderRadius: '6px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '1rem', marginBottom: '0.75rem', backgroundColor: '#F8FAFC', color: '#64748B', textAlign: 'center' }}>
+                    <Camera size={30} style={{ color: '#94A3B8' }} />
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155' }}>No Live Photo Captured</span>
+                    <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Take a live selfie or upload passport photo</span>
+                  </div>
+
+                  {fieldErrors.photo && (
+                    <span style={{ color: '#EF4444', fontSize: '0.72rem', display: 'block', marginBottom: '0.5rem' }}>
+                      {fieldErrors.photo}
+                    </span>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
+                    <button
+                      type="button"
+                      onClick={() => openCameraFor('photo')}
+                      className="btn btn-primary btn-sm"
+                      style={{ flex: 1, fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', backgroundColor: '#0F1B38', borderColor: '#0F1B38' }}
+                    >
+                      <Camera size={13} />
+                      <span>Use Camera</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => photoInputRef.current?.click()}
+                      className="btn btn-outline btn-sm"
+                      style={{ flex: 1, fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                    >
+                      <UploadCloud size={13} />
+                      <span>Select File</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {cameraError && (
-                <span style={{ color: '#EF4444', fontSize: '0.72rem', display: 'block', marginBottom: '0.5rem' }}>
-                  {cameraError}
-                </span>
-              )}
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
-                <button
-                  type="button"
-                  onClick={startCamera}
-                  className="btn btn-outline btn-sm"
-                  style={{ flex: 1, fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-                >
-                  <Camera size={13} />
-                  <span>Use Camera</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => photoInputRef.current?.click()}
-                  className="btn btn-outline btn-sm"
-                  style={{ flex: 1, fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-                >
-                  <UploadCloud size={13} />
-                  <span>Select File</span>
-                </button>
-                <input
-                  ref={photoInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  style={{ display: 'none' }}
-                  onChange={(e) => handleFileUpload(e, 'PHOTO', setPhotoDoc)}
-                />
-              </div>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: 'none' }}
+                onChange={(e) => handleFileUpload(e, 'PHOTO', setPhotoDoc)}
+              />
             </div>
 
             {/* 28. Aadhaar Card Photo */}
@@ -1375,44 +1479,195 @@ export const AdminRegularJoiningPage: React.FC = () => {
                 <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0F1B38' }}>
                   28. Aadhaar Card Photo <span style={{ color: '#EF4444' }}>*</span>
                 </span>
-                {aadhaarDoc && <CheckCircle2 size={16} style={{ color: '#10B981' }} />}
+                {aadhaarDoc && aadhaarBackDoc ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.68rem', fontWeight: 700, color: '#15803D', backgroundColor: '#DCFCE7', padding: '2px 6px', borderRadius: '4px' }}>
+                    <CheckCircle2 size={11} /> Both Sides
+                  </span>
+                ) : aadhaarDoc ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.68rem', fontWeight: 700, color: '#0284C7', backgroundColor: '#E0F2FE', padding: '2px 6px', borderRadius: '4px' }}>
+                    <CheckCircle2 size={11} /> Front Ready
+                  </span>
+                ) : null}
               </div>
 
-              {aadhaarDoc?.dataUrl ? (
-                <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
-                  <img
-                    src={aadhaarDoc.dataUrl}
-                    alt="Aadhaar Card"
-                    style={{ width: '150px', height: '100px', objectFit: 'cover', borderRadius: '4px', margin: '15px auto', border: '1px solid #E2E8F0', display: 'block' }}
-                  />
-                  <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', marginTop: '0.35rem' }}>
-                    {aadhaarDoc.name}
+              {/* Sub-panel: Front Side */}
+              <div style={{ border: '1px solid #E2E8F0', borderRadius: '6px', padding: '0.65rem', marginBottom: '0.65rem', backgroundColor: '#F8FAFC' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
+                    Front Side <span style={{ color: '#EF4444' }}>*</span>
                   </span>
+                  {aadhaarDoc && <CheckCircle2 size={13} style={{ color: '#10B981' }} />}
                 </div>
-              ) : (
-                <div style={{ height: '135px', border: '1px dashed #CBD5E1', borderRadius: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', marginBottom: '0.75rem', color: '#94A3B8' }}>
-                  <UploadCloud size={28} />
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Upload Aadhaar Card Image</span>
+
+                {aadhaarDoc?.dataUrl ? (
+                  <div>
+                    <img
+                      src={aadhaarDoc.dataUrl}
+                      alt="Aadhaar Front"
+                      style={{ width: '100%', height: '85px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #CBD5E1', display: 'block' }}
+                    />
+                    <div style={{ fontSize: '0.68rem', color: '#334155', marginTop: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {aadhaarDoc.name}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.4rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => openCameraFor('aadhaar_front')}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.68rem', padding: '0.25rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                      >
+                        <RotateCcw size={11} />
+                        <span>Retake</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => aadhaarFrontInputRef.current?.click()}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.68rem', padding: '0.25rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                      >
+                        <UploadCloud size={11} />
+                        <span>Replace</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAadhaarDoc(null)}
+                        className="btn btn-outline btn-sm"
+                        style={{ color: '#EF4444', borderColor: '#FCA5A5', padding: '0.25rem 0.45rem' }}
+                        title="Remove Front"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ height: '55px', border: '1px dashed #CBD5E1', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', color: '#94A3B8', fontSize: '0.72rem', backgroundColor: '#FFFFFF', marginBottom: '0.45rem' }}>
+                      <Camera size={16} />
+                      <span>Front side image required</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => openCameraFor('aadhaar_front')}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.7rem', padding: '0.3rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                      >
+                        <Camera size={12} />
+                        <span>Use Camera</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => aadhaarFrontInputRef.current?.click()}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.7rem', padding: '0.3rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                      >
+                        <UploadCloud size={12} />
+                        <span>Select File</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Sub-panel: Back Side */}
+              <div style={{ border: '1px solid #E2E8F0', borderRadius: '6px', padding: '0.65rem', backgroundColor: '#F8FAFC' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
+                    Back Side (Address & QR)
+                  </span>
+                  {aadhaarBackDoc && <CheckCircle2 size={13} style={{ color: '#10B981' }} />}
                 </div>
+
+                {aadhaarBackDoc?.dataUrl ? (
+                  <div>
+                    <img
+                      src={aadhaarBackDoc.dataUrl}
+                      alt="Aadhaar Back"
+                      style={{ width: '100%', height: '85px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #CBD5E1', display: 'block' }}
+                    />
+                    <div style={{ fontSize: '0.68rem', color: '#334155', marginTop: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {aadhaarBackDoc.name}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.4rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => openCameraFor('aadhaar_back')}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.68rem', padding: '0.25rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                      >
+                        <RotateCcw size={11} />
+                        <span>Retake</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => aadhaarBackInputRef.current?.click()}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.68rem', padding: '0.25rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                      >
+                        <UploadCloud size={11} />
+                        <span>Replace</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAadhaarBackDoc(null)}
+                        className="btn btn-outline btn-sm"
+                        style={{ color: '#EF4444', borderColor: '#FCA5A5', padding: '0.25rem 0.45rem' }}
+                        title="Remove Back"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ height: '55px', border: '1px dashed #CBD5E1', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', color: '#94A3B8', fontSize: '0.72rem', backgroundColor: '#FFFFFF', marginBottom: '0.45rem' }}>
+                      <Camera size={16} />
+                      <span>Back side (address / QR)</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => openCameraFor('aadhaar_back')}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.7rem', padding: '0.3rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                      >
+                        <Camera size={12} />
+                        <span>Use Camera</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => aadhaarBackInputRef.current?.click()}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.7rem', padding: '0.3rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                      >
+                        <UploadCloud size={12} />
+                        <span>Select File</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {fieldErrors.aadhaar && (
+                <span style={{ color: '#EF4444', fontSize: '0.72rem', display: 'block', marginTop: '0.5rem' }}>
+                  {fieldErrors.aadhaar}
+                </span>
               )}
 
               <input
-                ref={aadhaarInputRef}
+                ref={aadhaarFrontInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 style={{ display: 'none' }}
-                onChange={(e) => handleFileUpload(e, 'AADHAAR', setAadhaarDoc)}
+                onChange={(e) => handleFileUpload(e, 'AADHAAR', setAadhaarDoc, 'FRONT')}
               />
-
-              <button
-                type="button"
-                onClick={() => aadhaarInputRef.current?.click()}
-                className="btn btn-outline btn-sm"
-                style={{ marginTop: 'auto', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-              >
-                <UploadCloud size={13} />
-                <span>{aadhaarDoc ? 'Replace Aadhaar' : 'Upload Aadhaar'}</span>
-              </button>
+              <input
+                ref={aadhaarBackInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: 'none' }}
+                onChange={(e) => handleFileUpload(e, 'AADHAAR_BACK', setAadhaarBackDoc, 'BACK')}
+              />
             </div>
 
             {/* 29. Bank Passbook Photo */}
@@ -1421,44 +1676,195 @@ export const AdminRegularJoiningPage: React.FC = () => {
                 <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0F1B38' }}>
                   29. Bank Passbook Photo <span style={{ color: '#EF4444' }}>*</span>
                 </span>
-                {bankPassbookDoc && <CheckCircle2 size={16} style={{ color: '#10B981' }} />}
+                {bankPassbookDoc && bankPassbookBackDoc ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.68rem', fontWeight: 700, color: '#15803D', backgroundColor: '#DCFCE7', padding: '2px 6px', borderRadius: '4px' }}>
+                    <CheckCircle2 size={11} /> Both Sides
+                  </span>
+                ) : bankPassbookDoc ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.68rem', fontWeight: 700, color: '#0284C7', backgroundColor: '#E0F2FE', padding: '2px 6px', borderRadius: '4px' }}>
+                    <CheckCircle2 size={11} /> Front Ready
+                  </span>
+                ) : null}
               </div>
 
-              {bankPassbookDoc?.dataUrl ? (
-                <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
-                  <img
-                    src={bankPassbookDoc.dataUrl}
-                    alt="Bank Passbook"
-                    style={{ width: '150px', height: '100px', objectFit: 'cover', borderRadius: '4px', margin: '15px auto', border: '1px solid #E2E8F0', display: 'block' }}
-                  />
-                  <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', marginTop: '0.35rem' }}>
-                    {bankPassbookDoc.name}
+              {/* Sub-panel: Front Page */}
+              <div style={{ border: '1px solid #E2E8F0', borderRadius: '6px', padding: '0.65rem', marginBottom: '0.65rem', backgroundColor: '#F8FAFC' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
+                    Front Page / Cheque <span style={{ color: '#EF4444' }}>*</span>
                   </span>
+                  {bankPassbookDoc && <CheckCircle2 size={13} style={{ color: '#10B981' }} />}
                 </div>
-              ) : (
-                <div style={{ height: '135px', border: '1px dashed #CBD5E1', borderRadius: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', marginBottom: '0.75rem', color: '#94A3B8' }}>
-                  <CreditCard size={28} />
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Upload Bank Passbook Image</span>
+
+                {bankPassbookDoc?.dataUrl ? (
+                  <div>
+                    <img
+                      src={bankPassbookDoc.dataUrl}
+                      alt="Bank Passbook Front"
+                      style={{ width: '100%', height: '85px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #CBD5E1', display: 'block' }}
+                    />
+                    <div style={{ fontSize: '0.68rem', color: '#334155', marginTop: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {bankPassbookDoc.name}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.4rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => openCameraFor('passbook_front')}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.68rem', padding: '0.25rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                      >
+                        <RotateCcw size={11} />
+                        <span>Retake</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => passbookFrontInputRef.current?.click()}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.68rem', padding: '0.25rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                      >
+                        <UploadCloud size={11} />
+                        <span>Replace</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBankPassbookDoc(null)}
+                        className="btn btn-outline btn-sm"
+                        style={{ color: '#EF4444', borderColor: '#FCA5A5', padding: '0.25rem 0.45rem' }}
+                        title="Remove Front"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ height: '55px', border: '1px dashed #CBD5E1', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', color: '#94A3B8', fontSize: '0.72rem', backgroundColor: '#FFFFFF', marginBottom: '0.45rem' }}>
+                      <CreditCard size={16} />
+                      <span>Account number & IFSC page</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => openCameraFor('passbook_front')}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.7rem', padding: '0.3rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                      >
+                        <Camera size={12} />
+                        <span>Use Camera</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => passbookFrontInputRef.current?.click()}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.7rem', padding: '0.3rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                      >
+                        <UploadCloud size={12} />
+                        <span>Select File</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Sub-panel: Back Side */}
+              <div style={{ border: '1px solid #E2E8F0', borderRadius: '6px', padding: '0.65rem', backgroundColor: '#F8FAFC' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155' }}>
+                    Back Side / Inner Page (Optional)
+                  </span>
+                  {bankPassbookBackDoc && <CheckCircle2 size={13} style={{ color: '#10B981' }} />}
                 </div>
+
+                {bankPassbookBackDoc?.dataUrl ? (
+                  <div>
+                    <img
+                      src={bankPassbookBackDoc.dataUrl}
+                      alt="Bank Passbook Back"
+                      style={{ width: '100%', height: '85px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #CBD5E1', display: 'block' }}
+                    />
+                    <div style={{ fontSize: '0.68rem', color: '#334155', marginTop: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {bankPassbookBackDoc.name}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.4rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => openCameraFor('passbook_back')}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.68rem', padding: '0.25rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                      >
+                        <RotateCcw size={11} />
+                        <span>Retake</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => passbookBackInputRef.current?.click()}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.68rem', padding: '0.25rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                      >
+                        <UploadCloud size={11} />
+                        <span>Replace</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBankPassbookBackDoc(null)}
+                        className="btn btn-outline btn-sm"
+                        style={{ color: '#EF4444', borderColor: '#FCA5A5', padding: '0.25rem 0.45rem' }}
+                        title="Remove Back"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ height: '55px', border: '1px dashed #CBD5E1', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', color: '#94A3B8', fontSize: '0.72rem', backgroundColor: '#FFFFFF', marginBottom: '0.45rem' }}>
+                      <CreditCard size={16} />
+                      <span>Back side / inner statement page</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => openCameraFor('passbook_back')}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.7rem', padding: '0.3rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                      >
+                        <Camera size={12} />
+                        <span>Use Camera</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => passbookBackInputRef.current?.click()}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, fontSize: '0.7rem', padding: '0.3rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                      >
+                        <UploadCloud size={12} />
+                        <span>Select File</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {fieldErrors.bankPassbook && (
+                <span style={{ color: '#EF4444', fontSize: '0.72rem', display: 'block', marginTop: '0.5rem' }}>
+                  {fieldErrors.bankPassbook}
+                </span>
               )}
 
               <input
-                ref={passbookInputRef}
+                ref={passbookFrontInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 style={{ display: 'none' }}
-                onChange={(e) => handleFileUpload(e, 'BANK_PASSBOOK', setBankPassbookDoc)}
+                onChange={(e) => handleFileUpload(e, 'BANK_PASSBOOK', setBankPassbookDoc, 'FRONT')}
               />
-
-              <button
-                type="button"
-                onClick={() => passbookInputRef.current?.click()}
-                className="btn btn-outline btn-sm"
-                style={{ marginTop: 'auto', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-              >
-                <UploadCloud size={13} />
-                <span>{bankPassbookDoc ? 'Replace Passbook' : 'Upload Passbook'}</span>
-              </button>
+              <input
+                ref={passbookBackInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: 'none' }}
+                onChange={(e) => handleFileUpload(e, 'BANK_PASSBOOK_BACK', setBankPassbookBackDoc, 'BACK')}
+              />
             </div>
 
             {/* 30. Signature Photo */}
@@ -1475,16 +1881,80 @@ export const AdminRegularJoiningPage: React.FC = () => {
                   <img
                     src={signatureDoc.dataUrl}
                     alt="Candidate Signature"
-                    style={{ width: '150px', height: '80px', objectFit: 'contain', margin: '25px auto', border: '1px solid #E2E8F0', display: 'block', backgroundColor: '#F8FAFC' }}
+                    style={{ width: '100%', height: '110px', objectFit: 'contain', margin: '0 auto', border: '1px solid #CBD5E1', borderRadius: '4px', display: 'block', backgroundColor: '#F8FAFC' }}
                   />
-                  <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block', marginTop: '0.35rem' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#334155', fontWeight: 600, marginTop: '0.45rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {signatureDoc.name}
-                  </span>
+                  </div>
+                  {signatureDoc.size ? (
+                    <div style={{ fontSize: '0.68rem', color: '#64748B' }}>{(signatureDoc.size / 1024).toFixed(1)} KB</div>
+                  ) : null}
+                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.65rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => openCameraFor('signature')}
+                      className="btn btn-outline btn-sm"
+                      style={{ flex: 1, fontSize: '0.72rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                      title="Retake signature using camera"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Retake</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => signatureInputRef.current?.click()}
+                      className="btn btn-outline btn-sm"
+                      style={{ flex: 1, fontSize: '0.72rem', padding: '0.35rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                      title="Replace signature from file"
+                    >
+                      <UploadCloud size={12} />
+                      <span>Replace</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSignatureDoc(null)}
+                      className="btn btn-outline btn-sm"
+                      style={{ color: '#EF4444', borderColor: '#FCA5A5', padding: '0.35rem 0.55rem' }}
+                      title="Remove signature"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div style={{ height: '135px', border: '1px dashed #CBD5E1', borderRadius: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', marginBottom: '0.75rem', color: '#94A3B8' }}>
-                  <FileCheck2 size={28} />
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Upload Signature Image</span>
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  <div style={{ minHeight: '140px', border: '1px dashed #CBD5E1', borderRadius: '6px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '1rem', marginBottom: '0.75rem', backgroundColor: '#F8FAFC', color: '#64748B', textAlign: 'center' }}>
+                    <FileCheck2 size={30} style={{ color: '#94A3B8' }} />
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155' }}>No Signature Captured</span>
+                    <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Capture signature with camera or select file</span>
+                  </div>
+
+                  {fieldErrors.signature && (
+                    <span style={{ color: '#EF4444', fontSize: '0.72rem', display: 'block', marginBottom: '0.5rem' }}>
+                      {fieldErrors.signature}
+                    </span>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
+                    <button
+                      type="button"
+                      onClick={() => openCameraFor('signature')}
+                      className="btn btn-primary btn-sm"
+                      style={{ flex: 1, fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', backgroundColor: '#0F1B38', borderColor: '#0F1B38' }}
+                    >
+                      <Camera size={13} />
+                      <span>Use Camera</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => signatureInputRef.current?.click()}
+                      className="btn btn-outline btn-sm"
+                      style={{ flex: 1, fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                    >
+                      <UploadCloud size={13} />
+                      <span>Select File</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1495,16 +1965,6 @@ export const AdminRegularJoiningPage: React.FC = () => {
                 style={{ display: 'none' }}
                 onChange={(e) => handleFileUpload(e, 'SIGNATURE', setSignatureDoc)}
               />
-
-              <button
-                type="button"
-                onClick={() => signatureInputRef.current?.click()}
-                className="btn btn-outline btn-sm"
-                style={{ marginTop: 'auto', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-              >
-                <UploadCloud size={13} />
-                <span>{signatureDoc ? 'Replace Signature' : 'Upload Signature'}</span>
-              </button>
             </div>
           </div>
         </div>
@@ -1620,6 +2080,22 @@ export const AdminRegularJoiningPage: React.FC = () => {
         isOpen={isSlipModalOpen}
         onClose={() => setIsSlipModalOpen(false)}
         formData={currentFormData}
+      />
+
+      {/* Universal Document Camera Capture Modal */}
+      <DocumentCameraModal
+        isOpen={cameraModalConfig.isOpen}
+        onClose={() => setCameraModalConfig((prev) => ({ ...prev, isOpen: false }))}
+        title={cameraModalConfig.title}
+        subtitle={cameraModalConfig.subtitle}
+        preferredFacing={cameraModalConfig.preferredFacingMode}
+        isPortraitGuide={cameraModalConfig.guideType === 'portrait'}
+        onCapture={handleCameraCaptureConfirm}
+        onSelectFileFallback={() => {
+          const target = cameraModalConfig.target;
+          setCameraModalConfig((prev) => ({ ...prev, isOpen: false }));
+          setTimeout(() => triggerFileInputFor(target), 150);
+        }}
       />
     </div>
   );

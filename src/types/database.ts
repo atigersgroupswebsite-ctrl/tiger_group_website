@@ -94,6 +94,7 @@ export type GeneratedFileType =
 
 export type AdminRole =
   | 'SUPER_ADMIN'
+  | 'SUB_ADMIN'
   | 'ADMIN'
   | 'COORDINATOR'
   | 'DOCUMENT_VERIFIER'
@@ -1155,6 +1156,8 @@ export interface Database {
           full_name: string | null;
           role: AdminRole;
           active: boolean;
+          designation?: string | null;
+          created_by?: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -1163,6 +1166,8 @@ export interface Database {
           full_name?: string | null;
           role?: AdminRole;
           active?: boolean;
+          designation?: string | null;
+          created_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1171,6 +1176,8 @@ export interface Database {
           full_name?: string | null;
           role?: AdminRole;
           active?: boolean;
+          designation?: string | null;
+          created_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };

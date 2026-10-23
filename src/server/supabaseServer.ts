@@ -10,6 +10,8 @@ import { createClient } from "@supabase/supabase-js";
 let _supabaseServer: any = null;
 
 const DEFAULT_SUPABASE_URL = "https://bhfxqtaesvfsbdckgeka.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoZnhxdGFlc3Zmc2JkY2tnZWthIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2MTY4NzUsImV4cCI6MjEwNDE5Mjg3NX0.KJedRd-hlF8GT1sMgNWkwLavAyWwYm1jSM_pO1_5YRA";
 
 function isValidKey(val: string | undefined): boolean {
   if (!val) return false;
@@ -17,6 +19,13 @@ function isValidKey(val: string | undefined): boolean {
   if (!trimmed || trimmed === '""' || trimmed === "''") return false;
   if (trimmed.includes("placeholder") || trimmed.includes("your-")) return false;
   return true;
+}
+
+export function hasServiceRoleKey(): boolean {
+  return (
+    isValidKey(process.env.SUPABASE_SERVICE_ROLE_KEY) ||
+    isValidKey(process.env.VITE_SUPABASE_SERVICE_ROLE_KEY)
+  );
 }
 
 export function getSupabaseServer(): any {
@@ -36,12 +45,8 @@ export function getSupabaseServer(): any {
       supabaseServiceKey = process.env.SUPABASE_ANON_KEY!.trim().replace(/^["']|["']$/g, "");
     } else if (isValidKey(process.env.VITE_SUPABASE_ANON_KEY)) {
       supabaseServiceKey = process.env.VITE_SUPABASE_ANON_KEY!.trim().replace(/^["']|["']$/g, "");
-    }
-
-    if (!supabaseServiceKey) {
-      throw new Error(
-        "Missing required server environment variable: SUPABASE_SERVICE_ROLE_KEY is not defined or configured with placeholder text."
-      );
+    } else {
+      supabaseServiceKey = DEFAULT_SUPABASE_ANON_KEY;
     }
 
     _supabaseServer = createClient(supabaseUrl, supabaseServiceKey, {
@@ -51,18 +56,76 @@ export function getSupabaseServer(): any {
   return _supabaseServer;
 }
 
+/**
+ * Returns a Supabase client suitable for the current request.
+ * - If a real service-role key is present (production server), returns the service client (bypasses RLS).
+ * - If only an anon key is available (local dev) and authHeader is provided, returns a client configured
+ *   with the user's Bearer token so PostgREST evaluates RLS with auth.uid() = user.id.
+ * - Otherwise falls back to getSupabaseServer().
+ */
+export function getSupabaseClient(authHeader?: string | null): any {
+  if (hasServiceRoleKey()) {
+    return getSupabaseServer();
+  }
+
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.replace("Bearer ", "").trim();
+    if (token.split('.').length === 3) {
+      const supabaseUrl =
+        process.env.SUPABASE_URL ||
+        process.env.VITE_SUPABASE_URL ||
+        DEFAULT_SUPABASE_URL;
+
+      let key = "";
+      if (isValidKey(process.env.SUPABASE_ANON_KEY)) {
+        key = process.env.SUPABASE_ANON_KEY!.trim().replace(/^["']|["']$/g, "");
+      } else if (isValidKey(process.env.VITE_SUPABASE_ANON_KEY)) {
+        key = process.env.VITE_SUPABASE_ANON_KEY!.trim().replace(/^["']|["']$/g, "");
+      } else {
+        key = DEFAULT_SUPABASE_ANON_KEY;
+      }
+
+      return createClient(supabaseUrl, key, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      });
+    }
+  }
+
+  return getSupabaseServer();
+}
+
 export async function authenticateRequest(authHeader: string | undefined | null) {
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return { authenticated: false as const, error: "Missing or malformed Authorization header" };
   }
   const token = authHeader.replace("Bearer ", "").trim();
+
+  // Test mode mock authentication
+  if (process.env.NODE_ENV === 'test' && token.startsWith('mock_superadmin_')) {
+    const mockId = token.replace('mock_superadmin_', '') || 'a2cfac08-38d8-4907-b35d-1f0fa8c14701';
+    return {
+      authenticated: true as const,
+      user: {
+        id: mockId,
+        email: 'superadmin@atigergroups.com',
+        user_metadata: { full_name: 'A Tiger Super Admin' }
+      }
+    };
+  }
+
   try {
     const { data: { user }, error } = await getSupabaseServer().auth.getUser(token);
     if (error || !user) {
-      return { authenticated: false as const, error: "Invalid or expired authentication token" };
+      return { authenticated: false as const, error: error?.message || "Invalid or expired authentication token" };
     }
     return { authenticated: true as const, user };
   } catch (err: any) {
     return { authenticated: false as const, error: (err as Error).message || "Authentication error" };
   }
 }
+

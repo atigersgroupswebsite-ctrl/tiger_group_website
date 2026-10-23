@@ -79,9 +79,185 @@ export const RegularJoiningReviewModal: React.FC<RegularJoiningReviewModalProps>
   const renderDocCard = (
     titleWithNumber: string,
     doc: RegularJoiningDocItem | null | undefined,
-    fallbackLabel: string
+    fallbackLabel: string,
+    backDoc?: RegularJoiningDocItem | null | undefined
   ) => {
-    const isUploaded = Boolean(doc?.dataUrl || doc?.storagePath);
+    const isTwoSided = backDoc !== undefined;
+    const isFrontUploaded = Boolean(doc?.dataUrl || doc?.storagePath);
+    const isBackUploaded = Boolean(backDoc?.dataUrl || backDoc?.storagePath);
+    const isUploaded = isFrontUploaded;
+
+    if (isTwoSided) {
+      return (
+        <div
+          style={{
+            border: isFrontUploaded ? '1px solid #CBD5E1' : '1px dashed #F87171',
+            borderRadius: '8px',
+            padding: '0.85rem',
+            backgroundColor: '#FFFFFF',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            minHeight: '220px',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+          }}
+        >
+          <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0F1B38' }}>
+              {titleWithNumber}
+            </span>
+            {isFrontUploaded && isBackUploaded ? (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  color: '#15803D',
+                  backgroundColor: '#DCFCE7',
+                  padding: '2px 6px',
+                  borderRadius: '4px'
+                }}
+              >
+                <CheckCircle2 size={11} />
+                <span>Both Sides</span>
+              </span>
+            ) : isFrontUploaded ? (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  color: '#0284C7',
+                  backgroundColor: '#E0F2FE',
+                  padding: '2px 6px',
+                  borderRadius: '4px'
+                }}
+              >
+                <CheckCircle2 size={11} />
+                <span>Front Uploaded</span>
+              </span>
+            ) : (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  color: '#B91C1C',
+                  backgroundColor: '#FEE2E2',
+                  padding: '2px 6px',
+                  borderRadius: '4px'
+                }}
+              >
+                <AlertCircle size={11} />
+                <span>Missing *</span>
+              </span>
+            )}
+          </div>
+
+          {/* Front & Back Previews */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', width: '100%' }}>
+            {/* Front Side */}
+            <div style={{ border: '1px solid #E2E8F0', borderRadius: '6px', padding: '4px', backgroundColor: '#F8FAFC', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>Front</div>
+              <div style={{ width: '100%', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', borderRadius: '4px', backgroundColor: '#FFFFFF' }}>
+                {doc?.dataUrl ? (
+                  <>
+                    <img
+                      src={doc.dataUrl}
+                      alt={`${titleWithNumber} Front`}
+                      style={{ maxWidth: '100%', maxHeight: '80px', objectFit: 'contain' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setInspectDoc({ title: `${titleWithNumber} (Front Side)`, url: doc.dataUrl! })}
+                      style={{
+                        position: 'absolute',
+                        right: '3px',
+                        bottom: '3px',
+                        backgroundColor: 'rgba(15, 27, 56, 0.85)',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '3px',
+                        padding: '2px 4px',
+                        fontSize: '0.65rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        cursor: 'pointer'
+                      }}
+                      title="Inspect Front in high resolution"
+                    >
+                      <ZoomIn size={10} />
+                    </button>
+                  </>
+                ) : (
+                  <div style={{ color: '#94A3B8', fontSize: '0.65rem' }}>No Front</div>
+                )}
+              </div>
+            </div>
+
+            {/* Back Side */}
+            <div style={{ border: '1px solid #E2E8F0', borderRadius: '6px', padding: '4px', backgroundColor: '#F8FAFC', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>Back</div>
+              <div style={{ width: '100%', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', borderRadius: '4px', backgroundColor: '#FFFFFF' }}>
+                {backDoc?.dataUrl ? (
+                  <>
+                    <img
+                      src={backDoc.dataUrl}
+                      alt={`${titleWithNumber} Back`}
+                      style={{ maxWidth: '100%', maxHeight: '80px', objectFit: 'contain' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setInspectDoc({ title: `${titleWithNumber} (Back Side)`, url: backDoc.dataUrl! })}
+                      style={{
+                        position: 'absolute',
+                        right: '3px',
+                        bottom: '3px',
+                        backgroundColor: 'rgba(15, 27, 56, 0.85)',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '3px',
+                        padding: '2px 4px',
+                        fontSize: '0.65rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        cursor: 'pointer'
+                      }}
+                      title="Inspect Back in high resolution"
+                    >
+                      <ZoomIn size={10} />
+                    </button>
+                  </>
+                ) : (
+                  <div style={{ color: '#94A3B8', fontSize: '0.65rem' }}>No Back</div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Details info */}
+          <div style={{ width: '100%', marginTop: '0.5rem', textAlign: 'left', fontSize: '0.7rem', color: '#64748B' }}>
+            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, color: '#334155' }}>
+              {doc?.name ? `Front: ${doc.name}` : 'Front: Missing'}
+            </div>
+            {backDoc?.name && (
+              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#64748B' }}>
+                Back: {backDoc.name}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     const imageUrl = doc?.dataUrl;
 
     return (
@@ -691,8 +867,8 @@ export const RegularJoiningReviewModal: React.FC<RegularJoiningReviewModalProps>
                 }}
               >
                 {renderDocCard('27. Live Photo', formData.photo, 'Live Photo')}
-                {renderDocCard('28. Aadhaar Card Photo', formData.aadhaar, 'Aadhaar Card')}
-                {renderDocCard('29. Bank Passbook Photo', formData.bankPassbook, 'Passbook / Cheque')}
+                {renderDocCard('28. Aadhaar Card Photo', formData.aadhaar, 'Aadhaar Card', formData.aadhaarBack)}
+                {renderDocCard('29. Bank Passbook Photo', formData.bankPassbook, 'Passbook / Cheque', formData.bankPassbookBack)}
                 {renderDocCard('30. Signature Photo', formData.signature, 'Candidate Signature')}
               </div>
             </div>

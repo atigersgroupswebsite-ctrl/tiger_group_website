@@ -39,16 +39,17 @@ interface NavItemDef {
   path: string;
   icon: React.ElementType;
   isStage3?: boolean;
+  requiredPermission?: string;
 }
 
 const CORE_NAV_ITEMS: NavItemDef[] = [
-  { name: 'Dashboard', path: ADMIN_ROUTES.dashboard, icon: LayoutDashboard },
-  { name: 'Applications', path: ADMIN_ROUTES.applications, icon: Users },
-  { name: 'Joining Submissions', path: ADMIN_ROUTES.joining, icon: FileCheck2 },
-  { name: 'Regular Joining Form', path: ADMIN_ROUTES.regularJoining, icon: FileCheck2 },
-  { name: 'Employer Enquiries', path: ADMIN_ROUTES.employerEnquiries, icon: Building2 },
-  { name: 'Admin Directory', path: ADMIN_ROUTES.adminUsers, icon: ShieldCheck },
-  { name: 'Exports', path: ADMIN_ROUTES.exports, icon: Download }
+  { name: 'Dashboard', path: ADMIN_ROUTES.dashboard, icon: LayoutDashboard, requiredPermission: 'dashboard.view' },
+  { name: 'Admin Management', path: ADMIN_ROUTES.adminManagement, icon: ShieldCheck, requiredPermission: 'admin_management.view' },
+  { name: 'Applications', path: ADMIN_ROUTES.applications, icon: Users, requiredPermission: 'dashboard.view' },
+  { name: 'Joining Submissions', path: ADMIN_ROUTES.joining, icon: FileCheck2, requiredPermission: 'regular_joining.submissions' },
+  { name: 'Regular Joining Form', path: ADMIN_ROUTES.regularJoining, icon: FileCheck2, requiredPermission: 'regular_joining.view' },
+  { name: 'Employer Enquiries', path: ADMIN_ROUTES.employerEnquiries, icon: Building2, requiredPermission: 'dashboard.view' },
+  { name: 'Exports', path: ADMIN_ROUTES.exports, icon: Download, requiredPermission: 'reports.view' }
 ];
 
 const OPERATOR_NAV_ITEMS: NavItemDef[] = [
@@ -57,21 +58,30 @@ const OPERATOR_NAV_ITEMS: NavItemDef[] = [
 ];
 
 const MANAGEMENT_SUITE_ITEMS: NavItemDef[] = [
-  { name: 'Jobs', path: ADMIN_ROUTES.jobs, icon: Briefcase, isStage3: true },
-  { name: 'Companies', path: ADMIN_ROUTES.companies, icon: Factory, isStage3: true },
-  { name: 'Documents', path: ADMIN_ROUTES.documents, icon: FolderOpen, isStage3: true },
-  { name: 'Payments', path: ADMIN_ROUTES.payments, icon: CreditCard, isStage3: true },
-  { name: 'Reference Slips', path: ADMIN_ROUTES.referenceSlips, icon: FileText, isStage3: true },
-  { name: 'Employees', path: ADMIN_ROUTES.employees, icon: UserCheck, isStage3: true },
-  { name: 'Files', path: ADMIN_ROUTES.files, icon: FolderArchive, isStage3: true },
-  { name: 'Activity', path: ADMIN_ROUTES.activity, icon: Activity, isStage3: true },
-  { name: 'Settings', path: ADMIN_ROUTES.settings, icon: Settings, isStage3: true },
-  { name: 'Joining Config', path: ADMIN_ROUTES.joiningFormSettings, icon: SlidersHorizontal, isStage3: true }
+  { name: 'Jobs', path: ADMIN_ROUTES.jobs, icon: Briefcase, isStage3: true, requiredPermission: 'website.view' },
+  { name: 'Companies', path: ADMIN_ROUTES.companies, icon: Factory, isStage3: true, requiredPermission: 'website.view' },
+  { name: 'Documents', path: ADMIN_ROUTES.documents, icon: FolderOpen, isStage3: true, requiredPermission: 'documents.view' },
+  { name: 'Payments', path: ADMIN_ROUTES.payments, icon: CreditCard, isStage3: true, requiredPermission: 'dashboard.view' },
+  { name: 'Reference Slips', path: ADMIN_ROUTES.referenceSlips, icon: FileText, isStage3: true, requiredPermission: 'regular_joining.generate_slip' },
+  { name: 'Employees', path: ADMIN_ROUTES.employees, icon: UserCheck, isStage3: true, requiredPermission: 'employees.view' },
+  { name: 'Files', path: ADMIN_ROUTES.files, icon: FolderArchive, isStage3: true, requiredPermission: 'documents.view' },
+  { name: 'Activity', path: ADMIN_ROUTES.activity, icon: Activity, isStage3: true, requiredPermission: 'admin_management.view' },
+  { name: 'Settings', path: ADMIN_ROUTES.settings, icon: Settings, isStage3: true, requiredPermission: 'settings.view' },
+  { name: 'Joining Config', path: ADMIN_ROUTES.joiningFormSettings, icon: SlidersHorizontal, isStage3: true, requiredPermission: 'settings.view' }
 ];
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseMobile }) => {
-  const { isJoiningOperator, role } = useAdminAuth();
+  const { isJoiningOperator, role, isSuperAdmin, hasPermission } = useAdminAuth();
   const isOperator = isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR';
+
+  // Filter items by permission (Super Admin sees all)
+  const visibleCoreItems = CORE_NAV_ITEMS.filter(
+    (item) => isSuperAdmin || !item.requiredPermission || hasPermission(item.requiredPermission)
+  );
+
+  const visibleSuiteItems = MANAGEMENT_SUITE_ITEMS.filter(
+    (item) => isSuperAdmin || !item.requiredPermission || hasPermission(item.requiredPermission)
+  );
 
   return (
     <aside className={`admin-sidebar ${mobileOpen ? 'open' : ''}`}>
@@ -138,7 +148,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseM
             <div>
               <div className="admin-nav-group-title">Core Operations</div>
               <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {CORE_NAV_ITEMS.map((item) => {
+                {visibleCoreItems.map((item) => {
                   const Icon = item.icon;
                   return (
                     <NavLink
@@ -157,26 +167,27 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseM
             </div>
 
             {/* Management Suite Group */}
-            <div>
-              <div
-                className="admin-nav-group-title"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-              >
-                <span>Operations Suite</span>
-                <span
-                  style={{
-                    fontSize: '0.625rem',
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                    color: 'rgba(252, 251, 251, 0.7)',
-                    padding: '2px 6px',
-                    borderRadius: '4px'
-                  }}
+            {visibleSuiteItems.length > 0 && (
+              <div>
+                <div
+                  className="admin-nav-group-title"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                 >
-                  Stage 3
-                </span>
-              </div>
-              <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                {MANAGEMENT_SUITE_ITEMS.map((item) => {
+                  <span>Operations Suite</span>
+                  <span
+                    style={{
+                      fontSize: '0.625rem',
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      color: 'rgba(252, 251, 251, 0.7)',
+                      padding: '2px 6px',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    Stage 3
+                  </span>
+                </div>
+                <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  {visibleSuiteItems.map((item) => {
                   const Icon = item.icon;
                   return (
                     <NavLink
@@ -193,8 +204,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseM
                 })}
               </nav>
             </div>
-          </>
-        )}
+          )}
+        </>
+      )}
       </div>
 
       {/* Footer link to public website */}

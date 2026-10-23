@@ -11,6 +11,7 @@ import type { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured, supabaseDiagnostics } from '../lib/supabaseClient';
 import type { AdminProfileRow, AdminRole } from '../types/database';
 import { getAuthRedirectUrl } from '../utils/authRedirect';
+import { ALL_PERMISSIONS, type PermissionKey, type ModuleKey } from '../types/rbac';
 
 export type AdminAuthErrorCode =
   | 'CONFIG_ERROR'
@@ -36,7 +37,12 @@ export interface AdminAuthContextType {
   role: AdminRole | null;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  isSubAdmin: boolean;
   isJoiningOperator: boolean;
+  permissions: PermissionKey[];
+  hasPermission: (key: PermissionKey | string) => boolean;
+  hasAnyPermission: (keys: (PermissionKey | string)[]) => boolean;
+  hasModuleAccess: (moduleName: ModuleKey | string) => boolean;
   adminState: AdminAuthState;
   loading: boolean;
   authLoading: boolean;
@@ -53,6 +59,7 @@ const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefin
 
 const ALLOWED_ADMIN_ROLES: AdminRole[] = [
   'SUPER_ADMIN',
+  'SUB_ADMIN',
   'ADMIN',
   'COORDINATOR',
   'DOCUMENT_VERIFIER',
@@ -77,6 +84,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<AdminProfileRow | null>(null);
+  const [permissions, setPermissions] = useState<PermissionKey[]>([]);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [profileLoading, setProfileLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +129,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const authorizeUser = useCallback(async (currentUser: User | null): Promise<AuthorizationResult> => {
     if (!currentUser) {
       setProfile(null);
+      setPermissions([]);
       return { authorized: false, profile: null };
     }
 
@@ -129,6 +138,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (queryError) {
       console.error('[AdminAuth] RLS or query error during authorization:', queryError);
       setProfile(null);
+      setPermissions([]);
       return {
         authorized: false,
         profile: null,
@@ -140,6 +150,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!adminProfile) {
       console.warn(`[AdminAuth] Access Denied: User (${currentUser.id}) has no record in public.admin_profiles.`);
       setProfile(null);
+      setPermissions([]);
       return {
         authorized: false,
         profile: null,
@@ -151,6 +162,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!adminProfile.active) {
       console.warn(`[AdminAuth] Access Denied: Admin profile (${adminProfile.id}) is inactive.`);
       setProfile(null);
+      setPermissions([]);
       return {
         authorized: false,
         profile: null,
@@ -167,6 +179,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!ALLOWED_ADMIN_ROLES.includes(adminProfile.role)) {
       console.warn(`[AdminAuth] Access Denied: Role '${adminProfile.role}' is not permitted.`);
       setProfile(null);
+      setPermissions([]);
       return {
         authorized: false,
         profile: null,
@@ -176,6 +189,59 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
 
     setProfile(adminProfile);
+
+    // Fetch granular permissions
+    let userPermissions: PermissionKey[] = [];
+    if (adminProfile.role === 'SUPER_ADMIN') {
+      userPermissions = ALL_PERMISSIONS.map((p) => p.key);
+    } else {
+      try {
+        const { data: { session: curSession } } = await supabase.auth.getSession();
+        const res = await fetch('/api/admin/users/me/permissions', {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(curSession?.access_token ? { Authorization: `Bearer ${curSession.access_token}` } : {})
+          }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.permissions)) {
+            userPermissions = json.permissions;
+          }
+        }
+      } catch {
+        // fallback
+      }
+
+      if (userPermissions.length === 0) {
+        if (adminProfile.role === 'REGULAR_JOINING_OPERATOR') {
+          userPermissions = [
+            'dashboard.view',
+            'regular_joining.view',
+            'regular_joining.submissions',
+            'regular_joining.candidate_details',
+            'regular_joining.edit',
+            'regular_joining.verify',
+            'regular_joining.generate_slip',
+            'regular_joining.generate_id_card',
+            'regular_joining.download_docs',
+            'regular_joining.export_excel'
+          ];
+        } else if (adminProfile.role === 'DOCUMENT_VERIFIER') {
+          userPermissions = [
+            'dashboard.view',
+            'regular_joining.view',
+            'regular_joining.submissions',
+            'regular_joining.candidate_details',
+            'regular_joining.verify',
+            'documents.view',
+            'documents.download'
+          ];
+        }
+      }
+    }
+    setPermissions(userPermissions);
+
     return { authorized: true, profile: adminProfile };
   }, [fetchAdminProfile]);
 
@@ -367,6 +433,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setUser(null);
       setSession(null);
       setProfile(null);
+      setPermissions([]);
       setError(null);
       setErrorCode(null);
       setProfileLoading(false);
@@ -464,12 +531,41 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [profile]);
 
   const isSuperAdmin = useMemo(() => currentRole === 'SUPER_ADMIN', [currentRole]);
+  const isSubAdmin = useMemo(() => currentRole === 'SUB_ADMIN', [currentRole]);
   const isJoiningOperator = useMemo(() => currentRole === 'REGULAR_JOINING_OPERATOR', [currentRole]);
 
   // Overall loading state is true only while authorization is still resolving
   const loading = useMemo(() => {
     return adminState === 'AUTH_LOADING';
   }, [adminState]);
+
+  // Granular RBAC Check Helpers
+  const hasPermission = useCallback((key: PermissionKey | string): boolean => {
+    if (isSuperAdmin) return true;
+    if (!profile?.active) return false;
+    return permissions.includes(key as PermissionKey);
+  }, [isSuperAdmin, profile, permissions]);
+
+  const hasAnyPermission = useCallback((keys: (PermissionKey | string)[]): boolean => {
+    if (isSuperAdmin) return true;
+    if (!profile?.active) return false;
+    return keys.some((k) => permissions.includes(k as PermissionKey));
+  }, [isSuperAdmin, profile, permissions]);
+
+  const hasModuleAccess = useCallback((moduleName: ModuleKey | string): boolean => {
+    if (isSuperAdmin) return true;
+    if (!profile?.active) return false;
+    // Find all permissions under this module
+    const modulePerms = ALL_PERMISSIONS.filter(
+      (p) => p.module.toLowerCase() === moduleName.toLowerCase()
+    );
+    if (modulePerms.length === 0) {
+      // Fallback: key prefix check
+      const prefix = moduleName.toLowerCase().replace(/\s+/g, '_');
+      return permissions.some((k) => k.startsWith(prefix));
+    }
+    return modulePerms.some((p) => permissions.includes(p.key));
+  }, [isSuperAdmin, profile, permissions]);
 
   const value = useMemo<AdminAuthContextType>(() => ({
     user,
@@ -478,7 +574,12 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     role: currentRole,
     isAdmin,
     isSuperAdmin,
+    isSubAdmin,
     isJoiningOperator,
+    permissions,
+    hasPermission,
+    hasAnyPermission,
+    hasModuleAccess,
     adminState,
     loading,
     authLoading,
@@ -489,7 +590,30 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     sendSignInLink,
     signOut,
     refreshProfile
-  }), [user, session, profile, currentRole, isAdmin, isSuperAdmin, isJoiningOperator, adminState, loading, authLoading, profileLoading, error, errorCode, signIn, sendSignInLink, fetchAdminProfile, authorizeUser]);
+  }), [
+    user,
+    session,
+    profile,
+    currentRole,
+    isAdmin,
+    isSuperAdmin,
+    isSubAdmin,
+    isJoiningOperator,
+    permissions,
+    hasPermission,
+    hasAnyPermission,
+    hasModuleAccess,
+    adminState,
+    loading,
+    authLoading,
+    profileLoading,
+    error,
+    errorCode,
+    signIn,
+    sendSignInLink,
+    fetchAdminProfile,
+    authorizeUser
+  ]);
 
   return (
     <AdminAuthContext.Provider value={value}>

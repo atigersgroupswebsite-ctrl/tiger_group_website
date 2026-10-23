@@ -35,6 +35,7 @@ import {
 const ROLE_CONFIG: Record<AdminRole, { label: string; color: string; bg: string }> = {
   SUPER_ADMIN: { label: 'Super Admin', color: '#991B1B', bg: '#FEE2E2' },
   ADMIN: { label: 'Administrator', color: '#B91C1C', bg: '#FEE2E2' },
+  SUB_ADMIN: { label: 'Sub-Admin', color: '#1E40AF', bg: '#EFF6FF' },
   COORDINATOR: { label: 'Coordinator', color: '#1E40AF', bg: '#DBEAFE' },
   DOCUMENT_VERIFIER: { label: 'Doc Verifier', color: '#065F46', bg: '#D1FAE5' },
   ACCOUNTANT: { label: 'Accountant', color: '#92400E', bg: '#FEF3C7' },

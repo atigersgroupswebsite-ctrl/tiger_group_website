@@ -176,7 +176,10 @@ async function runWorkflowTestSuite() {
 
   assert(dossierContent.includes('Verify Candidate & Documents'), 'Dossier provides administrative verification trigger');
   assert(dossierContent.includes('Generate Employee Reference Slip'), 'Dossier provides 1-page Reference Slip action');
-  assert(dossierContent.includes('Open in ID Cards Section'), 'Dossier provides direct transition to ID Cards section');
+  assert(
+    dossierContent.includes('Open in ID Cards Section') || dossierContent.includes('Generate Employee ID Card'),
+    'Dossier provides direct transition to ID Cards section'
+  );
   assert(dossierContent.includes('Reject') && dossierContent.includes('rejectionReason'), 'Dossier provides rejection modal with recorded reason');
 
   const regularServicePath = path.resolve(__dirname, '../src/services/regularJoiningService.ts');

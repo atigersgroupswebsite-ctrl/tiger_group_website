@@ -16,7 +16,7 @@ import { Loader2, ShieldAlert, LogOut } from 'lucide-react';
 import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 
 export const AdminProtectedRoute: React.FC = () => {
-  const { adminState, user, signOut, role, isJoiningOperator } = useAdminAuth();
+  const { adminState, user, signOut, role, isJoiningOperator, isSuperAdmin, hasPermission } = useAdminAuth();
   const location = useLocation();
 
   // 1. Loading state: wait while checking Supabase session and admin profile
@@ -252,14 +252,13 @@ export const AdminProtectedRoute: React.FC = () => {
     );
   }
 
-  // 5. Authorized Admin / Operator Check
+  // 5. Authorized Admin / Operator / Sub-Admin Check
   if (adminState === 'AUTHORIZED_ADMIN') {
     const isOperator = isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR';
+    const cleanPath = location.pathname.replace(/\/+$/, '') || '/admin';
 
+    // A. Operators logic (Restricted to Joining Forms)
     if (isOperator) {
-      const cleanPath = location.pathname.replace(/\/+$/, '') || '/admin';
-
-      // Redirect operator from /admin root to their authorized landing page (Joining Submissions)
       if (cleanPath === '/admin') {
         return <Navigate to={ADMIN_ROUTES.regularJoiningList} replace />;
       }
@@ -359,6 +358,208 @@ export const AdminProtectedRoute: React.FC = () => {
               >
                 <span>Return to Joining Submissions</span>
               </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  await signOut();
+                  window.location.href = ADMIN_ROUTES.login;
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  color: '#FCFBFB',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  cursor: 'pointer'
+                }}
+              >
+                <LogOut size={16} />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    // B. Sub-Admin & Non-Super-Admin Granular RBAC Route Verification
+    if (!isSuperAdmin) {
+      // Find fallback accessible landing route if user visits /admin without dashboard.view
+      const getAccessibleLandingRoute = (): string => {
+        if (hasPermission('regular_joining.submissions') || hasPermission('regular_joining.view')) {
+          return ADMIN_ROUTES.regularJoiningList;
+        }
+        if (hasPermission('employees.view')) {
+          return ADMIN_ROUTES.employees;
+        }
+        if (hasPermission('documents.view')) {
+          return ADMIN_ROUTES.documents;
+        }
+        if (hasPermission('reports.view') || hasPermission('reports.export')) {
+          return ADMIN_ROUTES.exports;
+        }
+        if (hasPermission('website.view')) {
+          return ADMIN_ROUTES.jobs;
+        }
+        if (hasPermission('settings.view')) {
+          return ADMIN_ROUTES.settings;
+        }
+        if (hasPermission('admin_management.view')) {
+          return ADMIN_ROUTES.adminUsers;
+        }
+        return ADMIN_ROUTES.login;
+      };
+
+      if (cleanPath === '/admin' && !hasPermission('dashboard.view')) {
+        const landing = getAccessibleLandingRoute();
+        if (landing !== ADMIN_ROUTES.login) {
+          return <Navigate to={landing} replace />;
+        }
+      }
+
+      // Check required permission by path
+      let requiredPerm: string | null = null;
+      let moduleName = 'This Section';
+
+      if (cleanPath === '/admin') {
+        requiredPerm = 'dashboard.view';
+        moduleName = 'Dashboard Overview';
+      } else if (cleanPath === '/admin/admin-users' || cleanPath === '/admin/sub-admins' || cleanPath === '/admin/admin-management') {
+        requiredPerm = 'admin_management.view';
+        moduleName = 'Admin Management';
+      } else if (cleanPath === '/admin/regular-joining-list') {
+        requiredPerm = 'regular_joining.submissions';
+        moduleName = 'Regular Joining Submissions';
+      } else if (cleanPath === '/admin/regular-joining' || cleanPath.startsWith('/admin/regular-joining/')) {
+        requiredPerm = 'regular_joining.view';
+        moduleName = 'Regular Joining Form';
+      } else if (cleanPath === '/admin/joining' || cleanPath.startsWith('/admin/joining/')) {
+        requiredPerm = 'regular_joining.submissions';
+        moduleName = 'Joining Dossiers';
+      } else if (cleanPath === '/admin/employees' || cleanPath.startsWith('/admin/employees/')) {
+        requiredPerm = 'employees.view';
+        moduleName = 'Employee Management';
+      } else if (cleanPath === '/admin/documents' || cleanPath.startsWith('/admin/documents/')) {
+        requiredPerm = 'documents.view';
+        moduleName = 'Document Management';
+      } else if (cleanPath === '/admin/exports') {
+        requiredPerm = 'reports.view';
+        moduleName = 'Reports and Exports';
+      } else if (cleanPath === '/admin/reference-slips' || cleanPath.startsWith('/admin/reference-slips/')) {
+        requiredPerm = 'regular_joining.generate_slip';
+        moduleName = 'Reference Slips';
+      } else if (cleanPath === '/admin/settings' || cleanPath === '/admin/joining-form-settings') {
+        requiredPerm = 'settings.view';
+        moduleName = 'System Settings';
+      } else if (cleanPath === '/admin/jobs' || cleanPath === '/admin/companies' || cleanPath.startsWith('/admin/jobs/') || cleanPath.startsWith('/admin/companies/')) {
+        requiredPerm = 'website.view';
+        moduleName = 'Website and Content Management';
+      } else if (cleanPath === '/admin/activity') {
+        requiredPerm = 'admin_management.view';
+        moduleName = 'Audit Activity Logs';
+      }
+
+      if (requiredPerm && !hasPermission(requiredPerm)) {
+        const fallbackRoute = getAccessibleLandingRoute();
+        return (
+          <div
+            style={{
+              minHeight: '100vh',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#0F1B38',
+              color: '#FCFBFB',
+              fontFamily: 'Plus Jakarta Sans, Inter, system-ui, sans-serif',
+              padding: '2rem',
+              textAlign: 'center'
+            }}
+          >
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '16px',
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid #EF4444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '1.5rem',
+                color: '#EF4444'
+              }}
+            >
+              <ShieldAlert size={32} />
+            </div>
+
+            <h1
+              style={{
+                fontSize: '1.65rem',
+                fontWeight: 800,
+                color: '#FCFBFB',
+                margin: '0 0 0.5rem 0'
+              }}
+            >
+              Access Restricted — Insufficient Permissions
+            </h1>
+
+            <p
+              style={{
+                fontSize: '0.9rem',
+                color: 'rgba(252, 251, 251, 0.8)',
+                maxWidth: '520px',
+                lineHeight: 1.6,
+                margin: '0 0 0.75rem 0'
+              }}
+            >
+              Your Sub-Admin account ({user?.email}) does not possess the requisite authorization to access <strong>{moduleName}</strong>.
+            </p>
+
+            <p
+              style={{
+                fontSize: '0.8rem',
+                color: '#F7D794',
+                fontFamily: 'monospace',
+                backgroundColor: 'rgba(247, 215, 148, 0.1)',
+                padding: '0.4rem 0.8rem',
+                borderRadius: '6px',
+                marginBottom: '1.75rem'
+              }}
+            >
+              Required Permission: {requiredPerm}
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {fallbackRoute !== ADMIN_ROUTES.login && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = fallbackRoute;
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    backgroundColor: '#F7D794',
+                    color: '#192A56',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <span>Go to Authorized Workspace</span>
+                </button>
+              )}
 
               <button
                 type="button"

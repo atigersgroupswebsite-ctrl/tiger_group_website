@@ -107,6 +107,9 @@ export const AdminLayout: React.FC = () => {
     if (path === ADMIN_ROUTES.activity) {
       return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'System Audit Activity' }];
     }
+    if (path === ADMIN_ROUTES.adminManagement || path === ADMIN_ROUTES.adminUsers || path === ADMIN_ROUTES.subAdmins) {
+      return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Admin Management' }];
+    }
     if (path === ADMIN_ROUTES.settings) {
       return [{ label: 'Dashboard', path: ADMIN_ROUTES.dashboard }, { label: 'Administration Settings' }];
     }
