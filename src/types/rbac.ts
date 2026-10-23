@@ -447,3 +447,52 @@ export interface AdminAuditLogEntry {
   metadata?: Record<string, any> | null;
   createdAt: string;
 }
+
+/**
+ * Normalizes any permission identifier or legacy permission ID (e.g. 'perm_dashboard_view')
+ * into the standard PermissionKey format (e.g. 'dashboard.view').
+ */
+export function normalizePermissionKey(raw: string | undefined | null): PermissionKey {
+  if (!raw || typeof raw !== 'string') return '' as PermissionKey;
+  const trimmed = raw.trim();
+
+  // 1. Direct match against known PermissionKey
+  const directMatch = ALL_PERMISSIONS.find((p) => p.key === trimmed);
+  if (directMatch) return directMatch.key;
+
+  // 2. Match against known PermissionDefinition id (e.g. 'perm_dashboard_view')
+  const idMatch = ALL_PERMISSIONS.find((p) => p.id === trimmed);
+  if (idMatch) return idMatch.key;
+
+  // 3. Fallback transformation for perm_ prefix
+  if (trimmed.startsWith('perm_')) {
+    const stripped = trimmed.slice(5);
+    const dotCandidate = stripped.replace('_', '.');
+    const matchedDot = ALL_PERMISSIONS.find((p) => p.key === dotCandidate);
+    if (matchedDot) return matchedDot.key;
+
+    // Handle multi-word modules (e.g. regular_joining_candidate_details -> regular_joining.candidate_details)
+    const lastUnderscoreToDot = stripped.replace(/_([^_]+)$/, '.$1');
+    const matchedLast = ALL_PERMISSIONS.find((p) => p.key === lastUnderscoreToDot);
+    if (matchedLast) return matchedLast.key;
+  }
+
+  return trimmed as PermissionKey;
+}
+
+/**
+ * Normalizes an array of permission keys/identifiers, removing duplicates and invalid keys.
+ */
+export function normalizePermissionKeys(rawList: (string | undefined | null)[]): PermissionKey[] {
+  if (!Array.isArray(rawList)) return [];
+  const validKeys = new Set<PermissionKey>();
+  for (const item of rawList) {
+    if (!item) continue;
+    const normalized = normalizePermissionKey(item);
+    if (normalized && ALL_PERMISSIONS.some((p) => p.key === normalized)) {
+      validKeys.add(normalized);
+    }
+  }
+  return Array.from(validKeys);
+}
+

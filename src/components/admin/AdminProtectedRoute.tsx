@@ -12,15 +12,26 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
-import { Loader2, ShieldAlert, LogOut } from 'lucide-react';
+import { Loader2, ShieldAlert, LogOut, RotateCcw } from 'lucide-react';
 import { ADMIN_ROUTES } from '../../constants/adminRoutes';
 
 export const AdminProtectedRoute: React.FC = () => {
-  const { adminState, user, signOut, role, isJoiningOperator, isSuperAdmin, hasPermission } = useAdminAuth();
+  const {
+    adminState,
+    user,
+    signOut,
+    role,
+    isJoiningOperator,
+    isSuperAdmin,
+    hasPermission,
+    permissionsLoading,
+    profileLoading,
+    refreshProfile
+  } = useAdminAuth();
   const location = useLocation();
 
-  // 1. Loading state: wait while checking Supabase session and admin profile
-  if (adminState === 'AUTH_LOADING') {
+  // 1. Loading state: wait while checking Supabase session, admin profile, and permissions
+  if (adminState === 'AUTH_LOADING' || permissionsLoading || profileLoading) {
     return (
       <div
         style={{
@@ -437,7 +448,7 @@ export const AdminProtectedRoute: React.FC = () => {
 
       if (cleanPath === '/admin' && !hasPermission('dashboard.view')) {
         const landing = getAccessibleLandingRoute();
-        if (landing) {
+        if (landing && landing !== cleanPath) {
           return <Navigate to={landing} replace />;
         }
       }
@@ -486,6 +497,8 @@ export const AdminProtectedRoute: React.FC = () => {
 
       if (requiredPerm && !hasPermission(requiredPerm)) {
         const fallbackRoute = getAccessibleLandingRoute();
+        const canGoToFallback = Boolean(fallbackRoute && fallbackRoute !== cleanPath);
+
         return (
           <div
             style={{
@@ -556,7 +569,7 @@ export const AdminProtectedRoute: React.FC = () => {
             </p>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {Boolean(fallbackRoute) && (
+              {canGoToFallback && (
                 <button
                   type="button"
                   onClick={() => {
@@ -579,6 +592,29 @@ export const AdminProtectedRoute: React.FC = () => {
                   <span>Go to Authorized Workspace</span>
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={async () => {
+                  await refreshProfile();
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  color: '#FCFBFB',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  cursor: 'pointer'
+                }}
+              >
+                <RotateCcw size={16} />
+                <span>Recheck Permissions</span>
+              </button>
 
               <button
                 type="button"
