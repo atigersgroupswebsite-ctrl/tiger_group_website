@@ -118,6 +118,40 @@ export async function authenticateRequest(authHeader: string | undefined | null)
     };
   }
 
+  // Support local development Sub-Admin authentication
+  if (token.startsWith('local_subadmin_jwt_')) {
+    const userId = token.replace('local_subadmin_jwt_', '');
+    try {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const storageFile = path.resolve(process.cwd(), 'node_modules', '.tiger_rbac_cache', 'rbac_store.json');
+      if (fs.existsSync(storageFile)) {
+        const store = JSON.parse(fs.readFileSync(storageFile, 'utf8'));
+        const matched = (store.users || []).find((u: any) => u.id === userId);
+        const isActive = typeof store.userStatuses?.[userId] === 'boolean'
+          ? store.userStatuses[userId]
+          : matched?.active !== false;
+
+        if (matched && isActive) {
+          return {
+            authenticated: true as const,
+            user: {
+              id: matched.id,
+              email: matched.email,
+              user_metadata: {
+                full_name: matched.fullName,
+                designation: matched.designation,
+                role: matched.role || 'SUB_ADMIN'
+              }
+            }
+          };
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   try {
     const { data: { user }, error } = await getSupabaseServer().auth.getUser(token);
     if (error || !user) {

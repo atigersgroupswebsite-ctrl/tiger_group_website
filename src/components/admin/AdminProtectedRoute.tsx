@@ -391,8 +391,27 @@ export const AdminProtectedRoute: React.FC = () => {
     // B. Sub-Admin & Non-Super-Admin Granular RBAC Route Verification
     if (!isSuperAdmin) {
       // Find fallback accessible landing route if user visits /admin without dashboard.view
-      const getAccessibleLandingRoute = (): string => {
-        if (hasPermission('regular_joining.submissions') || hasPermission('regular_joining.view')) {
+      const getAccessibleLandingRoute = (): string | null => {
+        if (hasPermission('dashboard.view')) {
+          return ADMIN_ROUTES.dashboard;
+        }
+        if (
+          hasPermission('regular_joining.submissions') ||
+          hasPermission('regular_joining.view') ||
+          hasPermission('regular_joining.verify') ||
+          hasPermission('regular_joining.candidate_details') ||
+          hasPermission('regular_joining.generate_slip') ||
+          hasPermission('regular_joining.generate_id_card') ||
+          hasPermission('regular_joining.download_docs') ||
+          hasPermission('regular_joining.export_excel') ||
+          hasPermission('regular_joining.edit')
+        ) {
+          if (hasPermission('regular_joining.submissions')) {
+            return ADMIN_ROUTES.regularJoiningList;
+          }
+          if (hasPermission('regular_joining.view')) {
+            return ADMIN_ROUTES.regularJoining;
+          }
           return ADMIN_ROUTES.regularJoiningList;
         }
         if (hasPermission('employees.view')) {
@@ -413,12 +432,12 @@ export const AdminProtectedRoute: React.FC = () => {
         if (hasPermission('admin_management.view')) {
           return ADMIN_ROUTES.adminUsers;
         }
-        return ADMIN_ROUTES.login;
+        return null;
       };
 
       if (cleanPath === '/admin' && !hasPermission('dashboard.view')) {
         const landing = getAccessibleLandingRoute();
-        if (landing !== ADMIN_ROUTES.login) {
+        if (landing) {
           return <Navigate to={landing} replace />;
         }
       }
@@ -537,11 +556,11 @@ export const AdminProtectedRoute: React.FC = () => {
             </p>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {fallbackRoute !== ADMIN_ROUTES.login && (
+              {Boolean(fallbackRoute) && (
                 <button
                   type="button"
                   onClick={() => {
-                    window.location.href = fallbackRoute;
+                    window.location.href = fallbackRoute!;
                   }}
                   style={{
                     display: 'inline-flex',

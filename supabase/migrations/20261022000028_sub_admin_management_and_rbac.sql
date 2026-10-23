@@ -49,6 +49,29 @@ ALTER TABLE public.admin_profiles ADD CONSTRAINT admin_profiles_role_check
     'REGULAR_JOINING_OPERATOR'
   ));
 
+-- Update is_active_admin() to include SUB_ADMIN
+CREATE OR REPLACE FUNCTION public.is_active_admin()
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN false;
+  END IF;
+
+  RETURN EXISTS (
+    SELECT 1 FROM public.admin_profiles
+    WHERE id = auth.uid()
+      AND active = true
+      AND role IN ('SUPER_ADMIN', 'SUB_ADMIN', 'ADMIN', 'COORDINATOR', 'DOCUMENT_VERIFIER', 'ACCOUNTANT', 'FINANCE')
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_active_admin() TO authenticated;
+
 -- ------------------------------------------------------------------------------
 -- 2. Add designation & created_by to public.admin_profiles
 -- ------------------------------------------------------------------------------

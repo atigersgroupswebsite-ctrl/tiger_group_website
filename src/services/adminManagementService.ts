@@ -35,7 +35,7 @@ export interface ServiceResult<T = unknown> {
  */
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = session?.access_token || (typeof window !== 'undefined' ? localStorage.getItem('tiger_admin_token') : null);
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {})

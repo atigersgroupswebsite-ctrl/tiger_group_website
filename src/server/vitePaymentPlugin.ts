@@ -68,9 +68,18 @@ export function paymentApiPlugin(): Plugin {
               toggleAdminStatusHandler,
               inviteAdminUserHandler,
               getAdminAuditLogsHandler,
-              getCurrentUserPermissionsHandler
+              getCurrentUserPermissionsHandler,
+              adminLoginHandler
             } = await import('./adminServer.js');
             const { ALL_PERMISSIONS, PERMISSION_MODULES, ROLE_TEMPLATES } = await import('../types/rbac.js');
+
+            // Sub-Admin Direct / Fallback Login: POST /api/admin/users/login
+            if (url === '/api/admin/users/login' && method === 'POST') {
+              const rawBody = await parseRequestBody(req);
+              const body = JSON.parse(rawBody || '{}');
+              const result = await adminLoginHandler(body);
+              return sendJsonResponse(res, result.status || 200, result.data);
+            }
 
             // Public / Authorized catalog: GET /api/admin/permissions
             if (url === '/api/admin/permissions' && method === 'GET') {
