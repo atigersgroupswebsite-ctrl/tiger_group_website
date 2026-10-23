@@ -47,6 +47,7 @@ interface LocalRbacCache {
   userPermissions: Record<string, PermissionKey[]>;
   userDesignations: Record<string, string>;
   userStatuses: Record<string, boolean>;
+  userRoles?: Record<string, AdminRole>;
   userPasswordHashes?: Record<string, string>;
   auditLogs: AdminAuditLogEntry[];
 }
@@ -86,6 +87,9 @@ function getLocalRbacStore(): LocalRbacCache {
       if (!store.userStatuses || typeof store.userStatuses !== 'object') {
         store.userStatuses = {};
       }
+      if (!store.userRoles || typeof store.userRoles !== 'object') {
+        store.userRoles = {};
+      }
       if (!store.userPasswordHashes || typeof store.userPasswordHashes !== 'object') {
         store.userPasswordHashes = {};
       }
@@ -99,6 +103,31 @@ function getLocalRbacStore(): LocalRbacCache {
         for (const entry of store.auditLogs) {
           if (entry.action === 'SUB_ADMIN_DELETED' && entry.targetId) {
             deletedIds.add(entry.targetId);
+          }
+        }
+
+        // Map latest permissions and roles from PERMISSIONS_UPDATED audit logs
+        const latestPermsFromLogs: Record<string, PermissionKey[]> = {};
+        const latestRoleFromLogs: Record<string, AdminRole> = {};
+        for (const entry of store.auditLogs) {
+          const tId = entry.targetId;
+          const meta = (entry.metadata || {}) as any;
+          const mEmail = (meta.email || '').toLowerCase().trim();
+          if ((entry.action === 'PERMISSIONS_UPDATED' || entry.action === 'SUB_ADMIN_CREATED') && Array.isArray(meta.permissions)) {
+            if (tId && !latestPermsFromLogs[tId]) {
+              latestPermsFromLogs[tId] = normalizePermissionKeys(meta.permissions);
+            }
+            if (mEmail && !latestPermsFromLogs[mEmail]) {
+              latestPermsFromLogs[mEmail] = normalizePermissionKeys(meta.permissions);
+            }
+          }
+          if (meta.role && VALID_ADMIN_ROLES.includes(meta.role)) {
+            if (tId && !latestRoleFromLogs[tId]) {
+              latestRoleFromLogs[tId] = meta.role;
+            }
+            if (mEmail && !latestRoleFromLogs[mEmail]) {
+              latestRoleFromLogs[mEmail] = meta.role;
+            }
           }
         }
 
@@ -116,20 +145,39 @@ function getLocalRbacStore(): LocalRbacCache {
             if (!email || !email.includes('@')) {
               continue; // Never restore a profile with a placeholder or missing email
             }
+
+            const assignedRole: AdminRole =
+              store.userRoles[entry.targetId] ||
+              (email ? store.userRoles[email] : null) ||
+              latestRoleFromLogs[entry.targetId] ||
+              (email ? latestRoleFromLogs[email] : null) ||
+              (meta.role as AdminRole) ||
+              'SUB_ADMIN';
+
+            const assignedPerms: PermissionKey[] =
+              store.userPermissions[entry.targetId] ||
+              (email ? store.userPermissions[email] : null) ||
+              latestPermsFromLogs[entry.targetId] ||
+              (email ? latestPermsFromLogs[email] : null) ||
+              meta.permissions ||
+              [];
+
             const restoredUser: SubAdminUser = {
               id: entry.targetId,
               email,
               fullName: meta.fullName || 'Sub-Admin Executive',
-              role: (meta.role as AdminRole) || 'SUB_ADMIN',
+              role: assignedRole,
               designation: meta.designation || store.userDesignations[entry.targetId] || 'Sub-Admin Executive',
               active: typeof store.userStatuses[entry.targetId] === 'boolean' ? store.userStatuses[entry.targetId] : true,
               createdAt: entry.createdAt || new Date().toISOString(),
               lastSignInAt: null,
-              permissions: meta.permissions || store.userPermissions[entry.targetId] || [],
+              permissions: normalizePermissionKeys(assignedPerms),
               createdBy: entry.actingAdminId || null
             };
             store.users.push(restoredUser);
             store.userEmails[entry.targetId] = email;
+            store.userRoles[entry.targetId] = assignedRole;
+            if (email) store.userRoles[email] = assignedRole;
           }
         }
       }
@@ -276,14 +324,14 @@ export function resolveSubAdminPermissions(
   }
 
   // 2. Authoritative permissions saved directly on the SubAdminUser object
-  if (user && Array.isArray(user.permissions) && user.permissions.length > 0) {
+  if (user && Array.isArray(user.permissions)) {
     return normalizePermissionKeys(user.permissions);
   }
 
   // 3. LocalStore userPermissions by emails (email is unique to Sub-Admin)
   for (const email of emails) {
     const p = store.userPermissions[email];
-    if (Array.isArray(p) && p.length > 0) {
+    if (Array.isArray(p)) {
       return normalizePermissionKeys(p);
     }
   }
@@ -291,13 +339,13 @@ export function resolveSubAdminPermissions(
   // 4. LocalStore userPermissions by associated IDs (matched user ID first)
   if (user?.id) {
     const p = store.userPermissions[user.id];
-    if (Array.isArray(p) && p.length > 0) {
+    if (Array.isArray(p)) {
       return normalizePermissionKeys(p);
     }
   }
   for (const id of associatedIds) {
     const p = store.userPermissions[id];
-    if (Array.isArray(p) && p.length > 0) {
+    if (Array.isArray(p)) {
       return normalizePermissionKeys(p);
     }
   }
@@ -621,17 +669,43 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
       const normalizedEmail = email && email !== 'N/A' ? email.toLowerCase().trim() : null;
 
       // Role resolution
+      localStore.userRoles = localStore.userRoles || {};
       let role: AdminRole = p.role as AdminRole;
-      if (localUser?.role) {
-        role = localUser.role;
+      const storedRole =
+        localUser?.role ||
+        associatedIds.map((id) => localStore.userRoles?.[id]).find(Boolean) ||
+        (normalizedEmail ? localStore.userRoles?.[normalizedEmail] : undefined);
+
+      const operationalRoles: AdminRole[] = [
+        'COORDINATOR',
+        'DOCUMENT_VERIFIER',
+        'REGULAR_JOINING_OPERATOR',
+        'ACCOUNTANT',
+        'FINANCE'
+      ];
+
+      if (storedRole && operationalRoles.includes(storedRole)) {
+        role = storedRole;
+      } else if (p.role && operationalRoles.includes(p.role as AdminRole)) {
+        role = p.role as AdminRole;
+      } else if (storedRole && VALID_ADMIN_ROLES.includes(storedRole)) {
+        role = storedRole;
       } else if (!isSuper) {
-        if (
+        if (p.role === 'ADMIN') {
+          role = 'SUB_ADMIN';
+        } else if (
           localStore.userDesignations?.[p.id] ||
           associatedIds.some((id) => localStore.userDesignations?.[id]) ||
           localStore.userPermissions?.[p.id]
         ) {
           role = 'SUB_ADMIN';
         }
+      }
+
+      if (role && role !== 'SUPER_ADMIN') {
+        localStore.userRoles[p.id] = role;
+        if (normalizedEmail) localStore.userRoles[normalizedEmail] = role;
+        if (localUser) localUser.role = role;
       }
 
       // Permissions resolution
@@ -678,9 +752,10 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
       if (existingIdx >= 0) {
         // Merge permissions, status, designation with existing entry instead of duplicate
         const existing = mergedList[existingIdx];
-        if (existing.permissions.length === 0 && perms.length > 0) {
-          existing.permissions = perms;
+        if (role && role !== 'ADMIN' && (existing.role === 'SUB_ADMIN' || existing.role === 'ADMIN' || operationalRoles.includes(role))) {
+          existing.role = role;
         }
+        existing.permissions = perms;
         if (!existing.designation && designation) {
           existing.designation = designation;
         }
@@ -728,9 +803,17 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
 
       if (existingIdx >= 0) {
         const existing = mergedList[existingIdx];
-        if (existing.permissions.length === 0 && perms.length > 0) {
-          existing.permissions = perms;
+        const operationalRoles: AdminRole[] = [
+          'COORDINATOR',
+          'DOCUMENT_VERIFIER',
+          'REGULAR_JOINING_OPERATOR',
+          'ACCOUNTANT',
+          'FINANCE'
+        ];
+        if (lu.role && lu.role !== 'ADMIN' && (existing.role === 'SUB_ADMIN' || existing.role === 'ADMIN' || operationalRoles.includes(lu.role))) {
+          existing.role = lu.role;
         }
+        existing.permissions = perms;
         if (!existing.designation && (lu.designation || localStore.userDesignations?.[lu.id])) {
           existing.designation = lu.designation || localStore.userDesignations?.[lu.id] || null;
         }
@@ -748,11 +831,18 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
         associatedIds.map((id) => localStore.userStatuses?.[id]).find((s) => typeof s === 'boolean') ??
         (luEmail && typeof localStore.userStatuses?.[luEmail] === 'boolean' ? localStore.userStatuses[luEmail] : lu.active !== false);
 
+      const storedRole =
+        lu.role ||
+        associatedIds.map((id) => localStore.userRoles?.[id]).find(Boolean) ||
+        (luEmail ? localStore.userRoles?.[luEmail] : undefined) ||
+        'SUB_ADMIN';
+
       mergedList.push({
         ...lu,
-        permissions: perms,
+        role: storedRole,
         designation,
-        active
+        active,
+        permissions: perms
       });
     }
 
@@ -1058,6 +1148,10 @@ export async function createSubAdminHandler(
     localStore.userEmails[targetUserId] = normalizedEmail;
     localStore.userEmails[normalizedEmail] = normalizedEmail;
 
+    localStore.userRoles = localStore.userRoles || {};
+    localStore.userRoles[targetUserId] = assignedRole;
+    localStore.userRoles[normalizedEmail] = assignedRole;
+
     localStore.userPermissions = localStore.userPermissions || {};
     localStore.userPermissions[targetUserId] = assignedPermissions;
     localStore.userPermissions[normalizedEmail] = assignedPermissions;
@@ -1129,10 +1223,16 @@ export async function createSubAdminHandler(
 
 /**
  * Handler: POST /api/admin/users/update-permissions
- * Super Admin updates or revokes permissions for a Sub-Admin.
+ * Super Admin updates or revokes permissions and assigned role for a Sub-Admin.
  */
 export async function updateSubAdminPermissionsHandler(
-  body: { adminId?: string; permissions?: PermissionKey[] },
+  body: {
+    adminId?: string;
+    email?: string;
+    role?: AdminRole;
+    designation?: string;
+    permissions?: PermissionKey[];
+  },
   authHeader: string | undefined | null
 ) {
   const authCheck = await verifySuperAdmin(authHeader);
@@ -1140,7 +1240,7 @@ export async function updateSubAdminPermissionsHandler(
     return { status: authCheck.status, data: { success: false, error: authCheck.error } };
   }
 
-  const { adminId, permissions } = body;
+  const { adminId, permissions, email, role, designation } = body;
   if (!adminId) {
     return { status: 400, data: { success: false, error: 'Admin ID is required.' } };
   }
@@ -1169,23 +1269,69 @@ export async function updateSubAdminPermissionsHandler(
   }
 
   try {
-    // 1. Update local cache with aliased and normalized identity resolution
     const localStore = getLocalRbacStore();
+    localStore.userRoles = localStore.userRoles || {};
+    localStore.userDesignations = localStore.userDesignations || {};
+    localStore.userEmails = localStore.userEmails || {};
+
+    const cleanEmail = (email || localStore.userEmails[adminId] || '').toLowerCase().trim();
     const normalizedPerms = normalizePermissionKeys(permissions);
 
-    const resolved = resolveSubAdminIdentity(localStore, adminId, targetProfile?.full_name);
+    const resolved = resolveSubAdminIdentity(localStore, adminId, targetProfile?.full_name, cleanEmail);
     const targetUser = resolved.user;
     const associatedIds = Array.from(new Set([adminId, ...resolved.associatedIds]));
-    const emails = resolved.emails;
+    const emails = Array.from(new Set([cleanEmail, ...resolved.emails].filter(Boolean)));
 
+    // 1. Role and Designation update
+    const normalizedRole: AdminRole | undefined =
+      role && VALID_ADMIN_ROLES.includes(role.toUpperCase() as AdminRole) && role.toUpperCase() !== 'SUPER_ADMIN'
+        ? (role.toUpperCase() as AdminRole)
+        : undefined;
+
+    if (normalizedRole) {
+      for (const id of associatedIds) {
+        localStore.userRoles[id] = normalizedRole;
+      }
+      for (const e of emails) {
+        localStore.userRoles[e] = normalizedRole;
+      }
+      if (targetUser) {
+        targetUser.role = normalizedRole;
+      }
+      // Also update any matching user in localStore.users
+      for (const u of localStore.users) {
+        if (associatedIds.includes(u.id) || (u.email && emails.includes(u.email.toLowerCase().trim()))) {
+          u.role = normalizedRole;
+        }
+      }
+    }
+
+    const trimmedDesignation = designation !== undefined ? designation.trim() : undefined;
+    if (trimmedDesignation !== undefined) {
+      for (const id of associatedIds) {
+        localStore.userDesignations[id] = trimmedDesignation;
+      }
+      for (const e of emails) {
+        localStore.userDesignations[e] = trimmedDesignation;
+      }
+      if (targetUser) {
+        targetUser.designation = trimmedDesignation;
+      }
+      for (const u of localStore.users) {
+        if (associatedIds.includes(u.id) || (u.email && emails.includes(u.email.toLowerCase().trim()))) {
+          u.designation = trimmedDesignation;
+        }
+      }
+    }
+
+    // 2. Permissions update
     syncSubAdminPermissionsToStore(localStore, associatedIds, emails, normalizedPerms, targetUser);
     saveLocalRbacStore(localStore);
 
-    // 2. Update database admin_permissions across all associated IDs
-    try {
-      const dbIdsToUpdate = associatedIds.filter((id) => isValidUuid(id));
-
-      for (const tId of dbIdsToUpdate) {
+    // 3. Update database admin_permissions and admin_profiles across all associated IDs
+    const dbIdsToUpdate = associatedIds.filter((id) => isValidUuid(id));
+    for (const tId of dbIdsToUpdate) {
+      try {
         await supabase.from('admin_permissions').delete().eq('admin_id', tId);
         if (normalizedPerms.length > 0) {
           const rowsToInsert = normalizedPerms.map((key) => {
@@ -1198,21 +1344,49 @@ export async function updateSubAdminPermissionsHandler(
           });
           await supabase.from('admin_permissions').insert(rowsToInsert);
         }
+      } catch (permErr) {
+        console.warn('[AdminServer] admin_permissions update warning:', permErr);
       }
-    } catch (permErr) {
-      console.warn('[AdminServer] admin_permissions update warning:', permErr);
+
+      if (normalizedRole) {
+        try {
+          const { error: roleErr } = await supabase
+            .from('admin_profiles')
+            .update({ role: normalizedRole })
+            .eq('id', tId);
+
+          if (roleErr) {
+            console.warn('[AdminServer] admin_profiles role update error:', roleErr.message);
+            // Only fall back to ADMIN if check constraint specifically rejected the operational role
+            if (roleErr.message?.includes('admin_profiles_role_check') || roleErr.code === '23514') {
+              await supabase
+                .from('admin_profiles')
+                .update({ role: 'ADMIN' })
+                .eq('id', tId);
+            }
+          }
+        } catch (err: any) {
+          console.warn('[AdminServer] admin_profiles update exception:', err?.message);
+        }
+      }
     }
 
-    // 3. Log audit event
+    // 4. Log audit event with full metadata including role and email
+    const finalRole = normalizedRole || targetUser?.role || localStore.userRoles?.[adminId] || 'SUB_ADMIN';
+    const primaryEmail = emails[0] || cleanEmail || 'N/A';
+
     await recordAuditLog(
       authCheck.user!.id,
       'PERMISSIONS_UPDATED',
       adminId,
       'SUCCESS',
       {
-        targetUser: targetProfile?.full_name || adminId,
-        permissionsCount: permissions.length,
-        permissions
+        targetUser: targetProfile?.full_name || targetUser?.fullName || adminId,
+        email: primaryEmail,
+        role: finalRole,
+        designation: trimmedDesignation ?? targetUser?.designation,
+        permissionsCount: normalizedPerms.length,
+        permissions: normalizedPerms
       }
     );
 
@@ -1220,8 +1394,10 @@ export async function updateSubAdminPermissionsHandler(
       status: 200,
       data: {
         success: true,
-        message: `Permissions updated successfully (${permissions.length} active permissions).`,
-        permissions
+        message: `Account updated successfully with role (${finalRole.replace(/_/g, ' ')}) and ${normalizedPerms.length} active permissions.`,
+        permissions: normalizedPerms,
+        role: finalRole,
+        designation: trimmedDesignation ?? targetUser?.designation
       }
     };
   } catch (err: any) {
@@ -1713,15 +1889,29 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
       // Self-heal DB profile so PostgREST RLS recognizes auth.uid() = auth.user.id
       if (!profile && isValidUuid(auth.user.id)) {
         try {
-          await supabase.from('admin_profiles').upsert(
+          const selfHealRole: AdminRole = (localUser.role && VALID_ADMIN_ROLES.includes(localUser.role))
+            ? localUser.role
+            : 'ADMIN';
+          const { error: upsertErr } = await supabase.from('admin_profiles').upsert(
             {
               id: auth.user.id,
               full_name: localUser.fullName,
-              role: 'ADMIN',
+              role: selfHealRole,
               active: localUser.active !== false
             },
             { onConflict: 'id' }
           );
+          if (upsertErr) {
+            await supabase.from('admin_profiles').upsert(
+              {
+                id: auth.user.id,
+                full_name: localUser.fullName,
+                role: 'ADMIN',
+                active: localUser.active !== false
+              },
+              { onConflict: 'id' }
+            );
+          }
         } catch {
           // ignore
         }
@@ -1752,13 +1942,27 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
       };
     }
 
-    // Role resolution
-    const effectiveRole: AdminRole =
-      profile?.role === 'SUPER_ADMIN' || localUser?.role === 'SUPER_ADMIN'
-        ? 'SUPER_ADMIN'
-        : profile?.role === 'ADMIN' || localUser?.role === 'ADMIN' || localUser?.role === 'SUB_ADMIN'
-        ? 'SUB_ADMIN'
-        : (((profile?.role || localUser?.role) as AdminRole) || 'SUB_ADMIN');
+    // Role resolution: prioritize authoritative assigned operational role
+    localStore.userRoles = localStore.userRoles || {};
+    const storeRole =
+      localUser?.role ||
+      associatedIds.map((id) => localStore.userRoles?.[id]).find(Boolean) ||
+      emails.map((e) => localStore.userRoles?.[e]).find(Boolean);
+
+    let effectiveRole: AdminRole = 'SUB_ADMIN';
+    if (profile?.role === 'SUPER_ADMIN' || storeRole === 'SUPER_ADMIN') {
+      effectiveRole = 'SUPER_ADMIN';
+    } else if (storeRole && storeRole !== 'ADMIN' && VALID_ADMIN_ROLES.includes(storeRole)) {
+      effectiveRole = storeRole;
+    } else if (profile?.role && profile.role !== 'ADMIN' && VALID_ADMIN_ROLES.includes(profile.role)) {
+      effectiveRole = profile.role as AdminRole;
+    } else {
+      effectiveRole = 'SUB_ADMIN';
+    }
+
+    if (localUser) {
+      localUser.role = effectiveRole;
+    }
 
     if (effectiveRole === 'SUPER_ADMIN') {
       return {
@@ -1814,8 +2018,13 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
       perms = resolveSubAdminPermissions(localStore, associatedIds, emails, undefined, localUser);
     }
 
-    // Role-based defaults fallback for operational roles
-    if (perms.length === 0) {
+    // Role-based defaults fallback for operational roles ONLY if no explicit permissions exist anywhere
+    const hasExplicitPerms =
+      (localUser && Array.isArray(localUser.permissions)) ||
+      associatedIds.some((id) => Array.isArray(localStore.userPermissions?.[id])) ||
+      emails.some((e) => Array.isArray(localStore.userPermissions?.[e]));
+
+    if (perms.length === 0 && !hasExplicitPerms) {
       if (effectiveRole === 'REGULAR_JOINING_OPERATOR') {
         perms = [
           'dashboard.view',
@@ -1933,11 +2142,20 @@ export async function adminLoginHandler(body: { email?: string; password?: strin
     };
   }
 
-  // Resolve role: never grant Super Admin privileges automatically
-  const appRole: AdminRole = user.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'SUB_ADMIN';
-  const perms = user.permissions && user.permissions.length > 0
-    ? user.permissions
-    : localStore.userPermissions?.[user.id] || [];
+  // Resolve role: preserve assigned operational role, never grant unauthorized Super Admin
+  localStore.userRoles = localStore.userRoles || {};
+  const storedRole =
+    user.role ||
+    localStore.userRoles?.[user.id] ||
+    localStore.userRoles?.[normalizedEmail];
+
+  const appRole: AdminRole =
+    storedRole && VALID_ADMIN_ROLES.includes(storedRole) && storedRole !== 'ADMIN'
+      ? storedRole
+      : 'SUB_ADMIN';
+
+  const resolved = resolveSubAdminIdentity(localStore, user.id, user.fullName, normalizedEmail);
+  const perms = resolveSubAdminPermissions(localStore, resolved.associatedIds, resolved.emails, undefined, user);
 
   const token = `local_subadmin_jwt_${user.id}`;
   const authUser = {

@@ -30,6 +30,7 @@ import {
   type SubAdminUser,
   type AdminAuditLogEntry
 } from '../../types/rbac';
+import type { AdminRole } from '../../types/database';
 import {
   Users,
   UserPlus,
@@ -76,6 +77,7 @@ export const AdminManagementPage: React.FC = () => {
   const [formFullName, setFormFullName] = useState<string>('');
   const [formEmail, setFormEmail] = useState<string>('');
   const [formDesignation, setFormDesignation] = useState<string>('');
+  const [formRole, setFormRole] = useState<AdminRole>('SUB_ADMIN');
   const [formInitialPassword, setFormInitialPassword] = useState<string>('');
   const [formConfirmPassword, setFormConfirmPassword] = useState<string>('');
   const [formActive, setFormActive] = useState<boolean>(true);
@@ -89,6 +91,9 @@ export const AdminManagementPage: React.FC = () => {
   // Modals state
   const [viewingUser, setViewingUser] = useState<SubAdminUser | null>(null);
   const [editingPermsUser, setEditingPermsUser] = useState<SubAdminUser | null>(null);
+  const [editingRole, setEditingRole] = useState<AdminRole>('SUB_ADMIN');
+  const [editingDesignation, setEditingDesignation] = useState<string>('');
+  const [editingTemplate, setEditingTemplate] = useState<string>('CUSTOM_ADMIN');
   const [editingPermsSet, setEditingPermsSet] = useState<Set<PermissionKey>>(new Set());
   const [permsSaving, setPermsSaving] = useState<boolean>(false);
   const [permsError, setPermsError] = useState<string | null>(null);
@@ -191,6 +196,13 @@ export const AdminManagementPage: React.FC = () => {
     const tmpl = ROLE_TEMPLATES[templateKey];
     if (tmpl) {
       setFormPermissions(new Set(tmpl.permissions));
+      if (templateKey === 'JOINING_VERIFICATION_ADMIN') {
+        setFormRole('DOCUMENT_VERIFIER');
+      } else if (templateKey === 'HR_ADMIN') {
+        setFormRole('COORDINATOR');
+      } else if (templateKey === 'REPORTS_ADMIN') {
+        setFormRole('SUB_ADMIN');
+      }
     }
   };
 
@@ -273,7 +285,7 @@ export const AdminManagementPage: React.FC = () => {
         initialPassword: formInitialPassword,
         confirmPassword: formConfirmPassword,
         designation: formDesignation.trim() || 'Sub-Admin Executive',
-        role: 'SUB_ADMIN',
+        role: formRole,
         active: formActive,
         permissions: Array.from(formPermissions)
       });
@@ -281,11 +293,13 @@ export const AdminManagementPage: React.FC = () => {
       if (!res.success) {
         setFormError(res.error || 'Failed to create Sub-Admin account.');
       } else {
-        setSuccessMessage(`Sub-Admin account for ${formEmail} created successfully with ${formPermissions.size} assigned permissions!`);
+        const assignedRoleName = (res.data?.role || formRole).replace(/_/g, ' ');
+        setSuccessMessage(`Sub-Admin account for ${formEmail} created successfully with role (${assignedRoleName}) and ${formPermissions.size} assigned permissions!`);
         // Reset form
         setFormFullName('');
         setFormEmail('');
         setFormDesignation('');
+        setFormRole('SUB_ADMIN');
         setFormInitialPassword('');
         setFormConfirmPassword('');
         setFormPermissions(new Set(ROLE_TEMPLATES.JOINING_VERIFICATION_ADMIN.permissions));
@@ -307,7 +321,10 @@ export const AdminManagementPage: React.FC = () => {
   // Open Edit Permissions Modal
   const openEditPermissionsModal = (target: SubAdminUser) => {
     setEditingPermsUser(target);
+    setEditingRole(target.role || 'SUB_ADMIN');
+    setEditingDesignation(target.designation || '');
     setEditingPermsSet(new Set(target.permissions || []));
+    setEditingTemplate('CUSTOM_ADMIN');
     setPermsError(null);
   };
 
@@ -319,13 +336,28 @@ export const AdminManagementPage: React.FC = () => {
 
     try {
       const permsArray = Array.from(editingPermsSet);
-      const res = await updateSubAdminPermissions(editingPermsUser.id, permsArray);
+      const res = await updateSubAdminPermissions({
+        adminId: editingPermsUser.id,
+        email: editingPermsUser.email,
+        role: editingRole,
+        designation: editingDesignation,
+        permissions: permsArray
+      });
+
       if (!res.success) {
         setPermsError(res.error || 'Failed to update permissions.');
       } else {
-        setSuccessMessage(`Permissions for ${editingPermsUser.fullName} updated successfully (${permsArray.length} active).`);
+        const finalRole = res.data?.role || editingRole;
+        const finalDesignation = res.data?.designation || editingDesignation;
+        const finalPerms = res.data?.permissions || permsArray;
+
+        setSuccessMessage(`Account for ${editingPermsUser.fullName} updated successfully with role (${finalRole.replace(/_/g, ' ')}) and ${finalPerms.length} active permissions.`);
         setAdmins((prev) =>
-          prev.map((a) => (a.id === editingPermsUser.id ? { ...a, permissions: permsArray } : a))
+          prev.map((a) =>
+            a.id === editingPermsUser.id
+              ? { ...a, role: finalRole, designation: finalDesignation, permissions: finalPerms }
+              : a
+          )
         );
         setEditingPermsUser(null);
         await fetchDirectory();
@@ -805,7 +837,7 @@ export const AdminManagementPage: React.FC = () => {
                                   onClick={() => openEditPermissionsModal(admin)}
                                   className="btn btn-outline btn-sm"
                                   style={{ padding: '0.25rem 0.45rem', borderColor: '#F7D794', color: '#B45309' }}
-                                  title="Edit Module Permissions"
+                                  title="Edit Role & Module Permissions"
                                 >
                                   <Sliders size={13} />
                                 </button>
@@ -959,6 +991,24 @@ export const AdminManagementPage: React.FC = () => {
                   placeholder="e.g. Senior Verification Officer / HR Executive"
                   style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.85rem' }}
                 />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#1E293B', marginBottom: '0.35rem' }}>
+                  Assigned Administrative Role *
+                </label>
+                <select
+                  value={formRole}
+                  onChange={(e) => setFormRole(e.target.value as AdminRole)}
+                  style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.85rem' }}
+                >
+                  <option value="SUB_ADMIN">Sub-Admin (Standard Administrator)</option>
+                  <option value="COORDINATOR">Coordinator (Operations Lead)</option>
+                  <option value="DOCUMENT_VERIFIER">Document Verifier (Verification Specialist)</option>
+                  <option value="REGULAR_JOINING_OPERATOR">Regular Joining Operator</option>
+                  <option value="ACCOUNTANT">Accountant (Accounts Management)</option>
+                  <option value="FINANCE">Finance (Financial Review)</option>
+                </select>
               </div>
 
               <div>
@@ -1326,11 +1376,11 @@ export const AdminManagementPage: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 2: EDIT PERMISSIONS MODAL                                           */}
+      {/* MODAL 2: EDIT ROLE & PERMISSIONS MODAL                                    */}
       {/* ========================================================================= */}
       {editingPermsUser && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,27,56,0.7)', backdropFilter: 'blur(3px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ background: '#FFFFFF', borderRadius: '12px', width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem', position: 'relative' }}>
+          <div style={{ background: '#FFFFFF', borderRadius: '12px', width: '100%', maxWidth: '850px', maxHeight: '92vh', overflowY: 'auto', padding: '1.75rem', position: 'relative' }}>
             <button
               type="button"
               onClick={() => setEditingPermsUser(null)}
@@ -1340,11 +1390,14 @@ export const AdminManagementPage: React.FC = () => {
             </button>
 
             <div style={{ marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#0F1B38' }}>
-                Edit Permissions: {editingPermsUser.fullName}
-              </h3>
-              <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0.25rem 0 0' }}>
-                Toggle granular authority for {editingPermsUser.email}. Sub-Admins can only perform actions explicitly granted.
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                <Sliders size={20} style={{ color: '#B45309' }} />
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#0F1B38' }}>
+                  Manage Sub-Admin Role & Permissions: {editingPermsUser.fullName}
+                </h3>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>
+                Configure operational role, corporate designation, and granular module permissions for <strong>{editingPermsUser.email}</strong>.
               </p>
             </div>
 
@@ -1354,6 +1407,85 @@ export const AdminManagementPage: React.FC = () => {
               </div>
             )}
 
+            {/* Account Role & Designation Configuration Card */}
+            <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', padding: '1rem', borderRadius: '8px', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#1E293B', marginBottom: '0.35rem' }}>
+                    Assigned Operational Role *
+                  </label>
+                  <select
+                    value={editingRole}
+                    onChange={(e) => setEditingRole(e.target.value as AdminRole)}
+                    style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.85rem', background: '#FFFFFF' }}
+                  >
+                    <option value="SUB_ADMIN">Sub-Admin (Standard Administrator)</option>
+                    <option value="COORDINATOR">Coordinator (Operations Lead)</option>
+                    <option value="DOCUMENT_VERIFIER">Document Verifier (Verification Specialist)</option>
+                    <option value="REGULAR_JOINING_OPERATOR">Regular Joining Operator</option>
+                    <option value="ACCOUNTANT">Accountant (Accounts Management)</option>
+                    <option value="FINANCE">Finance (Financial Review)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#1E293B', marginBottom: '0.35rem' }}>
+                    Operational Designation / Title
+                  </label>
+                  <input
+                    type="text"
+                    value={editingDesignation}
+                    onChange={(e) => setEditingDesignation(e.target.value)}
+                    placeholder="e.g. Senior Verification Officer"
+                    style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.85rem', background: '#FFFFFF' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Template Presets Bar */}
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0F1B38' }}>Apply Role Template Preset:</span>
+                <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Preset automatically selects recommended permissions</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {Object.values(ROLE_TEMPLATES).map((tmpl) => {
+                  const isSelected = editingTemplate === tmpl.key;
+                  return (
+                    <button
+                      key={tmpl.key}
+                      type="button"
+                      onClick={() => {
+                        setEditingTemplate(tmpl.key);
+                        if (tmpl.permissions.length > 0) {
+                          setEditingPermsSet(new Set(tmpl.permissions));
+                        }
+                        if (tmpl.key === 'JOINING_VERIFICATION_ADMIN') {
+                          setEditingRole('DOCUMENT_VERIFIER');
+                        } else if (tmpl.key === 'HR_ADMIN') {
+                          setEditingRole('COORDINATOR');
+                        } else if (tmpl.key === 'REPORTS_ADMIN') {
+                          setEditingRole('SUB_ADMIN');
+                        }
+                      }}
+                      className="btn btn-outline btn-sm"
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.25rem 0.6rem',
+                        borderColor: isSelected ? '#0F1B38' : '#CBD5E1',
+                        backgroundColor: isSelected ? '#0F1B38' : '#FFFFFF',
+                        color: isSelected ? '#FFFFFF' : '#334155',
+                        fontWeight: isSelected ? 700 : 500
+                      }}
+                    >
+                      {tmpl.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Quick Bulk Actions */}
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', background: '#F8FAFC', padding: '0.65rem 0.85rem', borderRadius: '6px' }}>
               <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#0F1B38' }}>
@@ -1362,7 +1494,10 @@ export const AdminManagementPage: React.FC = () => {
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
                   type="button"
-                  onClick={() => handleSelectAll(setEditingPermsSet)}
+                  onClick={() => {
+                    handleSelectAll(setEditingPermsSet);
+                    setEditingTemplate('CUSTOM_ADMIN');
+                  }}
                   className="btn btn-outline btn-sm"
                   style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
                 >
@@ -1370,7 +1505,10 @@ export const AdminManagementPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDeselectAll(setEditingPermsSet)}
+                  onClick={() => {
+                    handleDeselectAll(setEditingPermsSet);
+                    setEditingTemplate('CUSTOM_ADMIN');
+                  }}
                   className="btn btn-outline btn-sm"
                   style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
                 >
@@ -1380,7 +1518,7 @@ export const AdminManagementPage: React.FC = () => {
             </div>
 
             {/* Module Checklist */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', maxHeight: '55vh', overflowY: 'auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', maxHeight: '48vh', overflowY: 'auto' }}>
               {PERMISSION_MODULES.map((modName) => {
                 const modPerms = ALL_PERMISSIONS.filter((p) => p.module === modName);
                 const allSelected = modPerms.every((p) => editingPermsSet.has(p.key));
@@ -1391,7 +1529,10 @@ export const AdminManagementPage: React.FC = () => {
                       <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#0F1B38' }}>{modName}</span>
                       <button
                         type="button"
-                        onClick={() => toggleModulePermissions(modName, editingPermsSet, setEditingPermsSet)}
+                        onClick={() => {
+                          toggleModulePermissions(modName, editingPermsSet, setEditingPermsSet);
+                          setEditingTemplate('CUSTOM_ADMIN');
+                        }}
                         style={{ background: 'none', border: 'none', color: '#2563EB', fontSize: '0.7rem', cursor: 'pointer' }}
                       >
                         {allSelected ? 'Clear' : 'Select'}
@@ -1413,6 +1554,7 @@ export const AdminManagementPage: React.FC = () => {
                                   else next.add(perm.key);
                                   return next;
                                 });
+                                setEditingTemplate('CUSTOM_ADMIN');
                               }}
                             />
                             <span>{perm.name}</span>
@@ -1437,7 +1579,7 @@ export const AdminManagementPage: React.FC = () => {
                 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
               >
                 {permsSaving && <Loader2 size={14} className="animate-spin" />}
-                <span>Save Permissions</span>
+                <span>Save Role & Permissions</span>
               </button>
             </div>
           </div>

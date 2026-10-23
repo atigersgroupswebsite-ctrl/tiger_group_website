@@ -145,6 +145,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       let resolvedProfile: AdminProfileRow | null = adminProfile;
       let userPermissions: PermissionKey[] = [];
+      let hasServerPermissions = false;
 
       // Determine authorization token to query server permissions endpoint
       const localToken = typeof window !== 'undefined' ? localStorage.getItem('tiger_admin_token') : null;
@@ -171,19 +172,28 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           if (res.ok) {
             const json = await res.json();
             if (json.success) {
+              const serverRole = (json.role || json.user?.role) as AdminRole | undefined;
               if (json.user && !resolvedProfile) {
                 resolvedProfile = {
                   id: json.user.id,
                   full_name: json.user.name || json.user.fullName || null,
-                  role: json.user.role === 'ADMIN' ? 'SUB_ADMIN' : json.user.role,
+                  role: serverRole === 'ADMIN' ? 'SUB_ADMIN' : serverRole || 'SUB_ADMIN',
                   active: json.user.active ?? true,
                   designation: json.user.designation || null,
                   created_at: new Date().toISOString(),
                   updated_at: new Date().toISOString()
                 };
+              } else if (resolvedProfile) {
+                if (serverRole && serverRole !== 'ADMIN' && ALLOWED_ADMIN_ROLES.includes(serverRole)) {
+                  resolvedProfile.role = serverRole;
+                }
+                if (json.user?.designation) {
+                  resolvedProfile.designation = json.user.designation;
+                }
               }
-              if (Array.isArray(json.permissions) && json.permissions.length > 0) {
+              if (Array.isArray(json.permissions)) {
                 userPermissions = normalizePermissionKeys(json.permissions);
+                hasServerPermissions = true;
               }
             }
           }
@@ -249,9 +259,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (resolvedProfile.role === 'SUPER_ADMIN') {
         userPermissions = ALL_PERMISSIONS.map((p) => p.key);
       } else {
-        // If userPermissions still empty, check cached permissions
-        if (userPermissions.length === 0 && typeof window !== 'undefined') {
-          const cached = localStorage.getItem('tiger_admin_permissions');
+        // If userPermissions still empty and server check did not return an authoritative array, check cached permissions
+        if (!hasServerPermissions && userPermissions.length === 0 && typeof window !== 'undefined') {
+          const cached = localStorage.getItem(`tiger_admin_permissions_${currentUser.id}`) || localStorage.getItem('tiger_admin_permissions');
           if (cached) {
             try {
               const parsed = JSON.parse(cached);
@@ -262,8 +272,8 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           }
         }
 
-        // Standard role fallback defaults if no explicit permissions in database
-        if (userPermissions.length === 0) {
+        // Standard role fallback defaults ONLY if no permissions were granted or returned from server
+        if (!hasServerPermissions && userPermissions.length === 0) {
           if (resolvedProfile.role === 'REGULAR_JOINING_OPERATOR') {
             userPermissions = [
               'dashboard.view',
@@ -292,7 +302,8 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       // Persist latest verified permissions to client storage cache for resilient offline/reload access
-      if (typeof window !== 'undefined' && userPermissions.length > 0) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`tiger_admin_permissions_${currentUser.id}`, JSON.stringify(userPermissions));
         localStorage.setItem('tiger_admin_permissions', JSON.stringify(userPermissions));
       }
 
@@ -618,6 +629,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         localStorage.removeItem('tiger_admin_user');
         localStorage.removeItem('tiger_admin_profile');
         localStorage.removeItem('tiger_admin_permissions');
+        if (user?.id) {
+          localStorage.removeItem(`tiger_admin_permissions_${user.id}`);
+        }
       }
       await supabase.auth.signOut();
     } finally {
@@ -727,7 +741,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [profile]);
 
   const isSuperAdmin = useMemo(() => currentRole === 'SUPER_ADMIN', [currentRole]);
-  const isSubAdmin = useMemo(() => currentRole === 'SUB_ADMIN', [currentRole]);
+  const isSubAdmin = useMemo(() => currentRole !== null && currentRole !== 'SUPER_ADMIN', [currentRole]);
   const isJoiningOperator = useMemo(() => currentRole === 'REGULAR_JOINING_OPERATOR', [currentRole]);
 
   // Overall loading state is true only while authorization is still resolving

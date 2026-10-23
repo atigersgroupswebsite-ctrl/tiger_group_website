@@ -101,29 +101,48 @@ export async function createSubAdmin(params: {
   }
 }
 
+export interface UpdateSubAdminPermissionsParams {
+  adminId: string;
+  email?: string;
+  role?: AdminRole;
+  designation?: string;
+  permissions: PermissionKey[];
+}
+
 /**
- * Updates or revokes permissions for a Sub-Admin.
+ * Updates or revokes permissions, role, and operational details for a Sub-Admin.
  */
 export async function updateSubAdminPermissions(
-  adminId: string,
-  permissions: PermissionKey[]
-): Promise<ServiceResult<PermissionKey[]>> {
+  paramsOrId: string | UpdateSubAdminPermissionsParams,
+  legacyPermissions?: PermissionKey[]
+): Promise<ServiceResult<{ permissions: PermissionKey[]; role?: AdminRole; designation?: string }>> {
   try {
+    const payload = typeof paramsOrId === 'string'
+      ? { adminId: paramsOrId, permissions: legacyPermissions || [] }
+      : paramsOrId;
+
     const headers = await getAuthHeaders();
     const res = await fetch('/api/admin/users/update-permissions', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ adminId, permissions })
+      body: JSON.stringify(payload)
     });
 
     const json = await res.json();
     if (!res.ok || !json.success) {
-      return { success: false, error: json.error || 'Failed to update permissions' };
+      return { success: false, error: json.error || 'Failed to update account permissions and role' };
     }
 
-    return { success: true, data: json.permissions };
+    return {
+      success: true,
+      data: {
+        permissions: json.permissions || json.data?.permissions || [],
+        role: json.role || json.data?.role,
+        designation: json.designation || json.data?.designation
+      }
+    };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Network error updating permissions' };
+    return { success: false, error: err.message || 'Network error updating account permissions and role' };
   }
 }
 

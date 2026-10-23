@@ -280,6 +280,111 @@ async function runCriticalBugFixVerification() {
   assert(normalizePermissionKey('perm_regular_joining_candidate_details') === 'regular_joining.candidate_details', 'perm_regular_joining_candidate_details -> regular_joining.candidate_details');
   assert(normalizePermissionKey('regular_joining.generate_slip') === 'regular_joining.generate_slip', 'regular_joining.generate_slip unchanged');
 
+  // =============================================================================
+  // TEST G: OPERATIONAL ROLE ASSIGNMENT & PERMISSION REVERSION PREVENTION
+  // =============================================================================
+  console.log('\n--- TEST G: OPERATIONAL ROLE ASSIGNMENT & PERMISSION REVERSION PREVENTION ---');
+  const opRoleEmail = `role.test.${Date.now()}@gmail.com`;
+  const op5Perms: PermissionKey[] = [
+    'dashboard.view',
+    'regular_joining.submissions',
+    'regular_joining.candidate_details',
+    'regular_joining.verify',
+    'regular_joining.generate_slip'
+  ];
+
+  // 1. Create with operational role COORDINATOR
+  const createOpRes = await createSubAdminHandler(
+    {
+      fullName: 'Sunita Sharma',
+      email: opRoleEmail,
+      initialPassword: 'TigerSecurePass@2026!',
+      confirmPassword: 'TigerSecurePass@2026!',
+      designation: 'Field Operations Lead',
+      role: 'COORDINATOR',
+      active: true,
+      permissions: op5Perms
+    },
+    superAdminAuth
+  );
+  assert(createOpRes.status === 200, 'Sub-Admin created with operational role COORDINATOR');
+  assert(createOpRes.data.user.role === 'COORDINATOR', `Created role is COORDINATOR (got: ${createOpRes.data.user.role})`);
+
+  // 2. Query directory
+  const opDir1 = await listAdminUsersHandler(superAdminAuth);
+  const opUser1 = opDir1.data.admins?.find((a: any) => a.email === opRoleEmail);
+  assert(Boolean(opUser1), 'COORDINATOR user found in admin directory');
+  assert(opUser1.role === 'COORDINATOR', `Directory displays assigned role COORDINATOR (got: ${opUser1.role})`);
+  assert(opUser1.permissions.length === 5, `Directory displays 5 permissions (got: ${opUser1.permissions.length})`);
+
+  // 3. Update to DOCUMENT_VERIFIER with 7 permissions
+  const op7Perms: PermissionKey[] = [
+    'dashboard.view',
+    'regular_joining.submissions',
+    'regular_joining.candidate_details',
+    'regular_joining.verify',
+    'regular_joining.generate_slip',
+    'documents.view',
+    'documents.download'
+  ];
+
+  const updateOpRes = await updateSubAdminPermissionsHandler(
+    {
+      adminId: opUser1.id,
+      email: opRoleEmail,
+      role: 'DOCUMENT_VERIFIER',
+      designation: 'Senior Document Verifier',
+      permissions: op7Perms
+    },
+    superAdminAuth
+  );
+  assert(updateOpRes.status === 200, 'Sub-Admin updated to DOCUMENT_VERIFIER via API');
+  assert(updateOpRes.data.role === 'DOCUMENT_VERIFIER', `Updated role is DOCUMENT_VERIFIER (got: ${updateOpRes.data.role})`);
+  assert(updateOpRes.data.permissions.length === 7, `Updated permissions count is 7 (got: ${updateOpRes.data.permissions.length})`);
+
+  // 4. Query directory after update (simulating page refresh)
+  const opDir2 = await listAdminUsersHandler(superAdminAuth);
+  const opUser2 = opDir2.data.admins?.find((a: any) => a.email === opRoleEmail);
+  assert(opUser2.role === 'DOCUMENT_VERIFIER', `Directory retains DOCUMENT_VERIFIER after reload (got: ${opUser2.role})`);
+  assert(opUser2.permissions.length === 7, `Directory retains 7 permissions after reload (got: ${opUser2.permissions.length})`);
+
+  // 5. Simulate Sub-Admin login with distinct Supabase Auth UID
+  const opLoginToken = `Bearer mock_gmail_op_uid_${Date.now()}:${opRoleEmail}`;
+  const opLoginRes = await getCurrentUserPermissionsHandler(opLoginToken);
+  assert(opLoginRes.status === 200, 'Sub-Admin with DOCUMENT_VERIFIER logs in successfully');
+  assert(opLoginRes.data.role === 'DOCUMENT_VERIFIER', `Authenticated session holds DOCUMENT_VERIFIER role (got: ${opLoginRes.data.role})`);
+  assert(opLoginRes.data.permissions.length === 7, `Authenticated session holds 7 permissions (got: ${opLoginRes.data.permissions.length})`);
+
+  // 6. Super Admin re-queries directory after sub-admin logged in (checking for zero-reversion)
+  const opDir3 = await listAdminUsersHandler(superAdminAuth);
+  const opUser3 = opDir3.data.admins?.find((a: any) => a.email === opRoleEmail);
+  assert(opUser3.role === 'DOCUMENT_VERIFIER', `Directory role DID NOT revert after login (got: ${opUser3.role})`);
+  assert(opUser3.permissions.length === 7, `Directory permissions DID NOT revert after login (got: ${opUser3.permissions.length})`);
+
+  // 7. Revoke all permissions (0 permissions test)
+  const revokeAllRes = await updateSubAdminPermissionsHandler(
+    {
+      adminId: opUser3.id,
+      email: opRoleEmail,
+      role: 'DOCUMENT_VERIFIER',
+      permissions: []
+    },
+    superAdminAuth
+  );
+  assert(revokeAllRes.status === 200, 'Revoked all permissions successfully');
+  assert(revokeAllRes.data.permissions.length === 0, 'Returned 0 permissions');
+
+  // 8. Re-query directory to ensure 0 permissions is not replaced by default template
+  const opDir4 = await listAdminUsersHandler(superAdminAuth);
+  const opUser4 = opDir4.data.admins?.find((a: any) => a.email === opRoleEmail);
+  assert(opUser4.permissions.length === 0, `Directory displays 0 permissions and does NOT revive stale permissions (got: ${opUser4.permissions.length})`);
+  assert(opUser4.role === 'DOCUMENT_VERIFIER', `Role remains DOCUMENT_VERIFIER even with 0 permissions (got: ${opUser4.role})`);
+
+  // 9. Sub-Admin session with 0 permissions
+  const opLoginRes2 = await getCurrentUserPermissionsHandler(opLoginToken);
+  assert(opLoginRes2.status === 200, 'Sub-Admin with 0 permissions logs in');
+  assert(opLoginRes2.data.permissions.length === 0, `Sub-Admin session accurately holds 0 permissions (got: ${opLoginRes2.data.permissions.length})`);
+
   console.log('\n================================================================================');
   console.log(`ALL TESTS PASSED: ${passed} / ${total} critical checks verified successfully!`);
   console.log('================================================================================');
