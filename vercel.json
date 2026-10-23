@@ -47,6 +47,10 @@
       "destination": "/api/payment?_action=public-verify&token=$1"
     },
     {
+      "source": "/api/admin/users/(.*)",
+      "destination": "/api/admin/users?_action=$1"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
