@@ -118,6 +118,19 @@ export async function authenticateRequest(authHeader: string | undefined | null)
     };
   }
 
+  if (process.env.NODE_ENV === 'test' && token.startsWith('mock_gmail_')) {
+    const raw = token.replace('mock_gmail_', '');
+    const [mockUid, mockEmail] = raw.includes(':') ? raw.split(':') : [raw, 'subadmin@gmail.com'];
+    return {
+      authenticated: true as const,
+      user: {
+        id: mockUid,
+        email: mockEmail,
+        user_metadata: { full_name: 'Gmail Sub-Admin' }
+      }
+    };
+  }
+
   // Support local development Sub-Admin authentication
   if (token.startsWith('local_subadmin_jwt_')) {
     const userId = token.replace('local_subadmin_jwt_', '');

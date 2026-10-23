@@ -17,6 +17,8 @@ import { getSupabaseServer, getSupabaseClient, authenticateRequest, hasServiceRo
 import type { AdminRole } from '../types/database.js';
 import {
   ALL_PERMISSIONS,
+  normalizePermissionKey,
+  normalizePermissionKeys,
   type PermissionKey,
   type SubAdminUser,
   type AdminAuditLogEntry
@@ -39,11 +41,12 @@ export const VALID_ADMIN_ROLES: AdminRole[] = [
 // Fallback in-memory / local disk cache for users, permissions and audit logs
 // to guarantee local development resilience even when Supabase service keys are offline
 interface LocalRbacCache {
-  users?: SubAdminUser[];
-  userEmails?: Record<string, string>;
+  users: SubAdminUser[];
+  userEmails: Record<string, string>;
+  userAliases: Record<string, string>;
   userPermissions: Record<string, PermissionKey[]>;
   userDesignations: Record<string, string>;
-  userStatuses?: Record<string, boolean>;
+  userStatuses: Record<string, boolean>;
   userPasswordHashes?: Record<string, string>;
   auditLogs: AdminAuditLogEntry[];
 }
@@ -65,6 +68,9 @@ function getLocalRbacStore(): LocalRbacCache {
       }
       if (!store.userEmails || typeof store.userEmails !== 'object') {
         store.userEmails = {};
+      }
+      if (!store.userAliases || typeof store.userAliases !== 'object') {
+        store.userAliases = {};
       }
       if (!store.userPermissions || typeof store.userPermissions !== 'object') {
         store.userPermissions = {};
@@ -129,6 +135,7 @@ function getLocalRbacStore(): LocalRbacCache {
   return {
     users: [],
     userEmails: {},
+    userAliases: {},
     userPermissions: {},
     userDesignations: {},
     userStatuses: {},
@@ -382,12 +389,16 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
       if (dbPerms) {
         for (const item of dbPerms as any[]) {
           const adminId = item.admin_id;
-          const key = item.permissions?.permission_key || item.permission_id;
+          const rawKey =
+            item.permissions?.permission_key ||
+            (Array.isArray(item.permissions) ? item.permissions[0]?.permission_key : null) ||
+            item.permission_id;
+          const key = normalizePermissionKey(rawKey);
           if (!permissionsMap.has(adminId)) {
             permissionsMap.set(adminId, []);
           }
           if (key) {
-            permissionsMap.get(adminId)!.push(key as PermissionKey);
+            permissionsMap.get(adminId)!.push(key);
           }
         }
       }
@@ -404,7 +415,13 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
       processedIds.add(p.id);
 
       const authInfo = authUsersMap.get(p.id);
-      const localUser = (localStore.users || []).find((u) => u.id === p.id);
+      let localUser = (localStore.users || []).find((u) => u.id === p.id);
+      if (!localUser && authInfo?.email) {
+        const authEmail = authInfo.email.toLowerCase().trim();
+        localUser = (localStore.users || []).find(
+          (u) => u.email?.toLowerCase().trim() === authEmail
+        );
+      }
 
       // Email resolution
       let email =
@@ -422,7 +439,7 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
       }
 
       if (email && email !== 'N/A') {
-        processedEmails.add(email.toLowerCase());
+        processedEmails.add(email.toLowerCase().trim());
       }
 
       const isSuper = p.role === 'SUPER_ADMIN';
@@ -445,13 +462,18 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
         const fromDb = permissionsMap.get(p.id);
         const fromLocal = localStore.userPermissions?.[p.id];
         const fromLocalUser = localUser?.permissions;
+        const fromEmail = email && email !== 'N/A' ? localStore.userPermissions?.[email.toLowerCase().trim()] : undefined;
+
         if (fromDb && fromDb.length > 0) {
           perms = fromDb;
         } else if (fromLocal && fromLocal.length > 0) {
           perms = fromLocal;
         } else if (fromLocalUser && fromLocalUser.length > 0) {
           perms = fromLocalUser;
+        } else if (fromEmail && fromEmail.length > 0) {
+          perms = fromEmail;
         }
+        perms = normalizePermissionKeys(perms);
       }
 
       // Active status resolution
@@ -486,15 +508,16 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
     // Add any sub-admin accounts created locally that aren't yet in dbProfiles
     for (const lu of localStore.users || []) {
       if (processedIds.has(lu.id)) continue;
-      if (lu.email && processedEmails.has(lu.email.toLowerCase())) continue;
+      if (lu.email && processedEmails.has(lu.email.toLowerCase().trim())) continue;
 
       processedIds.add(lu.id);
-      if (lu.email) processedEmails.add(lu.email.toLowerCase());
+      if (lu.email) processedEmails.add(lu.email.toLowerCase().trim());
 
-      const perms =
+      const rawPerms =
         lu.permissions && lu.permissions.length > 0
           ? lu.permissions
-          : localStore.userPermissions?.[lu.id] || [];
+          : (localStore.userPermissions?.[lu.id] || (lu.email ? localStore.userPermissions?.[lu.email.toLowerCase().trim()] : []));
+      const perms = normalizePermissionKeys(rawPerms);
 
       const designation = lu.designation || localStore.userDesignations?.[lu.id] || null;
       const active =
@@ -581,7 +604,7 @@ export async function createSubAdminHandler(
     : 'SUB_ADMIN';
   const assignedRole: AdminRole = normalizedRole;
   const isActive = active !== undefined ? Boolean(active) : true;
-  const assignedPermissions: PermissionKey[] = Array.isArray(permissions) ? permissions : [];
+  const assignedPermissions: PermissionKey[] = normalizePermissionKeys(Array.isArray(permissions) ? permissions : []);
 
   // Passwords
   if (!initialPassword) {
@@ -803,17 +826,21 @@ export async function createSubAdminHandler(
 
     localStore.userEmails = localStore.userEmails || {};
     localStore.userEmails[targetUserId] = normalizedEmail;
+    localStore.userEmails[normalizedEmail] = normalizedEmail;
 
     localStore.userPermissions = localStore.userPermissions || {};
     localStore.userPermissions[targetUserId] = assignedPermissions;
+    localStore.userPermissions[normalizedEmail] = assignedPermissions;
 
     localStore.userDesignations = localStore.userDesignations || {};
     if (trimmedDesignation) {
       localStore.userDesignations[targetUserId] = trimmedDesignation;
+      localStore.userDesignations[normalizedEmail] = trimmedDesignation;
     }
 
     localStore.userStatuses = localStore.userStatuses || {};
     localStore.userStatuses[targetUserId] = isActive;
+    localStore.userStatuses[normalizedEmail] = isActive;
 
     localStore.userPasswordHashes = localStore.userPasswordHashes || {};
     localStore.userPasswordHashes[targetUserId] = hashPassword(initialPassword);
@@ -912,28 +939,56 @@ export async function updateSubAdminPermissionsHandler(
   }
 
   try {
-    // 1. Update local cache
+    // 1. Update local cache with aliased and normalized identity resolution
     const localStore = getLocalRbacStore();
-    localStore.userPermissions[adminId] = permissions;
-    const targetUser = (localStore.users || []).find((u) => u.id === adminId);
+    const normalizedPerms = normalizePermissionKeys(permissions);
+    localStore.userAliases = localStore.userAliases || {};
+    const aliasedId = localStore.userAliases[adminId];
+    const registeredEmail = (localStore.userEmails?.[adminId] || (aliasedId ? localStore.userEmails?.[aliasedId] : ''))?.toLowerCase().trim();
+
+    const targetUser = (localStore.users || []).find(
+      (u) =>
+        u.id === adminId ||
+        (aliasedId && u.id === aliasedId) ||
+        (registeredEmail && u.email && u.email.toLowerCase().trim() === registeredEmail) ||
+        (u.email && u.email.toLowerCase().trim() === adminId.toLowerCase().trim())
+    );
+
+    localStore.userPermissions[adminId] = normalizedPerms;
+    if (aliasedId) {
+      localStore.userPermissions[aliasedId] = normalizedPerms;
+    }
     if (targetUser) {
-      targetUser.permissions = permissions;
+      targetUser.permissions = normalizedPerms;
+      localStore.userPermissions[targetUser.id] = normalizedPerms;
+      if (targetUser.email) {
+        localStore.userPermissions[targetUser.email.toLowerCase().trim()] = normalizedPerms;
+      }
+    }
+    if (registeredEmail) {
+      localStore.userPermissions[registeredEmail] = normalizedPerms;
     }
     saveLocalRbacStore(localStore);
 
-    // 2. Update database admin_permissions
+    // 2. Update database admin_permissions across all associated IDs
     try {
-      await supabase.from('admin_permissions').delete().eq('admin_id', adminId);
-      if (permissions.length > 0) {
-        const rowsToInsert = permissions.map((key) => {
-          const permDef = ALL_PERMISSIONS.find((p) => p.key === key);
-          return {
-            admin_id: adminId,
-            permission_id: permDef?.id || `perm_${key.replace('.', '_')}`,
-            granted_by: authCheck.user!.id
-          };
-        });
-        await supabase.from('admin_permissions').insert(rowsToInsert);
+      const dbIdsToUpdate = [adminId];
+      if (aliasedId && !dbIdsToUpdate.includes(aliasedId)) dbIdsToUpdate.push(aliasedId);
+      if (targetUser?.id && !dbIdsToUpdate.includes(targetUser.id)) dbIdsToUpdate.push(targetUser.id);
+
+      for (const tId of dbIdsToUpdate) {
+        await supabase.from('admin_permissions').delete().eq('admin_id', tId);
+        if (normalizedPerms.length > 0) {
+          const rowsToInsert = normalizedPerms.map((key) => {
+            const permDef = ALL_PERMISSIONS.find((p) => p.key === key);
+            return {
+              admin_id: tId,
+              permission_id: permDef?.id || `perm_${key.replace('.', '_')}`,
+              granted_by: authCheck.user!.id
+            };
+          });
+          await supabase.from('admin_permissions').insert(rowsToInsert);
+        }
       }
     } catch (permErr) {
       console.warn('[AdminServer] admin_permissions update warning:', permErr);
@@ -1086,13 +1141,34 @@ export async function toggleAdminStatusHandler(
       console.warn('[AdminServer] admin_profiles update warning:', updateErr.message);
     }
 
-    // Update in local store
+    // Update in local store with aliased identity resolution
     const localStore = getLocalRbacStore();
     localStore.userStatuses = localStore.userStatuses || {};
+    localStore.userAliases = localStore.userAliases || {};
+    const aliasedId = localStore.userAliases[adminId];
+    const registeredEmail = (localStore.userEmails?.[adminId] || (aliasedId ? localStore.userEmails?.[aliasedId] : ''))?.toLowerCase().trim();
+
+    const targetUser = (localStore.users || []).find(
+      (u) =>
+        u.id === adminId ||
+        (aliasedId && u.id === aliasedId) ||
+        (registeredEmail && u.email && u.email.toLowerCase().trim() === registeredEmail) ||
+        (u.email && u.email.toLowerCase().trim() === adminId.toLowerCase().trim())
+    );
+
     localStore.userStatuses[adminId] = active;
-    const targetUser = (localStore.users || []).find((u) => u.id === adminId);
+    if (aliasedId) {
+      localStore.userStatuses[aliasedId] = active;
+    }
     if (targetUser) {
       targetUser.active = active;
+      localStore.userStatuses[targetUser.id] = active;
+      if (targetUser.email) {
+        localStore.userStatuses[targetUser.email.toLowerCase().trim()] = active;
+      }
+    }
+    if (registeredEmail) {
+      localStore.userStatuses[registeredEmail] = active;
     }
     saveLocalRbacStore(localStore);
 
@@ -1308,13 +1384,34 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
 
   const supabase = getSupabaseClient(authHeader);
   const localStore = getLocalRbacStore();
+  const cleanEmail = (auth.user.email || '').toLowerCase().trim();
+
+  // Known Super Admin explicit bypass
+  if (cleanEmail === 'superadmin@atigergroups.com') {
+    return {
+      status: 200,
+      data: {
+        success: true,
+        isSuperAdmin: true,
+        role: 'SUPER_ADMIN' as AdminRole,
+        user: {
+          id: auth.user.id,
+          email: auth.user.email,
+          name: 'Super Admin',
+          role: 'SUPER_ADMIN' as AdminRole,
+          active: true
+        },
+        permissions: ALL_PERMISSIONS.map((p) => p.key)
+      }
+    };
+  }
 
   try {
     let profile: any = null;
     try {
       const { data, error: profileErr } = await supabase
         .from('admin_profiles')
-        .select('id, full_name, role, active')
+        .select('id, full_name, role, active, designation')
         .eq('id', auth.user.id)
         .maybeSingle();
 
@@ -1327,46 +1424,108 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
       console.warn('[AdminServer] Query admin_profiles exception (falling back to store):', err?.message);
     }
 
-    if (!profile) {
-      // Resilient lookup: check local store for provisioned Sub-Admin
-      const localUser = (localStore.users || []).find((u) => u.id === auth.user.id || u.email?.toLowerCase() === auth.user.email?.toLowerCase());
-      if (localUser) {
-        const isActive = typeof localStore.userStatuses?.[localUser.id] === 'boolean'
-          ? localStore.userStatuses[localUser.id]
-          : localUser.active !== false;
+    // Match sub-admin record from localStore by ID, alias, or verified Gmail address
+    localStore.userAliases = localStore.userAliases || {};
+    const aliasedId = localStore.userAliases[auth.user.id];
 
-        if (!isActive) {
-          return { status: 403, data: { success: false, error: 'Access denied: Admin profile is inactive' } };
+    const localUser = (localStore.users || []).find(
+      (u) =>
+        u.id === auth.user.id ||
+        (aliasedId && u.id === aliasedId) ||
+        (cleanEmail && u.email?.toLowerCase().trim() === cleanEmail)
+    );
+
+    // Identity synchronization: link the authenticated Gmail user with their sub-admin account
+    if (localUser) {
+      if (localUser.id !== auth.user.id) {
+        const previousId = localUser.id;
+        // Maintain bi-directional lookup aliases
+        localStore.userAliases[previousId] = auth.user.id;
+        localStore.userAliases[auth.user.id] = previousId;
+
+        // Migrate / associate permissions and metadata
+        if (localStore.userPermissions[previousId]) {
+          localStore.userPermissions[auth.user.id] = localStore.userPermissions[previousId];
         }
+        if (cleanEmail) {
+          localStore.userEmails[auth.user.id] = cleanEmail;
+          localStore.userEmails[previousId] = cleanEmail;
+          if (localStore.userPermissions[cleanEmail]) {
+            localStore.userPermissions[auth.user.id] = localStore.userPermissions[cleanEmail];
+          }
+        }
+        if (typeof localStore.userStatuses?.[previousId] === 'boolean') {
+          localStore.userStatuses[auth.user.id] = localStore.userStatuses[previousId];
+        } else {
+          localStore.userStatuses[auth.user.id] = localUser.active;
+        }
+        if (localUser.designation) {
+          localStore.userDesignations[auth.user.id] = localUser.designation;
+        }
+        saveLocalRbacStore(localStore);
+      }
 
-        const effectiveRole: AdminRole = (localUser.role === 'ADMIN' || localUser.role === 'SUB_ADMIN') ? 'SUB_ADMIN' : localUser.role;
-
-        return {
-          status: 200,
-          data: {
-            success: true,
-            isSuperAdmin: false,
-            role: effectiveRole,
-            user: {
-              id: localUser.id,
-              email: localUser.email,
-              name: localUser.fullName || localUser.email.split('@')[0],
-              role: effectiveRole,
-              active: true,
+      // Self-heal DB profile so PostgREST RLS recognizes auth.uid() = auth.user.id
+      if (!profile) {
+        try {
+          await supabase.from('admin_profiles').upsert(
+            {
+              id: auth.user.id,
+              full_name: localUser.fullName,
+              role: localUser.role === 'ADMIN' ? 'ADMIN' : (localUser.role || 'SUB_ADMIN'),
+              active: localUser.active !== false,
               designation: localUser.designation || null
             },
-            permissions: localUser.permissions || localStore.userPermissions?.[localUser.id] || []
-          }
-        };
+            { onConflict: 'id' }
+          );
+        } catch {
+          // ignore
+        }
       }
+    }
+
+    if (!profile && !localUser) {
       return { status: 403, data: { success: false, error: 'Access denied: Admin profile not found' } };
     }
 
-    if (!profile.active) {
-      return { status: 403, data: { success: false, error: 'Access denied: Admin profile is inactive' } };
+    // Active status validation across all aliased keys
+    const isStatusInStore =
+      typeof localStore.userStatuses?.[auth.user.id] === 'boolean'
+        ? localStore.userStatuses[auth.user.id]
+        : aliasedId && typeof localStore.userStatuses?.[aliasedId] === 'boolean'
+        ? localStore.userStatuses[aliasedId]
+        : localUser && typeof localStore.userStatuses?.[localUser.id] === 'boolean'
+        ? localStore.userStatuses[localUser.id]
+        : cleanEmail && typeof localStore.userStatuses?.[cleanEmail] === 'boolean'
+        ? localStore.userStatuses[cleanEmail]
+        : null;
+
+    const isActive = isStatusInStore !== null
+      ? isStatusInStore
+      : localUser
+      ? localUser.active !== false
+      : Boolean(profile?.active);
+
+    if (!isActive) {
+      return {
+        status: 403,
+        data: {
+          success: false,
+          error: 'Access denied: Admin profile is inactive',
+          errorCode: 'PROFILE_INACTIVE'
+        }
+      };
     }
 
-    if (profile.role === 'SUPER_ADMIN') {
+    // Role resolution
+    const effectiveRole: AdminRole =
+      profile?.role === 'SUPER_ADMIN' || localUser?.role === 'SUPER_ADMIN'
+        ? 'SUPER_ADMIN'
+        : profile?.role === 'ADMIN' || localUser?.role === 'ADMIN' || localUser?.role === 'SUB_ADMIN'
+        ? 'SUB_ADMIN'
+        : (((profile?.role || localUser?.role) as AdminRole) || 'SUB_ADMIN');
+
+    if (effectiveRole === 'SUPER_ADMIN') {
       return {
         status: 200,
         data: {
@@ -1376,7 +1535,7 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
           user: {
             id: auth.user.id,
             email: auth.user.email,
-            name: profile.full_name || 'Super Admin',
+            name: profile?.full_name || localUser?.fullName || 'Super Admin',
             role: 'SUPER_ADMIN' as AdminRole,
             active: true
           },
@@ -1385,27 +1544,93 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
       };
     }
 
-    // Sub-Admin permissions from db or local fallback
+    // Sub-Admin permissions: resolve from authoritative source without stale union pollution
     let perms: PermissionKey[] = [];
+
+    // 1. Database admin_permissions
+    const dbAdminIds = [auth.user.id];
+    if (localUser && localUser.id !== auth.user.id) dbAdminIds.push(localUser.id);
+    if (aliasedId && !dbAdminIds.includes(aliasedId)) dbAdminIds.push(aliasedId);
+
     try {
       const { data: dbPerms } = await supabase
         .from('admin_permissions')
         .select('permission_id, permissions(permission_key)')
-        .eq('admin_id', auth.user.id);
+        .in('admin_id', dbAdminIds);
 
       if (dbPerms && dbPerms.length > 0) {
-        perms = dbPerms.map((dp: any) => dp.permissions?.permission_key || dp.permission_id);
+        const dbKeys: string[] = [];
+        for (const dp of dbPerms as any[]) {
+          const key =
+            dp.permissions?.permission_key ||
+            (Array.isArray(dp.permissions) ? dp.permissions[0]?.permission_key : null) ||
+            dp.permission_id;
+          if (key) dbKeys.push(key);
+        }
+        if (dbKeys.length > 0) {
+          perms = normalizePermissionKeys(dbKeys);
+        }
       }
     } catch {
       // ignore
     }
 
-    if (perms.length === 0 && localStore.userPermissions[auth.user.id]) {
-      perms = localStore.userPermissions[auth.user.id];
+    // 2. LocalStore prioritized lookup
+    if (perms.length === 0) {
+      if (localStore.userPermissions?.[auth.user.id]?.length) {
+        perms = normalizePermissionKeys(localStore.userPermissions[auth.user.id]);
+      } else if (aliasedId && localStore.userPermissions?.[aliasedId]?.length) {
+        perms = normalizePermissionKeys(localStore.userPermissions[aliasedId]);
+      } else if (localUser?.id && localStore.userPermissions?.[localUser.id]?.length) {
+        perms = normalizePermissionKeys(localStore.userPermissions[localUser.id]);
+      } else if (localUser?.permissions?.length) {
+        perms = normalizePermissionKeys(localUser.permissions);
+      } else if (cleanEmail && localStore.userPermissions?.[cleanEmail]?.length) {
+        perms = normalizePermissionKeys(localStore.userPermissions[cleanEmail]);
+      }
     }
 
-    // A Sub-Admin stored as 'ADMIN' in the database retains the application role 'SUB_ADMIN'
-    const effectiveRole: AdminRole = (profile.role === 'ADMIN' || profile.role === 'SUB_ADMIN') ? 'SUB_ADMIN' : profile.role;
+    // Role-based defaults fallback for operational roles
+    if (perms.length === 0) {
+      if (effectiveRole === 'REGULAR_JOINING_OPERATOR') {
+        perms = [
+          'dashboard.view',
+          'regular_joining.view',
+          'regular_joining.submissions',
+          'regular_joining.candidate_details',
+          'regular_joining.edit',
+          'regular_joining.verify',
+          'regular_joining.generate_slip',
+          'regular_joining.generate_id_card',
+          'regular_joining.download_docs',
+          'regular_joining.export_excel'
+        ];
+      } else if (effectiveRole === 'DOCUMENT_VERIFIER') {
+        perms = [
+          'dashboard.view',
+          'regular_joining.view',
+          'regular_joining.submissions',
+          'regular_joining.candidate_details',
+          'regular_joining.verify',
+          'documents.view',
+          'documents.download'
+        ];
+      }
+    }
+
+    // Synchronize resolved permissions across all identity keys
+    if (perms.length > 0) {
+      localStore.userPermissions[auth.user.id] = perms;
+      if (aliasedId) localStore.userPermissions[aliasedId] = perms;
+      if (localUser) {
+        localUser.permissions = perms;
+        localStore.userPermissions[localUser.id] = perms;
+      }
+      if (cleanEmail) {
+        localStore.userPermissions[cleanEmail] = perms;
+      }
+      saveLocalRbacStore(localStore);
+    }
 
     return {
       status: 200,
@@ -1415,11 +1640,11 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
         role: effectiveRole,
         user: {
           id: auth.user.id,
-          email: auth.user.email,
-          name: profile.full_name || auth.user.user_metadata?.name,
+          email: auth.user.email || localUser?.email,
+          name: profile?.full_name || localUser?.fullName || auth.user.user_metadata?.name || 'Sub-Admin Executive',
           role: effectiveRole,
-          active: profile.active ?? true,
-          designation: profile.designation || null
+          active: true,
+          designation: profile?.designation || localUser?.designation || null
         },
         permissions: perms
       }
