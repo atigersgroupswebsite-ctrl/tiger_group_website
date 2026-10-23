@@ -134,6 +134,17 @@ function getLocalRbacStore(): LocalRbacCache {
         }
       }
 
+      // Clean up any stale/cross-user aliases where recorded emails conflict
+      if (store.userAliases && store.userEmails) {
+        for (const [k, v] of Object.entries(store.userAliases)) {
+          const emailK = store.userEmails[k]?.toLowerCase().trim();
+          const emailV = store.userEmails[v]?.toLowerCase().trim();
+          if (emailK && emailV && emailK !== emailV) {
+            delete store.userAliases[k];
+          }
+        }
+      }
+
       return store;
     }
   } catch {
@@ -158,6 +169,183 @@ function saveLocalRbacStore(store: LocalRbacCache) {
     fs.writeFileSync(LOCAL_STORAGE_FILE, JSON.stringify(store, null, 2), 'utf8');
   } catch (err) {
     console.warn('[AdminServer] Local RBAC store write warning:', err);
+  }
+}
+
+/**
+ * Resolves all identity aliases, identifiers, emails, and the authoritative SubAdminUser record.
+ */
+export function resolveSubAdminIdentity(
+  store: LocalRbacCache,
+  identifier: string | null | undefined,
+  fallbackName?: string | null,
+  fallbackEmail?: string | null
+): {
+  user: SubAdminUser | null;
+  associatedIds: string[];
+  emails: string[];
+} {
+  store.userAliases = store.userAliases || {};
+  store.userEmails = store.userEmails || {};
+  store.users = store.users || [];
+
+  const rawCleanId = identifier?.trim() || '';
+  const cleanEmail = fallbackEmail?.toLowerCase().trim() || (rawCleanId.includes('@') ? rawCleanId.toLowerCase() : '');
+  const cleanName = fallbackName?.toLowerCase().trim() || '';
+
+  const aliasedId = rawCleanId ? store.userAliases[rawCleanId] : undefined;
+
+  // Search local user with strict precedence:
+  // 1. By ID or direct alias
+  let matchedUser: SubAdminUser | null = null;
+  if (rawCleanId) {
+    matchedUser = store.users.find((u) => u.id === rawCleanId || (aliasedId && u.id === aliasedId)) || null;
+  }
+
+  // 2. By unique email
+  if (!matchedUser && cleanEmail) {
+    matchedUser = store.users.find((u) => u.email && u.email.toLowerCase().trim() === cleanEmail) || null;
+    if (!matchedUser && rawCleanId && store.userEmails[rawCleanId]) {
+      const e = store.userEmails[rawCleanId].toLowerCase().trim();
+      matchedUser = store.users.find((u) => u.email && u.email.toLowerCase().trim() === e) || null;
+    }
+  }
+
+  // 3. By name ONLY if NEITHER ID nor cleanEmail was provided (never match by name when email or ID is known)
+  if (!matchedUser && !rawCleanId && !cleanEmail && cleanName) {
+    matchedUser = store.users.find((u) => u.fullName && u.fullName.toLowerCase().trim() === cleanName) || null;
+  }
+
+  const idSet = new Set<string>();
+  if (rawCleanId) idSet.add(rawCleanId);
+  if (aliasedId) idSet.add(aliasedId);
+  if (matchedUser?.id) idSet.add(matchedUser.id);
+
+  // If a matched user exists, only collect aliases belonging to this exact user
+  if (matchedUser?.id) {
+    for (const [k, v] of Object.entries(store.userAliases)) {
+      if (k === matchedUser.id && v) idSet.add(v);
+      if (v === matchedUser.id && k) idSet.add(k);
+    }
+  }
+
+  // Collect emails strictly for this user
+  const emailSet = new Set<string>();
+  if (cleanEmail) emailSet.add(cleanEmail);
+  if (matchedUser?.email) emailSet.add(matchedUser.email.toLowerCase().trim());
+  if (matchedUser?.id && store.userEmails[matchedUser.id]) {
+    emailSet.add(store.userEmails[matchedUser.id].toLowerCase().trim());
+  }
+
+  const associatedIds = Array.from(idSet);
+  const emails = Array.from(emailSet);
+
+  // Maintain alias between caller ID and matchedUser.id
+  if (matchedUser && rawCleanId && rawCleanId !== matchedUser.id) {
+    store.userAliases[rawCleanId] = matchedUser.id;
+    store.userAliases[matchedUser.id] = rawCleanId;
+  }
+  for (const e of emails) {
+    if (rawCleanId) store.userEmails[rawCleanId] = e;
+    if (matchedUser?.id) store.userEmails[matchedUser.id] = e;
+  }
+
+  return {
+    user: matchedUser,
+    associatedIds,
+    emails
+  };
+}
+
+/**
+ * Resolves permissions for a Sub-Admin across all known identity sources and audit logs.
+ */
+export function resolveSubAdminPermissions(
+  store: LocalRbacCache,
+  associatedIds: string[],
+  emails: string[],
+  dbPerms?: PermissionKey[],
+  user?: SubAdminUser | null
+): PermissionKey[] {
+  store.userPermissions = store.userPermissions || {};
+
+  // 1. Database permissions take precedence if present
+  if (dbPerms && dbPerms.length > 0) {
+    const norm = normalizePermissionKeys(dbPerms);
+    if (norm.length > 0) return norm;
+  }
+
+  // 2. Authoritative permissions saved directly on the SubAdminUser object
+  if (user && Array.isArray(user.permissions) && user.permissions.length > 0) {
+    return normalizePermissionKeys(user.permissions);
+  }
+
+  // 3. LocalStore userPermissions by emails (email is unique to Sub-Admin)
+  for (const email of emails) {
+    const p = store.userPermissions[email];
+    if (Array.isArray(p) && p.length > 0) {
+      return normalizePermissionKeys(p);
+    }
+  }
+
+  // 4. LocalStore userPermissions by associated IDs (matched user ID first)
+  if (user?.id) {
+    const p = store.userPermissions[user.id];
+    if (Array.isArray(p) && p.length > 0) {
+      return normalizePermissionKeys(p);
+    }
+  }
+  for (const id of associatedIds) {
+    const p = store.userPermissions[id];
+    if (Array.isArray(p) && p.length > 0) {
+      return normalizePermissionKeys(p);
+    }
+  }
+
+  // 5. Restore from audit logs (newest first, matching this user's email or ID)
+  if (Array.isArray(store.auditLogs) && store.auditLogs.length > 0) {
+    for (const entry of store.auditLogs) {
+      const isTargetMatch =
+        (user?.id && entry.targetId === user.id) ||
+        (entry.metadata?.email && emails.includes((entry.metadata.email as string).toLowerCase().trim())) ||
+        (entry.targetId && associatedIds.includes(entry.targetId));
+
+      if (isTargetMatch) {
+        if (
+          (entry.action === 'PERMISSIONS_UPDATED' ||
+            entry.action === 'SUB_ADMIN_CREATED' ||
+            entry.action === 'SUB_ADMIN_PERMISSIONS_UPDATED') &&
+          Array.isArray(entry.metadata?.permissions)
+        ) {
+          return normalizePermissionKeys(entry.metadata.permissions);
+        }
+      }
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Synchronizes resolved permissions across all associated IDs, emails, and local user record.
+ */
+export function syncSubAdminPermissionsToStore(
+  store: LocalRbacCache,
+  associatedIds: string[],
+  emails: string[],
+  perms: PermissionKey[],
+  user?: SubAdminUser | null
+) {
+  store.userPermissions = store.userPermissions || {};
+  for (const id of associatedIds) {
+    store.userPermissions[id] = perms;
+  }
+  for (const e of emails) {
+    store.userPermissions[e] = perms;
+  }
+  if (user) {
+    user.permissions = perms;
+    store.userPermissions[user.id] = perms;
   }
 }
 
@@ -356,7 +544,7 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
     try {
       const { data: profiles, error: profileErr } = await supabase
         .from('admin_profiles')
-        .select('*')
+        .select('id, full_name, role, active, created_at')
         .order('created_at', { ascending: false });
 
       if (profileErr) {
@@ -419,44 +607,18 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
     const processedEmails = new Set<string>();
 
     for (const p of dbProfiles) {
-      const aliasedId = localStore.userAliases?.[p.id];
-      const authInfo = authUsersMap.get(p.id);
-
-      let localUser = (localStore.users || []).find(
-        (u) => u.id === p.id || (aliasedId && u.id === aliasedId)
-      );
-      if (!localUser && authInfo?.email) {
-        const authEmail = authInfo.email.toLowerCase().trim();
-        localUser = (localStore.users || []).find(
-          (u) => u.email?.toLowerCase().trim() === authEmail
-        );
-      }
-
-      // Email resolution
-      let email =
-        authInfo?.email ||
-        (aliasedId ? localStore.userEmails?.[aliasedId] : undefined) ||
-        localStore.userEmails?.[p.id] ||
-        localUser?.email ||
-        p.email;
-
-      if (!email || email === 'N/A') {
-        if (p.id === authCheck.user.id) {
-          email = authCheck.user.email || 'superadmin@atigergroups.com';
-        } else {
-          const byName = (localStore.users || []).find(
-            (u) => u.fullName?.toLowerCase().trim() === p.full_name?.toLowerCase().trim()
-          );
-          if (byName?.email) {
-            email = byName.email;
-          } else {
-            email = 'N/A';
-          }
-        }
-      }
-
-      const normalizedEmail = email && email !== 'N/A' ? email.toLowerCase().trim() : null;
       const isSuper = p.role === 'SUPER_ADMIN';
+      const authInfo = authUsersMap.get(p.id);
+      const resolved = resolveSubAdminIdentity(localStore, p.id, p.full_name, authInfo?.email);
+      const localUser = resolved.user;
+      const associatedIds = resolved.associatedIds;
+      const emails = resolved.emails;
+
+      let email = emails[0] || authInfo?.email || p.email || 'N/A';
+      if ((!email || email === 'N/A') && p.id === authCheck.user.id) {
+        email = authCheck.user.email || 'superadmin@atigergroups.com';
+      }
+      const normalizedEmail = email && email !== 'N/A' ? email.toLowerCase().trim() : null;
 
       // Role resolution
       let role: AdminRole = p.role as AdminRole;
@@ -465,7 +627,7 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
       } else if (!isSuper) {
         if (
           localStore.userDesignations?.[p.id] ||
-          (aliasedId && localStore.userDesignations?.[aliasedId]) ||
+          associatedIds.some((id) => localStore.userDesignations?.[id]) ||
           localStore.userPermissions?.[p.id]
         ) {
           role = 'SUB_ADMIN';
@@ -477,38 +639,28 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
       if (isSuper) {
         perms = ALL_PERMISSIONS.map((ap) => ap.key);
       } else {
-        const fromDb = permissionsMap.get(p.id) || (aliasedId ? permissionsMap.get(aliasedId) : undefined);
-        const fromLocal = localStore.userPermissions?.[p.id] || (aliasedId ? localStore.userPermissions?.[aliasedId] : undefined);
-        const fromLocalUser = localUser?.permissions;
-        const fromEmail = normalizedEmail ? localStore.userPermissions?.[normalizedEmail] : undefined;
-
-        if (fromDb && fromDb.length > 0) {
-          perms = fromDb;
-        } else if (fromLocal && fromLocal.length > 0) {
-          perms = fromLocal;
-        } else if (fromLocalUser && fromLocalUser.length > 0) {
-          perms = fromLocalUser;
-        } else if (fromEmail && fromEmail.length > 0) {
-          perms = fromEmail;
-        }
-        perms = normalizePermissionKeys(perms);
+        const fromDb = permissionsMap.get(p.id) || associatedIds.map((id) => permissionsMap.get(id)).find((p) => p && p.length > 0);
+        perms = resolveSubAdminPermissions(localStore, associatedIds, emails, fromDb, localUser);
+        syncSubAdminPermissionsToStore(localStore, associatedIds, emails, perms, localUser);
       }
 
       // Active status resolution
       let active = Boolean(p.active);
-      if (typeof localStore.userStatuses?.[p.id] === 'boolean') {
-        active = localStore.userStatuses[p.id];
-      } else if (aliasedId && typeof localStore.userStatuses?.[aliasedId] === 'boolean') {
-        active = localStore.userStatuses[aliasedId];
+      const matchedStatus = associatedIds
+        .map((id) => localStore.userStatuses?.[id])
+        .find((s) => typeof s === 'boolean');
+      if (typeof matchedStatus === 'boolean') {
+        active = matchedStatus;
+      } else if (normalizedEmail && typeof localStore.userStatuses?.[normalizedEmail] === 'boolean') {
+        active = localStore.userStatuses[normalizedEmail];
       } else if (localUser && typeof localUser.active === 'boolean') {
         active = localUser.active;
       }
 
       // Designation resolution
       const designation =
-        p.designation ||
-        localStore.userDesignations?.[p.id] ||
-        (aliasedId ? localStore.userDesignations?.[aliasedId] : null) ||
+        associatedIds.map((id) => localStore.userDesignations?.[id]).find(Boolean) ||
+        (normalizedEmail ? localStore.userDesignations?.[normalizedEmail] : null) ||
         localUser?.designation ||
         null;
 
@@ -517,7 +669,7 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
         if (normalizedEmail && m.email && m.email !== 'N/A' && m.email.toLowerCase().trim() === normalizedEmail) {
           return true;
         }
-        if (m.id === p.id || (aliasedId && m.id === aliasedId)) {
+        if (associatedIds.includes(m.id)) {
           return true;
         }
         return false;
@@ -526,8 +678,8 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
       if (existingIdx >= 0) {
         // Merge permissions, status, designation with existing entry instead of duplicate
         const existing = mergedList[existingIdx];
-        if (perms.length > 0) {
-          existing.permissions = normalizePermissionKeys([...(existing.permissions || []), ...perms]);
+        if (existing.permissions.length === 0 && perms.length > 0) {
+          existing.permissions = perms;
         }
         if (!existing.designation && designation) {
           existing.designation = designation;
@@ -535,14 +687,12 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
         if (authInfo?.last_sign_in_at && !existing.lastSignInAt) {
           existing.lastSignInAt = authInfo.last_sign_in_at;
         }
-        processedIds.add(p.id);
-        if (aliasedId) processedIds.add(aliasedId);
+        associatedIds.forEach((id) => processedIds.add(id));
         if (normalizedEmail) processedEmails.add(normalizedEmail);
         continue;
       }
 
-      processedIds.add(p.id);
-      if (aliasedId) processedIds.add(aliasedId);
+      associatedIds.forEach((id) => processedIds.add(id));
       if (normalizedEmail) processedEmails.add(normalizedEmail);
 
       mergedList.push({
@@ -555,35 +705,48 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
         createdAt: p.created_at || localUser?.createdAt || new Date().toISOString(),
         lastSignInAt: authInfo?.last_sign_in_at || localUser?.lastSignInAt || null,
         permissions: perms,
-        createdBy: p.created_by || localUser?.createdBy || null
+        createdBy: localUser?.createdBy || null
       });
     }
 
     // Add any sub-admin accounts created locally that aren't yet in dbProfiles
     for (const lu of localStore.users || []) {
       const luEmail = lu.email ? lu.email.toLowerCase().trim() : null;
-      const aliasedId = localStore.userAliases?.[lu.id];
+      const resolved = resolveSubAdminIdentity(localStore, lu.id, lu.fullName, luEmail || undefined);
+      const associatedIds = resolved.associatedIds;
+      const emails = resolved.emails;
 
-      if (processedIds.has(lu.id) || (aliasedId && processedIds.has(aliasedId))) continue;
+      const perms = resolveSubAdminPermissions(localStore, associatedIds, emails, undefined, lu);
+      syncSubAdminPermissionsToStore(localStore, associatedIds, emails, perms, lu);
+
+      // Check if already represented in mergedList
+      const existingIdx = mergedList.findIndex((m) => {
+        if (luEmail && m.email && m.email !== 'N/A' && m.email.toLowerCase().trim() === luEmail) return true;
+        if (associatedIds.includes(m.id)) return true;
+        return false;
+      });
+
+      if (existingIdx >= 0) {
+        const existing = mergedList[existingIdx];
+        if (existing.permissions.length === 0 && perms.length > 0) {
+          existing.permissions = perms;
+        }
+        if (!existing.designation && (lu.designation || localStore.userDesignations?.[lu.id])) {
+          existing.designation = lu.designation || localStore.userDesignations?.[lu.id] || null;
+        }
+        continue;
+      }
+
+      if (associatedIds.some((id) => processedIds.has(id))) continue;
       if (luEmail && processedEmails.has(luEmail)) continue;
 
-      processedIds.add(lu.id);
-      if (aliasedId) processedIds.add(aliasedId);
+      associatedIds.forEach((id) => processedIds.add(id));
       if (luEmail) processedEmails.add(luEmail);
 
-      const rawPerms =
-        lu.permissions && lu.permissions.length > 0
-          ? lu.permissions
-          : (localStore.userPermissions?.[lu.id] || (luEmail ? localStore.userPermissions?.[luEmail] : []));
-      const perms = normalizePermissionKeys(rawPerms);
-
-      const designation = lu.designation || localStore.userDesignations?.[lu.id] || (aliasedId ? localStore.userDesignations?.[aliasedId] : null) || null;
+      const designation = lu.designation || associatedIds.map((id) => localStore.userDesignations?.[id]).find(Boolean) || null;
       const active =
-        typeof localStore.userStatuses?.[lu.id] === 'boolean'
-          ? localStore.userStatuses[lu.id]
-          : (aliasedId && typeof localStore.userStatuses?.[aliasedId] === 'boolean'
-          ? localStore.userStatuses[aliasedId]
-          : lu.active !== false);
+        associatedIds.map((id) => localStore.userStatuses?.[id]).find((s) => typeof s === 'boolean') ??
+        (luEmail && typeof localStore.userStatuses?.[luEmail] === 'boolean' ? localStore.userStatuses[luEmail] : lu.active !== false);
 
       mergedList.push({
         ...lu,
@@ -592,6 +755,8 @@ export async function listAdminUsersHandler(authHeader: string | undefined | nul
         active
       });
     }
+
+    saveLocalRbacStore(localStore);
 
     // Ensure the authorized Super Admin is always included in the directory
     if (!mergedList.some((u) => u.id === authCheck.user.id || u.role === 'SUPER_ADMIN')) {
@@ -1007,39 +1172,18 @@ export async function updateSubAdminPermissionsHandler(
     // 1. Update local cache with aliased and normalized identity resolution
     const localStore = getLocalRbacStore();
     const normalizedPerms = normalizePermissionKeys(permissions);
-    localStore.userAliases = localStore.userAliases || {};
-    const aliasedId = localStore.userAliases[adminId];
-    const registeredEmail = (localStore.userEmails?.[adminId] || (aliasedId ? localStore.userEmails?.[aliasedId] : ''))?.toLowerCase().trim();
 
-    const targetUser = (localStore.users || []).find(
-      (u) =>
-        u.id === adminId ||
-        (aliasedId && u.id === aliasedId) ||
-        (registeredEmail && u.email && u.email.toLowerCase().trim() === registeredEmail) ||
-        (u.email && u.email.toLowerCase().trim() === adminId.toLowerCase().trim())
-    );
+    const resolved = resolveSubAdminIdentity(localStore, adminId, targetProfile?.full_name);
+    const targetUser = resolved.user;
+    const associatedIds = Array.from(new Set([adminId, ...resolved.associatedIds]));
+    const emails = resolved.emails;
 
-    localStore.userPermissions[adminId] = normalizedPerms;
-    if (aliasedId) {
-      localStore.userPermissions[aliasedId] = normalizedPerms;
-    }
-    if (targetUser) {
-      targetUser.permissions = normalizedPerms;
-      localStore.userPermissions[targetUser.id] = normalizedPerms;
-      if (targetUser.email) {
-        localStore.userPermissions[targetUser.email.toLowerCase().trim()] = normalizedPerms;
-      }
-    }
-    if (registeredEmail) {
-      localStore.userPermissions[registeredEmail] = normalizedPerms;
-    }
+    syncSubAdminPermissionsToStore(localStore, associatedIds, emails, normalizedPerms, targetUser);
     saveLocalRbacStore(localStore);
 
     // 2. Update database admin_permissions across all associated IDs
     try {
-      const dbIdsToUpdate = [adminId];
-      if (aliasedId && !dbIdsToUpdate.includes(aliasedId)) dbIdsToUpdate.push(aliasedId);
-      if (targetUser?.id && !dbIdsToUpdate.includes(targetUser.id)) dbIdsToUpdate.push(targetUser.id);
+      const dbIdsToUpdate = associatedIds.filter((id) => isValidUuid(id));
 
       for (const tId of dbIdsToUpdate) {
         await supabase.from('admin_permissions').delete().eq('admin_id', tId);
@@ -1211,21 +1355,16 @@ export async function toggleAdminStatusHandler(
     // Update in local store with aliased identity resolution
     const localStore = getLocalRbacStore();
     localStore.userStatuses = localStore.userStatuses || {};
-    localStore.userAliases = localStore.userAliases || {};
-    const aliasedId = localStore.userAliases[adminId];
-    const registeredEmail = (localStore.userEmails?.[adminId] || (aliasedId ? localStore.userEmails?.[aliasedId] : ''))?.toLowerCase().trim();
+    const resolved = resolveSubAdminIdentity(localStore, adminId);
+    const targetUser = resolved.user;
+    const associatedIds = Array.from(new Set([adminId, ...resolved.associatedIds]));
+    const emails = resolved.emails;
 
-    const targetUser = (localStore.users || []).find(
-      (u) =>
-        u.id === adminId ||
-        (aliasedId && u.id === aliasedId) ||
-        (registeredEmail && u.email && u.email.toLowerCase().trim() === registeredEmail) ||
-        (u.email && u.email.toLowerCase().trim() === adminId.toLowerCase().trim())
-    );
-
-    localStore.userStatuses[adminId] = active;
-    if (aliasedId) {
-      localStore.userStatuses[aliasedId] = active;
+    for (const id of associatedIds) {
+      localStore.userStatuses[id] = active;
+    }
+    for (const e of emails) {
+      localStore.userStatuses[e] = active;
     }
     if (targetUser) {
       targetUser.active = active;
@@ -1233,9 +1372,6 @@ export async function toggleAdminStatusHandler(
       if (targetUser.email) {
         localStore.userStatuses[targetUser.email.toLowerCase().trim()] = active;
       }
-    }
-    if (registeredEmail) {
-      localStore.userStatuses[registeredEmail] = active;
     }
     saveLocalRbacStore(localStore);
 
@@ -1510,7 +1646,7 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
     try {
       const { data, error: profileErr } = await supabase
         .from('admin_profiles')
-        .select('id, full_name, role, active, designation')
+        .select('id, full_name, role, active')
         .eq('id', auth.user.id)
         .maybeSingle();
 
@@ -1524,15 +1660,10 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
     }
 
     // Match sub-admin record from localStore by ID, alias, or verified Gmail address
-    localStore.userAliases = localStore.userAliases || {};
-    const aliasedId = localStore.userAliases[auth.user.id];
-
-    const localUser = (localStore.users || []).find(
-      (u) =>
-        u.id === auth.user.id ||
-        (aliasedId && u.id === aliasedId) ||
-        (cleanEmail && u.email?.toLowerCase().trim() === cleanEmail)
-    );
+    const resolved = resolveSubAdminIdentity(localStore, auth.user.id, profile?.full_name, cleanEmail);
+    const localUser = resolved.user;
+    const associatedIds = Array.from(new Set([auth.user.id, ...resolved.associatedIds]));
+    const emails = Array.from(new Set([cleanEmail, ...resolved.emails].filter(Boolean)));
 
     // Identity synchronization: link the authenticated Gmail user with their sub-admin account
     if (localUser) {
@@ -1586,9 +1717,8 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
             {
               id: auth.user.id,
               full_name: localUser.fullName,
-              role: localUser.role === 'ADMIN' ? 'ADMIN' : (localUser.role || 'SUB_ADMIN'),
-              active: localUser.active !== false,
-              designation: localUser.designation || null
+              role: 'ADMIN',
+              active: localUser.active !== false
             },
             { onConflict: 'id' }
           );
@@ -1605,21 +1735,11 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
 
     // Active status validation across all aliased keys
     const isStatusInStore =
-      typeof localStore.userStatuses?.[auth.user.id] === 'boolean'
-        ? localStore.userStatuses[auth.user.id]
-        : aliasedId && typeof localStore.userStatuses?.[aliasedId] === 'boolean'
-        ? localStore.userStatuses[aliasedId]
-        : localUser && typeof localStore.userStatuses?.[localUser.id] === 'boolean'
-        ? localStore.userStatuses[localUser.id]
-        : cleanEmail && typeof localStore.userStatuses?.[cleanEmail] === 'boolean'
-        ? localStore.userStatuses[cleanEmail]
-        : null;
+      associatedIds.map((id) => localStore.userStatuses?.[id]).find((s) => typeof s === 'boolean') ??
+      emails.map((e) => localStore.userStatuses?.[e]).find((s) => typeof s === 'boolean') ??
+      (localUser ? localUser.active !== false : Boolean(profile?.active));
 
-    const isActive = isStatusInStore !== null
-      ? isStatusInStore
-      : localUser
-      ? localUser.active !== false
-      : Boolean(profile?.active);
+    const isActive = isStatusInStore !== null ? isStatusInStore : Boolean(profile?.active);
 
     if (!isActive) {
       return {
@@ -1663,46 +1783,35 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
     let perms: PermissionKey[] = [];
 
     // 1. Database admin_permissions
-    const dbAdminIds = [auth.user.id];
-    if (localUser && localUser.id !== auth.user.id) dbAdminIds.push(localUser.id);
-    if (aliasedId && !dbAdminIds.includes(aliasedId)) dbAdminIds.push(aliasedId);
+    const dbAdminIds = associatedIds.filter(isValidUuid);
+    if (dbAdminIds.length > 0) {
+      try {
+        const { data: dbPerms } = await supabase
+          .from('admin_permissions')
+          .select('permission_id, permissions(permission_key)')
+          .in('admin_id', dbAdminIds);
 
-    try {
-      const { data: dbPerms } = await supabase
-        .from('admin_permissions')
-        .select('permission_id, permissions(permission_key)')
-        .in('admin_id', dbAdminIds);
-
-      if (dbPerms && dbPerms.length > 0) {
-        const dbKeys: string[] = [];
-        for (const dp of dbPerms as any[]) {
-          const key =
-            dp.permissions?.permission_key ||
-            (Array.isArray(dp.permissions) ? dp.permissions[0]?.permission_key : null) ||
-            dp.permission_id;
-          if (key) dbKeys.push(key);
+        if (dbPerms && dbPerms.length > 0) {
+          const dbKeys: string[] = [];
+          for (const dp of dbPerms as any[]) {
+            const key =
+              dp.permissions?.permission_key ||
+              (Array.isArray(dp.permissions) ? dp.permissions[0]?.permission_key : null) ||
+              dp.permission_id;
+            if (key) dbKeys.push(key);
+          }
+          if (dbKeys.length > 0) {
+            perms = normalizePermissionKeys(dbKeys);
+          }
         }
-        if (dbKeys.length > 0) {
-          perms = normalizePermissionKeys(dbKeys);
-        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
 
-    // 2. LocalStore prioritized lookup
+    // 2. Comprehensive resolver across IDs, emails, user object, and audit logs
     if (perms.length === 0) {
-      if (localStore.userPermissions?.[auth.user.id]?.length) {
-        perms = normalizePermissionKeys(localStore.userPermissions[auth.user.id]);
-      } else if (aliasedId && localStore.userPermissions?.[aliasedId]?.length) {
-        perms = normalizePermissionKeys(localStore.userPermissions[aliasedId]);
-      } else if (localUser?.id && localStore.userPermissions?.[localUser.id]?.length) {
-        perms = normalizePermissionKeys(localStore.userPermissions[localUser.id]);
-      } else if (localUser?.permissions?.length) {
-        perms = normalizePermissionKeys(localUser.permissions);
-      } else if (cleanEmail && localStore.userPermissions?.[cleanEmail]?.length) {
-        perms = normalizePermissionKeys(localStore.userPermissions[cleanEmail]);
-      }
+      perms = resolveSubAdminPermissions(localStore, associatedIds, emails, undefined, localUser);
     }
 
     // Role-based defaults fallback for operational roles
@@ -1735,15 +1844,7 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
 
     // Synchronize resolved permissions across all identity keys
     if (perms.length > 0) {
-      localStore.userPermissions[auth.user.id] = perms;
-      if (aliasedId) localStore.userPermissions[aliasedId] = perms;
-      if (localUser) {
-        localUser.permissions = perms;
-        localStore.userPermissions[localUser.id] = perms;
-      }
-      if (cleanEmail) {
-        localStore.userPermissions[cleanEmail] = perms;
-      }
+      syncSubAdminPermissionsToStore(localStore, associatedIds, emails, perms, localUser);
       saveLocalRbacStore(localStore);
     }
 

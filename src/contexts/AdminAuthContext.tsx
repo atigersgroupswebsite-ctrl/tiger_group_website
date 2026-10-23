@@ -97,7 +97,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
       const { data, error: queryError } = await supabase
         .from('admin_profiles')
-        .select('*')
+        .select('id, full_name, role, active, created_at, updated_at')
         .eq('id', userId)
         .maybeSingle();
 
@@ -111,7 +111,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const { data: retryData, error: retryError } = await supabase
         .from('admin_profiles')
-        .select('*')
+        .select('id, full_name, role, active, created_at, updated_at')
         .eq('id', userId)
         .maybeSingle();
 

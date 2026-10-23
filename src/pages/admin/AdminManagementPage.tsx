@@ -307,7 +307,7 @@ export const AdminManagementPage: React.FC = () => {
   // Open Edit Permissions Modal
   const openEditPermissionsModal = (target: SubAdminUser) => {
     setEditingPermsUser(target);
-    setEditingPermsSet(new Set(target.permissions));
+    setEditingPermsSet(new Set(target.permissions || []));
     setPermsError(null);
   };
 
@@ -328,6 +328,7 @@ export const AdminManagementPage: React.FC = () => {
           prev.map((a) => (a.id === editingPermsUser.id ? { ...a, permissions: permsArray } : a))
         );
         setEditingPermsUser(null);
+        await fetchDirectory();
         setTimeout(() => setSuccessMessage(null), 4000);
       }
     } catch (err: any) {
@@ -753,7 +754,7 @@ export const AdminManagementPage: React.FC = () => {
                                 }}
                                 title="Click to view & edit permissions"
                               >
-                                {admin.permissions.length} Granted Permissions
+                                {(admin.permissions || []).length} Granted Permissions
                               </button>
                             )}
                           </td>
