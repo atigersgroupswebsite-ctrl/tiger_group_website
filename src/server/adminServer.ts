@@ -1350,7 +1350,7 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
             user: {
               id: localUser.id,
               email: localUser.email,
-              name: localUser.fullName || localUser.name,
+              name: localUser.fullName || localUser.email.split('@')[0],
               role: effectiveRole,
               active: true,
               designation: localUser.designation || null
