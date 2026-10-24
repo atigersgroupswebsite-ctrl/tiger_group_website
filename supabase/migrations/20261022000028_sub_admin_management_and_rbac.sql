@@ -15,6 +15,8 @@
 -- ------------------------------------------------------------------------------
 -- 1. Safely Update public.admin_profiles Role Check Constraint
 -- ------------------------------------------------------------------------------
+BEGIN;
+
 UPDATE public.admin_profiles
 SET role = UPPER(TRIM(role))
 WHERE role IS NOT NULL;
@@ -162,7 +164,8 @@ VALUES
   ('perm_settings_view', 'settings.view', 'View Settings', 'System Settings', 'View platform parameters and registration fee settings'),
   ('perm_settings_modify', 'settings.modify', 'Modify Settings', 'System Settings', 'Update corporate parameters and configuration values'),
   ('perm_settings_auth', 'settings.auth', 'Manage Authentication Settings', 'System Settings', 'Manage session timeout and authentication parameters')
-ON CONFLICT (permission_key) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE SET
+  permission_key = EXCLUDED.permission_key,
   permission_name = EXCLUDED.permission_name,
   module_name = EXCLUDED.module_name,
   description = EXCLUDED.description;
@@ -303,3 +306,43 @@ CREATE POLICY "Admins can insert audit logs"
   FOR INSERT
   TO authenticated
   WITH CHECK (acting_admin_id = auth.uid() OR public.is_super_admin());
+
+-- ------------------------------------------------------------------------------
+-- 8. Trusted Super Admin Bootstrap (Idempotent — Resolves via auth.users, NO GUESSED UUIDs)
+-- ------------------------------------------------------------------------------
+-- To ensure the verified Super Admin can access the system without chicken-and-egg RLS lockouts,
+-- this query dynamically associates an existing authenticated user with an active SUPER_ADMIN profile.
+-- This block dynamically checks candidate administrator emails in auth.users
+-- ('superadmin@atigergroups.com', 'atigersgroupswebsite@gmail.com') and provisions
+-- an active SUPER_ADMIN profile for whichever account exists.
+DO $$
+DECLARE
+  -- Primary verified administrator email for A TIGER GROUPS
+  v_admin_email TEXT := 'atigersgroupswebsite@gmail.com';
+  -- Candidate administrator emails to bootstrap (primary intended admin + domain fallback + existing live admin)
+  v_candidate_emails TEXT[] := ARRAY[v_admin_email, 'superadmin@atigergroups.com', 'atigerglobal@gmail.com'];
+  v_target_email TEXT;
+  v_user_id UUID;
+  v_provisioned_count INT := 0;
+BEGIN
+  FOREACH v_target_email IN ARRAY v_candidate_emails LOOP
+    SELECT id INTO v_user_id FROM auth.users WHERE LOWER(email) = LOWER(v_target_email) LIMIT 1;
+    IF v_user_id IS NOT NULL THEN
+      INSERT INTO public.admin_profiles (id, full_name, role, active, designation)
+      VALUES (v_user_id, 'Chief Super Administrator', 'SUPER_ADMIN', true, 'Chief Administrator')
+      ON CONFLICT (id) DO UPDATE SET
+        role = 'SUPER_ADMIN',
+        active = true,
+        designation = COALESCE(admin_profiles.designation, EXCLUDED.designation);
+      v_provisioned_count := v_provisioned_count + 1;
+      RAISE NOTICE 'Super Admin profile successfully verified & provisioned for % (UID: %)', v_target_email, v_user_id;
+    END IF;
+  END LOOP;
+
+  IF v_provisioned_count = 0 THEN
+    RAISE NOTICE 'No matching auth.users account found for candidate emails %. If your Super Admin account uses another email, please update v_admin_email.', v_candidate_emails;
+  END IF;
+END $$;
+
+COMMIT;
+

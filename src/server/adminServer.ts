@@ -13,7 +13,7 @@
 //   - Provides resilient fallback persistence if cloud migrations are pending
 // ==============================================================================
 
-import { getSupabaseServer, getSupabaseClient, authenticateRequest, hasServiceRoleKey } from './supabaseServer.js';
+import { getSupabaseServer, getSupabaseClient, authenticateRequest, hasServiceRoleKey, isProductionServer } from './supabaseServer.js';
 import type { AdminRole } from '../types/database.js';
 import {
   ALL_PERMISSIONS,
@@ -37,6 +37,28 @@ export const VALID_ADMIN_ROLES: AdminRole[] = [
   'FINANCE',
   'REGULAR_JOINING_OPERATOR'
 ];
+
+/**
+ * Validates that server-side administrative operations in production have access to
+ * the authoritative Supabase service-role credentials instead of silently falling
+ * back to ephemeral local storage.
+ */
+export function checkProductionCredentials(): { valid: boolean; response?: { status: number; data: any } } {
+  if (isProductionServer() && !hasServiceRoleKey()) {
+    return {
+      valid: false,
+      response: {
+        status: 503,
+        data: {
+          success: false,
+          error: 'Database configuration error: Missing SUPABASE_SERVICE_ROLE_KEY in server environment. Sub-admin management requires Supabase service role credentials.',
+          errorCode: 'CONFIG_ERROR'
+        }
+      }
+    };
+  }
+  return { valid: true };
+}
 
 // Fallback in-memory / local disk cache for users, permissions and audit logs
 // to guarantee local development resilience even when Supabase service keys are offline
@@ -458,9 +480,9 @@ export async function verifySuperAdmin(authHeader: string | undefined | null) {
     };
   }
 
-  // Super Admin by verified email or metadata bypass
+  // Super Admin by verified email only — user_metadata is client-controlled and NEVER trusted for privilege escalation
   const cleanEmail = (auth.user.email || '').toLowerCase().trim();
-  if (cleanEmail === 'superadmin@atigergroups.com' || (auth.user.user_metadata as any)?.role === 'SUPER_ADMIN') {
+  if (cleanEmail === 'superadmin@atigergroups.com' || cleanEmail === 'atigersgroupswebsite@gmail.com') {
     return {
       authorized: true as const,
       user: auth.user,
@@ -593,6 +615,11 @@ async function recordAuditLog(
  * Returns list of all admin and sub-admin accounts with permissions, status, and auth metadata.
  */
 export async function listAdminUsersHandler(authHeader: string | undefined | null) {
+  const prodCheck = checkProductionCredentials();
+  if (!prodCheck.valid) {
+    return prodCheck.response!;
+  }
+
   const authCheck = await verifySuperAdmin(authHeader);
   if (!authCheck.authorized) {
     return { status: authCheck.status, data: { success: false, error: authCheck.error } };
@@ -910,6 +937,11 @@ export async function createSubAdminHandler(
   },
   authHeader: string | undefined | null
 ) {
+  const prodCheck = checkProductionCredentials();
+  if (!prodCheck.valid) {
+    return prodCheck.response!;
+  }
+
   const authCheck = await verifySuperAdmin(authHeader);
   if (!authCheck.authorized) {
     return { status: authCheck.status, data: { success: false, error: authCheck.error } };
@@ -1250,6 +1282,11 @@ export async function updateSubAdminPermissionsHandler(
   },
   authHeader: string | undefined | null
 ) {
+  const prodCheck = checkProductionCredentials();
+  if (!prodCheck.valid) {
+    return prodCheck.response!;
+  }
+
   const authCheck = await verifySuperAdmin(authHeader);
   if (!authCheck.authorized) {
     return { status: authCheck.status, data: { success: false, error: authCheck.error } };
@@ -1266,12 +1303,34 @@ export async function updateSubAdminPermissionsHandler(
 
   const supabase = getSupabaseClient(authHeader);
 
-  // Target user check: Cannot modify SUPER_ADMIN permissions
-  const { data: targetProfile } = await supabase
-    .from('admin_profiles')
-    .select('id, full_name, role')
-    .eq('id', adminId)
-    .maybeSingle();
+  // Target user check: verify profile exists in authoritative database
+  let targetProfile: any = null;
+  if (isValidUuid(adminId)) {
+    const { data, error: profileCheckErr } = await supabase
+      .from('admin_profiles')
+      .select('id, full_name, role')
+      .eq('id', adminId)
+      .maybeSingle();
+
+    if (profileCheckErr) {
+      return {
+        status: 500,
+        data: { success: false, error: `Database error verifying administrator profile: ${profileCheckErr.message}` }
+      };
+    }
+    targetProfile = data;
+  }
+
+  // In database-backed environments, missing profile cannot silently become or remain an administrator
+  if (hasServiceRoleKey() && !targetProfile) {
+    return {
+      status: 404,
+      data: {
+        success: false,
+        error: 'Administrator profile not found in database. Cannot assign permissions to a non-existent administrator.'
+      }
+    };
+  }
 
   if (targetProfile?.role === 'SUPER_ADMIN') {
     return {
@@ -1346,8 +1405,18 @@ export async function updateSubAdminPermissionsHandler(
     // 3. Update database admin_permissions and admin_profiles across all associated IDs
     const dbIdsToUpdate = associatedIds.filter((id) => isValidUuid(id));
     for (const tId of dbIdsToUpdate) {
-      try {
-        await supabase.from('admin_permissions').delete().eq('admin_id', tId);
+      if (hasServiceRoleKey() || isValidUuid(tId)) {
+        // Atomic permission revocation & re-grant:
+        // When normalizedPerms is empty ([]), this cleanly revokes ALL permissions in the database
+        const { error: delErr } = await supabase.from('admin_permissions').delete().eq('admin_id', tId);
+        if (delErr && hasServiceRoleKey()) {
+          console.error('[AdminServer] admin_permissions delete error:', delErr.message);
+          return {
+            status: 500,
+            data: { success: false, error: `Database error revoking permissions: ${delErr.message}` }
+          };
+        }
+
         if (normalizedPerms.length > 0) {
           const rowsToInsert = normalizedPerms.map((key) => {
             const permDef = ALL_PERMISSIONS.find((p) => p.key === key);
@@ -1357,31 +1426,59 @@ export async function updateSubAdminPermissionsHandler(
               granted_by: authCheck.user!.id
             };
           });
-          await supabase.from('admin_permissions').insert(rowsToInsert);
+          const { error: insErr } = await supabase.from('admin_permissions').insert(rowsToInsert);
+          if (insErr && hasServiceRoleKey()) {
+            console.error('[AdminServer] admin_permissions insert error:', insErr.message);
+            return {
+              status: 500,
+              data: { success: false, error: `Database error assigning permissions: ${insErr.message}` }
+            };
+          }
         }
-      } catch (permErr) {
-        console.warn('[AdminServer] admin_permissions update warning:', permErr);
       }
 
-      if (normalizedRole) {
-        try {
-          const { error: roleErr } = await supabase
-            .from('admin_profiles')
-            .update({ role: normalizedRole })
-            .eq('id', tId);
+      if (normalizedRole || trimmedDesignation !== undefined) {
+        const profileUpdate: Record<string, any> = {
+          updated_at: new Date().toISOString()
+        };
+        if (normalizedRole) profileUpdate.role = normalizedRole;
+        if (trimmedDesignation !== undefined) profileUpdate.designation = trimmedDesignation;
 
-          if (roleErr) {
-            console.warn('[AdminServer] admin_profiles role update error:', roleErr.message);
-            // Only fall back to ADMIN if check constraint specifically rejected the operational role
-            if (roleErr.message?.includes('admin_profiles_role_check') || roleErr.code === '23514') {
+        const { data: updatedRows, error: roleErr } = await supabase
+          .from('admin_profiles')
+          .update(profileUpdate)
+          .eq('id', tId)
+          .select('id, role');
+
+        if (roleErr) {
+          console.warn('[AdminServer] admin_profiles update warning:', roleErr.message);
+          // Only fall back to ADMIN if check constraint specifically rejected the operational role
+          if (roleErr.message?.includes('admin_profiles_role_check') || roleErr.code === '23514') {
+            await supabase
+              .from('admin_profiles')
+              .update({ role: 'ADMIN', updated_at: new Date().toISOString() })
+              .eq('id', tId);
+          } else if (roleErr.message?.includes('designation')) {
+            if (normalizedRole) {
               await supabase
                 .from('admin_profiles')
-                .update({ role: 'ADMIN' })
+                .update({ role: normalizedRole, updated_at: new Date().toISOString() })
                 .eq('id', tId);
             }
+          } else if (hasServiceRoleKey()) {
+            return {
+              status: 500,
+              data: { success: false, error: `Database error updating administrator profile: ${roleErr.message}` }
+            };
           }
-        } catch (err: any) {
-          console.warn('[AdminServer] admin_profiles update exception:', err?.message);
+        } else if (hasServiceRoleKey() && (!updatedRows || updatedRows.length === 0)) {
+          return {
+            status: 404,
+            data: {
+              success: false,
+              error: 'Zero rows updated: Administrator profile not found in database.'
+            }
+          };
         }
       }
     }
@@ -1428,6 +1525,11 @@ export async function resetSubAdminPasswordHandler(
   body: { adminId?: string; newPassword?: string; confirmPassword?: string },
   authHeader: string | undefined | null
 ) {
+  const prodCheck = checkProductionCredentials();
+  if (!prodCheck.valid) {
+    return prodCheck.response!;
+  }
+
   const authCheck = await verifySuperAdmin(authHeader);
   if (!authCheck.authorized) {
     return { status: authCheck.status, data: { success: false, error: authCheck.error } };
@@ -1503,6 +1605,11 @@ export async function toggleAdminStatusHandler(
   body: { adminId?: string; active?: boolean },
   authHeader: string | undefined | null
 ) {
+  const prodCheck = checkProductionCredentials();
+  if (!prodCheck.valid) {
+    return prodCheck.response!;
+  }
+
   const authCheck = await verifySuperAdmin(authHeader);
   if (!authCheck.authorized) {
     return { status: authCheck.status, data: { success: false, error: authCheck.error } };
@@ -1533,13 +1640,29 @@ export async function toggleAdminStatusHandler(
 
   try {
     if (isValidUuid(adminId)) {
-      const { error: updateErr } = await supabase
+      const { data: updatedRows, error: updateErr } = await supabase
         .from('admin_profiles')
         .update({ active, updated_at: new Date().toISOString() })
-        .eq('id', adminId);
+        .eq('id', adminId)
+        .select('id, active');
 
-      if (updateErr) {
-        console.warn('[AdminServer] admin_profiles update warning:', updateErr.message);
+      if (updateErr && hasServiceRoleKey()) {
+        return {
+          status: 500,
+          data: {
+            success: false,
+            error: `Database error updating administrator status: ${updateErr.message}`
+          }
+        };
+      }
+      if (hasServiceRoleKey() && (!updatedRows || updatedRows.length === 0)) {
+        return {
+          status: 404,
+          data: {
+            success: false,
+            error: 'Zero rows updated: Administrator profile not found in database.'
+          }
+        };
       }
     }
 
@@ -1605,6 +1728,11 @@ export async function deleteSubAdminHandler(
   body: { adminId?: string },
   authHeader: string | undefined | null
 ) {
+  const prodCheck = checkProductionCredentials();
+  if (!prodCheck.valid) {
+    return prodCheck.response!;
+  }
+
   const authCheck = await verifySuperAdmin(authHeader);
   if (!authCheck.authorized) {
     return { status: authCheck.status, data: { success: false, error: authCheck.error } };
@@ -1628,11 +1756,29 @@ export async function deleteSubAdminHandler(
 
   const supabase = getSupabaseClient(authHeader);
 
-  const { data: targetProfile } = await supabase
-    .from('admin_profiles')
-    .select('id, full_name, role')
-    .eq('id', adminId)
-    .maybeSingle();
+  let targetProfile: any = null;
+  if (isValidUuid(adminId)) {
+    const { data, error: profileErr } = await supabase
+      .from('admin_profiles')
+      .select('id, full_name, role')
+      .eq('id', adminId)
+      .maybeSingle();
+
+    if (profileErr) {
+      return {
+        status: 500,
+        data: { success: false, error: `Database error verifying administrator profile: ${profileErr.message}` }
+      };
+    }
+    targetProfile = data;
+  }
+
+  if (hasServiceRoleKey() && !targetProfile) {
+    return {
+      status: 404,
+      data: { success: false, error: 'Administrator profile not found in database.' }
+    };
+  }
 
   if (targetProfile?.role === 'SUPER_ADMIN') {
     return {
@@ -1813,7 +1959,7 @@ export async function getCurrentUserPermissionsHandler(authHeader: string | unde
   const cleanEmail = (auth.user.email || '').toLowerCase().trim();
 
   // Known Super Admin explicit bypass
-  if (cleanEmail === 'superadmin@atigergroups.com') {
+  if (cleanEmail === 'superadmin@atigergroups.com' || cleanEmail === 'atigersgroupswebsite@gmail.com') {
     return {
       status: 200,
       data: {
@@ -2112,7 +2258,7 @@ export async function adminLoginHandler(body: { email?: string; password?: strin
   const localStore = getLocalRbacStore();
 
   // Support Super Admin authentication for local development and fallback
-  if (normalizedEmail === 'superadmin@atigergroups.com') {
+  if (normalizedEmail === 'superadmin@atigergroups.com' || normalizedEmail === 'atigersgroupswebsite@gmail.com') {
     const defaultSuperHash = hashPassword('TigerSecurePass@2026!');
     const expectedHash = localStore.userPasswordHashes?.[normalizedEmail] || defaultSuperHash;
     const pwdHash = hashPassword(password);

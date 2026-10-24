@@ -21,11 +21,16 @@ function isValidKey(val: string | undefined): boolean {
   return true;
 }
 
-export function hasServiceRoleKey(): boolean {
-  return (
-    isValidKey(process.env.SUPABASE_SERVICE_ROLE_KEY) ||
-    isValidKey(process.env.VITE_SUPABASE_SERVICE_ROLE_KEY)
+export function isProductionServer(): boolean {
+  return Boolean(
+    process.env.VERCEL === '1' ||
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.NODE_ENV === 'production'
   );
+}
+
+export function hasServiceRoleKey(): boolean {
+  return isValidKey(process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
 export function getSupabaseServer(): any {
@@ -37,10 +42,10 @@ export function getSupabaseServer(): any {
 
     let supabaseServiceKey = "";
 
+    // Server-side privileged operations strictly require SUPABASE_SERVICE_ROLE_KEY.
+    // VITE_ variables are deliberately avoided here to prevent secret key leakage into browser builds.
     if (isValidKey(process.env.SUPABASE_SERVICE_ROLE_KEY)) {
       supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!.trim().replace(/^["']|["']$/g, "");
-    } else if (isValidKey(process.env.VITE_SUPABASE_SERVICE_ROLE_KEY)) {
-      supabaseServiceKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY!.trim().replace(/^["']|["']$/g, "");
     } else if (isValidKey(process.env.SUPABASE_ANON_KEY)) {
       supabaseServiceKey = process.env.SUPABASE_ANON_KEY!.trim().replace(/^["']|["']$/g, "");
     } else if (isValidKey(process.env.VITE_SUPABASE_ANON_KEY)) {

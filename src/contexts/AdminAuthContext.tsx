@@ -259,9 +259,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (resolvedProfile.role === 'SUPER_ADMIN') {
         userPermissions = ALL_PERMISSIONS.map((p) => p.key);
       } else {
-        // If userPermissions still empty and server check did not return an authoritative array, check cached permissions
+        // If userPermissions still empty and server check did not return an authoritative array, check user-specific cached permissions
         if (!hasServerPermissions && userPermissions.length === 0 && typeof window !== 'undefined') {
-          const cached = localStorage.getItem(`tiger_admin_permissions_${currentUser.id}`) || localStorage.getItem('tiger_admin_permissions');
+          const cached = localStorage.getItem(`tiger_admin_permissions_${currentUser.id}`);
           if (cached) {
             try {
               const parsed = JSON.parse(cached);
@@ -301,10 +301,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       }
 
-      // Persist latest verified permissions to client storage cache for resilient offline/reload access
+      // Persist latest verified permissions to user-specific client storage cache for resilient offline/reload access
       if (typeof window !== 'undefined') {
         localStorage.setItem(`tiger_admin_permissions_${currentUser.id}`, JSON.stringify(userPermissions));
-        localStorage.setItem('tiger_admin_permissions', JSON.stringify(userPermissions));
       }
 
       setProfile(resolvedProfile);
@@ -522,7 +521,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 localStorage.setItem('tiger_admin_token', localSession.access_token);
                 localStorage.setItem('tiger_admin_user', JSON.stringify(localUser));
                 localStorage.setItem('tiger_admin_profile', JSON.stringify(localProfile));
-                localStorage.setItem('tiger_admin_permissions', JSON.stringify(localPermissions));
+                localStorage.setItem(`tiger_admin_permissions_${localUser.id}`, JSON.stringify(localPermissions));
               }
 
               setUser(localUser);

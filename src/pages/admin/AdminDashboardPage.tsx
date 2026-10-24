@@ -33,11 +33,7 @@ import {
 
 export const AdminDashboardPage: React.FC = () => {
   const { isJoiningOperator, role } = useAdminAuth();
-
-  // Operators are strictly blocked from dashboard and redirected to their authorized joining workflow
-  if (isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR') {
-    return <Navigate to={ADMIN_ROUTES.regularJoiningList} replace />;
-  }
+  const { notifications } = useAdminNotifications();
 
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -58,6 +54,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [recentApplications, setRecentApplications] = useState<ApplicationRow[]>([]);
 
   const fetchDashboardData = useCallback(async () => {
+    if (isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR') return;
     setError(null);
     try {
       const [
@@ -122,24 +119,30 @@ export const AdminDashboardPage: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isJoiningOperator, role]);
 
   useEffect(() => {
+    if (isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR') return;
     fetchDashboardData();
-  }, [fetchDashboardData]);
+  }, [fetchDashboardData, isJoiningOperator, role]);
 
   // Automatically refresh live metrics & recent records when a realtime notification event arrives
-  const { notifications } = useAdminNotifications();
   useEffect(() => {
+    if (isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR') return;
     if (notifications.length > 0) {
       fetchDashboardData();
     }
-  }, [notifications.length, fetchDashboardData]);
+  }, [notifications.length, fetchDashboardData, isJoiningOperator, role]);
 
   const handleManualRefresh = () => {
     setRefreshing(true);
     fetchDashboardData();
   };
+
+  // Operators are strictly blocked from dashboard and redirected to their authorized joining workflow
+  if (isJoiningOperator || role === 'REGULAR_JOINING_OPERATOR') {
+    return <Navigate to={ADMIN_ROUTES.regularJoiningList} replace />;
+  }
 
   return (
     <div>
